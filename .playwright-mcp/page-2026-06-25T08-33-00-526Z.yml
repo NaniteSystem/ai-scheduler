@@ -1,0 +1,107 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - generic [ref=e10]: Scheduler
+  - generic [ref=e112]:
+    - generic [ref=e113]:
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - heading "Schedule" [level=1] [ref=e116]
+          - generic [ref=e117]: Thursday, 25 June 2026
+        - generic [ref=e118]:
+          - button [ref=e119]:
+            - img [ref=e120]
+          - button "Today" [ref=e122]
+          - button [ref=e123]:
+            - img [ref=e124]
+      - generic [ref=e126]:
+        - generic [ref=e127]:
+          - button "Day" [ref=e128]
+          - button "Week" [ref=e129]
+          - button "Month" [ref=e130]
+          - button "Year" [ref=e131]
+        - button "New session" [ref=e132]:
+          - img [ref=e133]
+          - text: New session
+    - generic [ref=e134]:
+      - generic [ref=e135]:
+        - generic [ref=e136]:
+          - button "M 22" [ref=e137]:
+            - generic [ref=e138]: M
+            - generic [ref=e139]: "22"
+          - button "T 23" [ref=e140]:
+            - generic [ref=e141]: T
+            - generic [ref=e142]: "23"
+          - button "W 24" [ref=e143]:
+            - generic [ref=e144]: W
+            - generic [ref=e145]: "24"
+          - button "T 25" [ref=e146]:
+            - generic [ref=e147]: T
+            - generic [ref=e148]: "25"
+          - button "F 26" [ref=e149]:
+            - generic [ref=e150]: F
+            - generic [ref=e151]: "26"
+          - button "S 27" [ref=e152]:
+            - generic [ref=e153]: S
+            - generic [ref=e154]: "27"
+          - button "S 28" [ref=e155]:
+            - generic [ref=e156]: S
+            - generic [ref=e157]: "28"
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e160]: 07:00
+            - generic [ref=e162]: 09:00
+            - generic [ref=e164]: 11:00
+            - generic [ref=e166]: 13:00
+            - generic [ref=e168]: 15:00
+            - generic [ref=e170]: 17:00
+            - generic [ref=e172]: 19:00
+            - generic [ref=e174]: 21:00
+          - generic "Double-click to create a session" [ref=e176]:
+            - generic [ref=e210] [cursor=pointer]:
+              - generic [ref=e211]:
+                - generic [ref=e212]: 🇯🇵
+                - text: Kanji
+              - generic [ref=e213]: 09:00 · 1.5 h
+            - generic [ref=e216] [cursor=pointer]:
+              - generic [ref=e217]: 🇯🇵
+              - text: Grammar
+            - generic [ref=e219] [cursor=pointer]:
+              - generic [ref=e220]:
+                - generic [ref=e221]: 🇯🇵
+                - text: Drag me
+              - generic [ref=e222]: 14:15 · 2 h
+            - generic:
+              - generic:
+                - generic: 17:33
+      - generic [ref=e223]:
+        - generic [ref=e224]:
+          - generic [ref=e225]:
+            - heading "Day budget" [level=3] [ref=e226]:
+              - img [ref=e227]
+              - text: Day budget
+            - generic [ref=e230]: 3.5h
+          - generic [ref=e231]:
+            - generic [ref=e232]: 3 sessions
+            - generic [ref=e233]: 1.5h done
+          - generic [ref=e238]:
+            - generic [ref=e239]:
+              - generic [ref=e240]: 🇯🇵
+              - text: JLPT N2
+            - generic [ref=e241]: 3.5h · 3
+        - generic [ref=e244]: Double-click the grid to create a session.
+  - navigation [ref=e89]:
+    - button "Home" [ref=e90]:
+      - img [ref=e91]
+      - generic [ref=e94]: Home
+    - button "Calendar" [active] [ref=e96]:
+      - img [ref=e97]
+      - generic [ref=e99]: Calendar
+    - button "Quick Capture → GTD" [ref=e100]:
+      - img [ref=e101]
+    - button "Overview" [ref=e102]:
+      - img [ref=e103]
+      - generic [ref=e105]: Overview
+    - button "Profile" [ref=e106]:
+      - img [ref=e107]
+      - generic [ref=e110]: Profile

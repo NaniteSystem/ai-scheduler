@@ -1,0 +1,28 @@
+- generic [ref=e3]:
+  - button [ref=e30]:
+    - img [ref=e31]
+  - generic [ref=e35]:
+    - paragraph [ref=e36]: Pick all that apply
+    - heading "What do you want to focus on?" [level=2] [ref=e37]
+    - generic [ref=e38]:
+      - button "⚡ Beat procrastination" [ref=e39]:
+        - generic [ref=e40]: ⚡
+        - generic [ref=e41]: Beat procrastination
+      - button "🗂️ Organize my day" [ref=e43]:
+        - generic [ref=e44]: 🗂️
+        - generic [ref=e45]: Organize my day
+      - button "🔁 Build daily habits" [ref=e47]:
+        - generic [ref=e48]: 🔁
+        - generic [ref=e49]: Build daily habits
+      - button "💪 More energy" [ref=e51]:
+        - generic [ref=e52]: 💪
+        - generic [ref=e53]: More energy
+      - button "🚀 Reach my goals" [ref=e55]:
+        - generic [ref=e56]: 🚀
+        - generic [ref=e57]: Reach my goals
+      - button "🌿 A calmer mind" [ref=e59]:
+        - generic [ref=e60]: 🌿
+        - generic [ref=e61]: A calmer mind
+  - button "Continue" [disabled] [ref=e63]:
+    - text: Continue
+    - img [ref=e27]

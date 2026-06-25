@@ -1,0 +1,55 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: Thursday, 25 June
+      - generic [ref=e8]: "2026"
+    - button "NEW GOAL" [ref=e10]:
+      - img [ref=e11]
+      - text: NEW GOAL
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Hi, Alex!
+          - generic [ref=e18]: Thursday, 25 June
+        - generic [ref=e19]:
+          - button [ref=e20]:
+            - img [ref=e21]
+          - generic [ref=e24]: A
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Your daily progress
+          - generic [ref=e28]: 0%
+        - generic [ref=e30]: 0 of 0 done today
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - heading "Today · scheduled" [level=3] [ref=e33]:
+          - img [ref=e34]
+          - text: Today · scheduled
+        - button "Expand Schedule ›" [ref=e37]
+      - generic [ref=e39]: Nothing scheduled by time today.
+    - generic [ref=e40]:
+      - heading "Today · to-do" [level=3] [ref=e41]:
+        - img [ref=e42]
+        - text: Today · to-do
+      - generic [ref=e46]: No to-dos for today.
+    - generic [ref=e47]:
+      - heading "Tomorrow" [level=3] [ref=e48]:
+        - img [ref=e49]
+        - text: Tomorrow
+      - generic [ref=e52]: Nothing planned for tomorrow.
+  - navigation [ref=e54]:
+    - button "Home" [ref=e55]:
+      - img [ref=e56]
+      - generic [ref=e59]: Home
+    - button "Calendar" [ref=e61]:
+      - img [ref=e62]
+      - generic [ref=e64]: Calendar
+    - button "Quick Capture → GTD" [ref=e65]:
+      - img [ref=e66]
+    - button "Overview" [ref=e67]:
+      - img [ref=e68]
+      - generic [ref=e70]: Overview
+    - button "Profile" [ref=e71]:
+      - img [ref=e72]
+      - generic [ref=e75]: Profile

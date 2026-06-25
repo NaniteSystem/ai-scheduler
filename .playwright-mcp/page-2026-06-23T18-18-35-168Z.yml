@@ -1,0 +1,616 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - heading "🗂️ Scheduler — карта проекта" [level=1] [ref=e4]
+    - paragraph [ref=e5]: "Полный обзор модулей, функций и кнопок приложения для удобства разработки: что уже есть, что частично, что планируется. Эта страница не часть приложения — открывается отдельно в браузере."
+    - generic [ref=e6]: "Стек: React + TypeScript + Vite + Zustand + Tailwind · локальное хранилище (localStorage, без бэкенда) · Capacitor → Android APK · i18n: EN / RU / JA · Обновлено: 2026-06-24"
+  - generic [ref=e7]:
+    - generic [ref=e8]: Готово
+    - generic [ref=e10]: Частично / можно улучшить
+    - generic [ref=e12]: Запланировано / добавить
+    - generic [ref=e14]: Нужен бэкенд / решение
+  - generic [ref=e16]:
+    - generic [ref=e17] [cursor=pointer]: Всё
+    - generic [ref=e18] [cursor=pointer]: Готово
+    - generic [ref=e19] [cursor=pointer]: Частично
+    - generic [ref=e20] [cursor=pointer]: Добавить
+    - generic [ref=e21] [cursor=pointer]: Заблокировано
+    - textbox "Поиск по функциям…" [ref=e22]
+  - navigation [ref=e23]:
+    - link "1. Платформа и оболочка 8/11" [ref=e24] [cursor=pointer]:
+      - /url: "#m-core"
+      - generic [ref=e25]: 1. Платформа и оболочка
+      - generic [ref=e26]: 8/11
+    - link "2. Онбординг 2/4" [ref=e27] [cursor=pointer]:
+      - /url: "#m-onb"
+      - generic [ref=e28]: 2. Онбординг
+      - generic [ref=e29]: 2/4
+    - link "3. Дашборд (Home) 5/6" [ref=e30] [cursor=pointer]:
+      - /url: "#m-dash"
+      - generic [ref=e31]: 3. Дашборд (Home)
+      - generic [ref=e32]: 5/6
+    - link "4. Цели 7/8" [ref=e33] [cursor=pointer]:
+      - /url: "#m-goals"
+      - generic [ref=e34]: 4. Цели
+      - generic [ref=e35]: 7/8
+    - link "5. Расписание 8/8" [ref=e36] [cursor=pointer]:
+      - /url: "#m-sched"
+      - generic [ref=e37]: 5. Расписание
+      - generic [ref=e38]: 8/8
+    - link "6. GTD Входящие 7/7" [ref=e39] [cursor=pointer]:
+      - /url: "#m-gtd"
+      - generic [ref=e40]: 6. GTD Входящие
+      - generic [ref=e41]: 7/7
+    - link "7. Привычки 6/7" [ref=e42] [cursor=pointer]:
+      - /url: "#m-habits"
+      - generic [ref=e43]: 7. Привычки
+      - generic [ref=e44]: 6/7
+    - link "8. Прогресс 2/3" [ref=e45] [cursor=pointer]:
+      - /url: "#m-prog"
+      - generic [ref=e46]: 8. Прогресс
+      - generic [ref=e47]: 2/3
+    - link "9. AI День-архитектор 3/5" [ref=e48] [cursor=pointer]:
+      - /url: "#m-ai"
+      - generic [ref=e49]: 9. AI День-архитектор
+      - generic [ref=e50]: 3/5
+    - link "10. История · Настройки · Уведомления 8/9" [ref=e51] [cursor=pointer]:
+      - /url: "#m-rest"
+      - generic [ref=e52]: 10. История · Настройки · Уведомления
+      - generic [ref=e53]: 8/9
+    - link "11. Бэклог / что добавить дальше 0/8" [ref=e54] [cursor=pointer]:
+      - /url: "#m-backlog"
+      - generic [ref=e55]: 11. Бэклог / что добавить дальше
+      - generic [ref=e56]: 0/8
+  - generic [ref=e57]:
+    - generic [ref=e58] [cursor=pointer]:
+      - generic [ref=e59]: ⚙️
+      - generic [ref=e60]:
+        - heading "1. Платформа и оболочка" [level=2] [ref=e61]
+        - generic [ref=e62]: Навигация, хранение, локализация, оформление
+      - generic [ref=e63]: ▾
+    - table [ref=e65]:
+      - rowgroup [ref=e66]:
+        - row "Статус Функция / элемент Описание" [ref=e67]:
+          - columnheader "Статус" [ref=e68]
+          - columnheader "Функция / элемент" [ref=e69]
+          - columnheader "Описание" [ref=e70]
+        - row "Готово Боковая навигация Дашборд, Цели, Расписание, GTD, Привычки, Прогресс, AI-архитектор, История, Настройки. На мобильном — выезжающий drawer + гамбургер." [ref=e71]:
+          - cell "Готово" [ref=e72]:
+            - generic [ref=e73]: Готово
+          - cell "Боковая навигация" [ref=e74]
+          - cell "Дашборд, Цели, Расписание, GTD, Привычки, Прогресс, AI-архитектор, История, Настройки. На мобильном — выезжающий drawer + гамбургер." [ref=e75]
+        - 'row "Готово Нижняя навигация (моб.) 5 пунктов: Home, Goals, Schedule, GTD, AI." [ref=e76]':
+          - cell "Готово" [ref=e77]:
+            - generic [ref=e78]: Готово
+          - cell "Нижняя навигация (моб.)" [ref=e79]
+          - 'cell "5 пунктов: Home, Goals, Schedule, GTD, AI." [ref=e80]'
+        - row "Готово Локальное хранилище Zustand + persist (ai-scheduler-store), version 2 + migrate. Всё хранится на устройстве." [ref=e81]:
+          - cell "Готово" [ref=e82]:
+            - generic [ref=e83]: Готово
+          - cell "Локальное хранилище" [ref=e84]
+          - cell "Zustand + persist (ai-scheduler-store), version 2 + migrate. Всё хранится на устройстве." [ref=e85]:
+            - text: Zustand + persist (
+            - code [ref=e86]: ai-scheduler-store
+            - text: ), version 2 + migrate. Всё хранится на устройстве.
+        - row "Готово Локализация EN / RU / JA ~707 ключей, полный паритет; переключение в Настройках." [ref=e87]:
+          - cell "Готово" [ref=e88]:
+            - generic [ref=e89]: Готово
+          - cell "Локализация EN / RU / JA" [ref=e90]
+          - cell "~707 ключей, полный паритет; переключение в Настройках." [ref=e91]
+        - row "Готово Плотность интерфейса Comfortable / Compact (класс density-compact на корне)." [ref=e92]:
+          - cell "Готово" [ref=e93]:
+            - generic [ref=e94]: Готово
+          - cell "Плотность интерфейса" [ref=e95]
+          - cell "Comfortable / Compact (класс density-compact на корне)." [ref=e96]:
+            - text: Comfortable / Compact (класс
+            - code [ref=e97]: density-compact
+            - text: на корне).
+        - row "Готово Глобальные модалки Кастомный ConfirmModal (askConfirm), Drawer, TimePicker, DatePicker, IconPicker — без нативных alert/confirm." [ref=e98]:
+          - cell "Готово" [ref=e99]:
+            - generic [ref=e100]: Готово
+          - cell "Глобальные модалки" [ref=e101]
+          - cell "Кастомный ConfirmModal (askConfirm), Drawer, TimePicker, DatePicker, IconPicker — без нативных alert/confirm." [ref=e102]:
+            - text: Кастомный
+            - code [ref=e103]: ConfirmModal
+            - text: (askConfirm),
+            - code [ref=e104]: Drawer
+            - text: ","
+            - code [ref=e105]: TimePicker
+            - text: ","
+            - code [ref=e106]: DatePicker
+            - text: ","
+            - code [ref=e107]: IconPicker
+            - text: — без нативных alert/confirm.
+        - row "Готово Быстрый захват (FAB) Плавающая кнопка → быстрое добавление задачи в GTD. Прячется при открытых модалках." [ref=e108]:
+          - cell "Готово" [ref=e109]:
+            - generic [ref=e110]: Готово
+          - cell "Быстрый захват (FAB)" [ref=e111]
+          - cell "Плавающая кнопка → быстрое добавление задачи в GTD. Прячется при открытых модалках." [ref=e112]
+        - row "Готово Android APK Capacitor, debug-сборка (Scheduler-debug.apk). Иконка есть." [ref=e113]:
+          - cell "Готово" [ref=e114]:
+            - generic [ref=e115]: Готово
+          - cell "Android APK" [ref=e116]
+          - cell "Capacitor, debug-сборка (Scheduler-debug.apk). Иконка есть." [ref=e117]:
+            - text: Capacitor, debug-сборка (
+            - code [ref=e118]: Scheduler-debug.apk
+            - text: ). Иконка есть.
+        - row "Добавить Релизная подпись APK keystore + signingConfig + assembleRelease — нужно для Google Play." [ref=e119]:
+          - cell "Добавить" [ref=e120]:
+            - generic [ref=e121]: Добавить
+          - cell "Релизная подпись APK" [ref=e122]
+          - cell "keystore + signingConfig + assembleRelease — нужно для Google Play." [ref=e123]:
+            - text: keystore + signingConfig +
+            - code [ref=e124]: assembleRelease
+            - text: — нужно для Google Play.
+        - row "Добавить Сплэш-экран assets/splash.png для APK (иконка уже сделана)." [ref=e125]:
+          - cell "Добавить" [ref=e126]:
+            - generic [ref=e127]: Добавить
+          - cell "Сплэш-экран" [ref=e128]
+          - cell "assets/splash.png для APK (иконка уже сделана)." [ref=e129]:
+            - code [ref=e130]: assets/splash.png
+            - text: для APK (иконка уже сделана).
+        - row "Заблок. Синхронизация между устройствами Невозможна без бэкенда (auth + сервер + БД). Отдельный проект." [ref=e131]:
+          - cell "Заблок." [ref=e132]:
+            - generic [ref=e133]: Заблок.
+          - cell "Синхронизация между устройствами" [ref=e134]
+          - cell "Невозможна без бэкенда (auth + сервер + БД). Отдельный проект." [ref=e135]
+  - generic [ref=e136]:
+    - generic [ref=e137] [cursor=pointer]:
+      - generic [ref=e138]: 👋
+      - generic [ref=e139]:
+        - heading "2. Онбординг" [level=2] [ref=e140]
+        - generic [ref=e141]: components/Onboarding.tsx
+      - generic [ref=e142]: ▾
+    - table [ref=e144]:
+      - rowgroup [ref=e145]:
+        - row "Статус Функция / элемент Описание" [ref=e146]:
+          - columnheader "Статус" [ref=e147]
+          - columnheader "Функция / элемент" [ref=e148]
+          - columnheader "Описание" [ref=e149]
+        - row "Готово Опросник из 6 шагов Имя → фокус (мульти) → пик энергии → сон → что мешает (мульти) → финал. Прогресс-бар, кнопка «Назад», авто-переход для одиночного выбора." [ref=e150]:
+          - cell "Готово" [ref=e151]:
+            - generic [ref=e152]: Готово
+          - cell "Опросник из 6 шагов" [ref=e153]
+          - cell "Имя → фокус (мульти) → пик энергии → сон → что мешает (мульти) → финал. Прогресс-бар, кнопка «Назад», авто-переход для одиночного выбора." [ref=e154]
+        - row "Готово Применение ответов Пик → productivityPeak; сон → wakeTime/sleepTime; фокус/трудности → userProfile." [ref=e155]:
+          - cell "Готово" [ref=e156]:
+            - generic [ref=e157]: Готово
+          - cell "Применение ответов" [ref=e158]
+          - cell "Пик → productivityPeak; сон → wakeTime/sleepTime; фокус/трудности → userProfile." [ref=e159]:
+            - text: Пик →
+            - code [ref=e160]: productivityPeak
+            - text: ; сон →
+            - code [ref=e161]: wakeTime
+            - text: /
+            - code [ref=e162]: sleepTime
+            - text: ; фокус/трудности →
+            - code [ref=e163]: userProfile
+            - text: .
+        - row "Добавить Доп. вопросы Возраст, «откуда узнали», интро-карусель «до/после» (есть в референсах) — по желанию." [ref=e164]:
+          - cell "Добавить" [ref=e165]:
+            - generic [ref=e166]: Добавить
+          - cell "Доп. вопросы" [ref=e167]
+          - cell "Возраст, «откуда узнали», интро-карусель «до/после» (есть в референсах) — по желанию." [ref=e168]
+        - row "Добавить Использовать профиль Подбирать стартовые цели/привычки по ответам userProfile (пока только сохраняется)." [ref=e169]:
+          - cell "Добавить" [ref=e170]:
+            - generic [ref=e171]: Добавить
+          - cell "Использовать профиль" [ref=e172]
+          - cell "Подбирать стартовые цели/привычки по ответам userProfile (пока только сохраняется)." [ref=e173]:
+            - text: Подбирать стартовые цели/привычки по ответам
+            - code [ref=e174]: userProfile
+            - text: (пока только сохраняется).
+  - generic [ref=e175]:
+    - generic [ref=e176] [cursor=pointer]:
+      - generic [ref=e177]: 🏠
+      - generic [ref=e178]:
+        - heading "3. Дашборд (Home)" [level=2] [ref=e179]
+        - generic [ref=e180]: App.tsx — вид «dashboard»
+      - generic [ref=e181]: ▾
+    - table [ref=e183]:
+      - rowgroup [ref=e184]:
+        - row "Статус Функция / элемент Описание" [ref=e185]:
+          - columnheader "Статус" [ref=e186]
+          - columnheader "Функция / элемент" [ref=e187]
+          - columnheader "Описание" [ref=e188]
+        - row "Готово Сегодня · Расписание Таймлайн сессий на сегодня; пустое состояние «ничего по времени»." [ref=e189]:
+          - cell "Готово" [ref=e190]:
+            - generic [ref=e191]: Готово
+          - cell "Сегодня · Расписание" [ref=e192]
+          - cell "Таймлайн сессий на сегодня; пустое состояние «ничего по времени»." [ref=e193]
+        - row "Готово Сегодня · To-do GTD-задачи в фокусе на сегодня." [ref=e194]:
+          - cell "Готово" [ref=e195]:
+            - generic [ref=e196]: Готово
+          - cell "Сегодня · To-do" [ref=e197]
+          - cell "GTD-задачи в фокусе на сегодня." [ref=e198]
+        - row "Готово Сегодня · Привычки Due-привычки с быстрым выполнением (рендерится при наличии)." [ref=e199]:
+          - cell "Готово" [ref=e200]:
+            - generic [ref=e201]: Готово
+          - cell "Сегодня · Привычки" [ref=e202]
+          - cell "Due-привычки с быстрым выполнением (рендерится при наличии)." [ref=e203]
+        - row "Готово Завтра Запланированное на завтра." [ref=e204]:
+          - cell "Готово" [ref=e205]:
+            - generic [ref=e206]: Готово
+          - cell "Завтра" [ref=e207]
+          - cell "Запланированное на завтра." [ref=e208]
+        - row "Готово Кнопка «Expand Schedule» Переход в расписание." [ref=e209]:
+          - cell "Готово" [ref=e210]:
+            - generic [ref=e211]: Готово
+          - cell "Кнопка «Expand Schedule»" [ref=e212]
+          - cell "Переход в расписание." [ref=e213]
+        - row "Добавить Стат-панели / Priority Focus Были убраны при редизайне Home — перенести в Прогресс/Дашборд позже (по решению)." [ref=e214]:
+          - cell "Добавить" [ref=e215]:
+            - generic [ref=e216]: Добавить
+          - cell "Стат-панели / Priority Focus" [ref=e217]
+          - cell "Были убраны при редизайне Home — перенести в Прогресс/Дашборд позже (по решению)." [ref=e218]
+  - generic [ref=e219]:
+    - generic [ref=e220] [cursor=pointer]:
+      - generic [ref=e221]: 🎯
+      - generic [ref=e222]:
+        - heading "4. Цели" [level=2] [ref=e223]
+        - generic [ref=e224]: App.tsx (список) + GoalDetailView.tsx
+      - generic [ref=e225]: ▾
+    - table [ref=e227]:
+      - rowgroup [ref=e228]:
+        - row "Статус Функция / элемент Описание" [ref=e229]:
+          - columnheader "Статус" [ref=e230]
+          - columnheader "Функция / элемент" [ref=e231]
+          - columnheader "Описание" [ref=e232]
+        - row "Готово Список целей Активные + секция «Завершённые»; прогресс-кольцо, серия, часы, инсайт. Кнопка «New Goal»." [ref=e233]:
+          - cell "Готово" [ref=e234]:
+            - generic [ref=e235]: Готово
+          - cell "Список целей" [ref=e236]
+          - cell "Активные + секция «Завершённые»; прогресс-кольцо, серия, часы, инсайт. Кнопка «New Goal»." [ref=e237]
+        - 'row "Готово Мастер создания цели GoalWizardModal: категория, название, AI-приветствие." [ref=e238]':
+          - cell "Готово" [ref=e239]:
+            - generic [ref=e240]: Готово
+          - cell "Мастер создания цели" [ref=e241]
+          - 'cell "GoalWizardModal: категория, название, AI-приветствие." [ref=e242]'
+        - row "Готово Деталь — таб Overview Кольцо прогресса, часы/сессии/completion rate, heatmap активности, milestones-сводка." [ref=e243]:
+          - cell "Готово" [ref=e244]:
+            - generic [ref=e245]: Готово
+          - cell "Деталь — таб Overview" [ref=e246]
+          - cell "Кольцо прогресса, часы/сессии/completion rate, heatmap активности, milestones-сводка." [ref=e247]
+        - row "Готово Деталь — таб Sessions Сессии цели + добавление бэклог-сессии (без даты)." [ref=e248]:
+          - cell "Готово" [ref=e249]:
+            - generic [ref=e250]: Готово
+          - cell "Деталь — таб Sessions" [ref=e251]
+          - cell "Сессии цели + добавление бэклог-сессии (без даты)." [ref=e252]
+        - 'row "Готово Деталь — таб Roadmap Milestones: добавить / отметить / удалить (редактируемые)." [ref=e253]':
+          - cell "Готово" [ref=e254]:
+            - generic [ref=e255]: Готово
+          - cell "Деталь — таб Roadmap" [ref=e256]
+          - 'cell "Milestones: добавить / отметить / удалить (редактируемые)." [ref=e257]'
+        - row "Готово Деталь — таб AI Insights Динамический инсайт (goalInsight) из реальных данных + карточки completion/avg/energy/pace." [ref=e258]:
+          - cell "Готово" [ref=e259]:
+            - generic [ref=e260]: Готово
+          - cell "Деталь — таб AI Insights" [ref=e261]
+          - cell "Динамический инсайт (goalInsight) из реальных данных + карточки completion/avg/energy/pace." [ref=e262]:
+            - text: Динамический инсайт (
+            - code [ref=e263]: goalInsight
+            - text: ) из реальных данных + карточки completion/avg/energy/pace.
+        - 'row "Готово Кнопки: Edit / Complete / Next Session Редактирование цели, завершение (успех/неудача), запуск сессии." [ref=e264]':
+          - cell "Готово" [ref=e265]:
+            - generic [ref=e266]: Готово
+          - 'cell "Кнопки: Edit / Complete / Next Session" [ref=e267]'
+          - cell "Редактирование цели, завершение (успех/неудача), запуск сессии." [ref=e268]
+        - row "Частично Внутренняя логика целей Прогресс считается из сессий; связь milestone↔прогресс и авто-обновление целевых часов можно углубить." [ref=e269]:
+          - cell "Частично" [ref=e270]:
+            - generic [ref=e271]: Частично
+          - cell "Внутренняя логика целей" [ref=e272]
+          - cell "Прогресс считается из сессий; связь milestone↔прогресс и авто-обновление целевых часов можно углубить." [ref=e273]
+  - generic [ref=e274]:
+    - generic [ref=e275] [cursor=pointer]:
+      - generic [ref=e276]: 📅
+      - generic [ref=e277]:
+        - heading "5. Расписание" [level=2] [ref=e278]
+        - generic [ref=e279]: ScheduleView.tsx
+      - generic [ref=e280]: ▾
+    - table [ref=e282]:
+      - rowgroup [ref=e283]:
+        - row "Статус Функция / элемент Описание" [ref=e284]:
+          - columnheader "Статус" [ref=e285]
+          - columnheader "Функция / элемент" [ref=e286]
+          - columnheader "Описание" [ref=e287]
+        - 'row "Готово Виды: День / Неделя / Месяц / Год Переключатель + навигация ‹ Сегодня ›." [ref=e288]':
+          - cell "Готово" [ref=e289]:
+            - generic [ref=e290]: Готово
+          - 'cell "Виды: День / Неделя / Месяц / Год" [ref=e291]'
+          - cell "Переключатель + навигация ‹ Сегодня ›." [ref=e292]
+        - row "Готово Неделя на мобильном ~3 дня одновременно + горизонтальный скролл; на десктопе все 7. Крупные ячейки." [ref=e293]:
+          - cell "Готово" [ref=e294]:
+            - generic [ref=e295]: Готово
+          - cell "Неделя на мобильном" [ref=e296]
+          - cell "~3 дня одновременно + горизонтальный скролл; на десктопе все 7. Крупные ячейки." [ref=e297]
+        - row "Готово Создание сессии Название (+автоподсказки), цвет, иконка, весь день, начало/конец, несколько дней, повтор, оповещение, место/URL/заметка." [ref=e298]:
+          - cell "Готово" [ref=e299]:
+            - generic [ref=e300]: Готово
+          - cell "Создание сессии" [ref=e301]
+          - cell "Название (+автоподсказки), цвет, иконка, весь день, начало/конец, несколько дней, повтор, оповещение, место/URL/заметка." [ref=e302]
+        - row "Готово Редактирование сессии Любая сессия → карточка → «Edit» → форма в режиме правки (обновление на месте)." [ref=e303]:
+          - cell "Готово" [ref=e304]:
+            - generic [ref=e305]: Готово
+          - cell "Редактирование сессии" [ref=e306]
+          - cell "Любая сессия → карточка → «Edit» → форма в режиме правки (обновление на месте)." [ref=e307]
+        - row "Готово Перенос / ресайз Drag-перенос; ресайз длительности (на мобильном отключён, чтобы не тянулось случайно)." [ref=e308]:
+          - cell "Готово" [ref=e309]:
+            - generic [ref=e310]: Готово
+          - cell "Перенос / ресайз" [ref=e311]
+          - cell "Drag-перенос; ресайз длительности (на мобильном отключён, чтобы не тянулось случайно)." [ref=e312]
+        - 'row "Готово Длительность в часах fmtDur: «1,5 ч», «1 ч 15 мин», «45 мин»." [ref=e313]':
+          - cell "Готово" [ref=e314]:
+            - generic [ref=e315]: Готово
+          - cell "Длительность в часах" [ref=e316]
+          - 'cell "fmtDur: «1,5 ч», «1 ч 15 мин», «45 мин»." [ref=e317]':
+            - code [ref=e318]: fmtDur
+            - text: ": «1,5 ч», «1 ч 15 мин», «45 мин»."
+        - row "Готово Бюджет недели Карточка → разбивка часов по задачам (Неделя/Месяц)." [ref=e319]:
+          - cell "Готово" [ref=e320]:
+            - generic [ref=e321]: Готово
+          - cell "Бюджет недели" [ref=e322]
+          - cell "Карточка → разбивка часов по задачам (Неделя/Месяц)." [ref=e323]
+        - row "Готово Выполнить / вернуть / удалить сессию В карточке сессии; удаление серии целиком." [ref=e324]:
+          - cell "Готово" [ref=e325]:
+            - generic [ref=e326]: Готово
+          - cell "Выполнить / вернуть / удалить сессию" [ref=e327]
+          - cell "В карточке сессии; удаление серии целиком." [ref=e328]
+  - generic [ref=e329]:
+    - generic [ref=e330] [cursor=pointer]:
+      - generic [ref=e331]: 📥
+      - generic [ref=e332]:
+        - heading "6. GTD Входящие" [level=2] [ref=e333]
+        - generic [ref=e334]: GTDView.tsx
+      - generic [ref=e335]: ▾
+    - table [ref=e337]:
+      - rowgroup [ref=e338]:
+        - row "Статус Функция / элемент Описание" [ref=e339]:
+          - columnheader "Статус" [ref=e340]
+          - columnheader "Функция / элемент" [ref=e341]
+          - columnheader "Описание" [ref=e342]
+        - 'row "Готово Захват задач «Capture anything…» + парсинг тегов (p1, @phone, #work, 30m)." [ref=e343]':
+          - cell "Готово" [ref=e344]:
+            - generic [ref=e345]: Готово
+          - cell "Захват задач" [ref=e346]
+          - 'cell "«Capture anything…» + парсинг тегов (p1, @phone, #work, 30m)." [ref=e347]'
+        - row "Готово Фильтры Today, Inbox, Next Actions, Projects, Waiting, Scheduled, Someday, Reference. Контексты, поиск." [ref=e348]:
+          - cell "Готово" [ref=e349]:
+            - generic [ref=e350]: Готово
+          - cell "Фильтры" [ref=e351]
+          - cell "Today, Inbox, Next Actions, Projects, Waiting, Scheduled, Someday, Reference. Контексты, поиск." [ref=e352]
+        - row "Готово Обработка задачи Next Action / Project / Delegate / Schedule / Someday / Reference / Done / Trash." [ref=e353]:
+          - cell "Готово" [ref=e354]:
+            - generic [ref=e355]: Готово
+          - cell "Обработка задачи" [ref=e356]
+          - cell "Next Action / Project / Delegate / Schedule / Someday / Reference / Done / Trash." [ref=e357]
+        - row "Готово GTD → Расписание «📅 Schedule» открывает создание сессии с предзаполнением." [ref=e358]:
+          - cell "Готово" [ref=e359]:
+            - generic [ref=e360]: Готово
+          - cell "GTD → Расписание" [ref=e361]
+          - cell "«📅 Schedule» открывает создание сессии с предзаполнением." [ref=e362]
+        - row "Готово Подзадачи, повтор, напоминания Чек-листы, recurring, remindAt; свайпы на мобильном; фокус «сегодня»." [ref=e363]:
+          - cell "Готово" [ref=e364]:
+            - generic [ref=e365]: Готово
+          - cell "Подзадачи, повтор, напоминания" [ref=e366]
+          - cell "Чек-листы, recurring, remindAt; свайпы на мобильном; фокус «сегодня»." [ref=e367]
+        - row "Готово Pomodoro Старт/стоп таймера по задаче." [ref=e368]:
+          - cell "Готово" [ref=e369]:
+            - generic [ref=e370]: Готово
+          - cell "Pomodoro" [ref=e371]
+          - cell "Старт/стоп таймера по задаче." [ref=e372]
+        - row "Готово Еженедельный обзор Weekly review модалка." [ref=e373]:
+          - cell "Готово" [ref=e374]:
+            - generic [ref=e375]: Готово
+          - cell "Еженедельный обзор" [ref=e376]
+          - cell "Weekly review модалка." [ref=e377]
+  - generic [ref=e378]:
+    - generic [ref=e379] [cursor=pointer]:
+      - generic [ref=e380]: 🔁
+      - generic [ref=e381]:
+        - heading "7. Привычки" [level=2] [ref=e382]
+        - generic [ref=e383]: HabitsView.tsx — фазы H1–H4
+      - generic [ref=e384]: ▾
+    - table [ref=e386]:
+      - rowgroup [ref=e387]:
+        - row "Статус Функция / элемент Описание" [ref=e388]:
+          - columnheader "Статус" [ref=e389]
+          - columnheader "Функция / элемент" [ref=e390]
+          - columnheader "Описание" [ref=e391]
+        - row "Готово H1 · Ядро привычек Группировка по anchor; Done / Rest / Fail; счётчики N/день; emoji+цвет; recurrence (daily/weekdays/weekends/weekly/everyN); серии; связь с целью; напоминание." [ref=e392]:
+          - cell "Готово" [ref=e393]:
+            - generic [ref=e394]: Готово
+          - cell "H1 · Ядро привычек" [ref=e395]
+          - cell "Группировка по anchor; Done / Rest / Fail; счётчики N/день; emoji+цвет; recurrence (daily/weekdays/weekends/weekly/everyN); серии; связь с целью; напоминание." [ref=e396]
+        - row "Готово Создание / редактирование Drawer-модалка со всеми полями; «New Habit»." [ref=e397]:
+          - cell "Готово" [ref=e398]:
+            - generic [ref=e399]: Готово
+          - cell "Создание / редактирование" [ref=e400]
+          - cell "Drawer-модалка со всеми полями; «New Habit»." [ref=e401]
+        - row "Готово H2 · Таб «Stats» Кольцо прогресса дня + 14-дневные бары; ачивки/бейджи; per-habit heatmap (12 нед) + серия/рекорд/30д %." [ref=e402]:
+          - cell "Готово" [ref=e403]:
+            - generic [ref=e404]: Готово
+          - cell "H2 · Таб «Stats»" [ref=e405]
+          - cell "Кольцо прогресса дня + 14-дневные бары; ачивки/бейджи; per-habit heatmap (12 нед) + серия/рекорд/30д %." [ref=e406]
+        - row "Готово H3 · Таб «Reflect» Настроение (1–5), журнал, кастомные числовые метрики; корреляция настроение↔привычки (Pearson + sparkline); история журнала." [ref=e407]:
+          - cell "Готово" [ref=e408]:
+            - generic [ref=e409]: Готово
+          - cell "H3 · Таб «Reflect»" [ref=e410]
+          - cell "Настроение (1–5), журнал, кастомные числовые метрики; корреляция настроение↔привычки (Pearson + sparkline); история журнала." [ref=e411]
+        - row "Готово H4 · Шаблоны рутин 3 готовых набора (Morning / Healthy body / Deep focus), «Add all»." [ref=e412]:
+          - cell "Готово" [ref=e413]:
+            - generic [ref=e414]: Готово
+          - cell "H4 · Шаблоны рутин" [ref=e415]
+          - cell "3 готовых набора (Morning / Healthy body / Deep focus), «Add all»." [ref=e416]
+        - row "Готово H4 · Уведомления о привычках Тогл + дефолтное время в Настройках; планируются на ближайшие due-дни (native)." [ref=e417]:
+          - cell "Готово" [ref=e418]:
+            - generic [ref=e419]: Готово
+          - cell "H4 · Уведомления о привычках" [ref=e420]
+          - cell "Тогл + дефолтное время в Настройках; планируются на ближайшие due-дни (native)." [ref=e421]
+        - row "Заблок. H5 · Соц/бэкенд Публичные профили, accountability, community, sync — нужен сервер. Отложено." [ref=e422]:
+          - cell "Заблок." [ref=e423]:
+            - generic [ref=e424]: Заблок.
+          - cell "H5 · Соц/бэкенд" [ref=e425]
+          - cell "Публичные профили, accountability, community, sync — нужен сервер. Отложено." [ref=e426]
+  - generic [ref=e427]:
+    - generic [ref=e428] [cursor=pointer]:
+      - generic [ref=e429]: 📈
+      - generic [ref=e430]:
+        - heading "8. Прогресс" [level=2] [ref=e431]
+        - generic [ref=e432]: App.tsx — вид «progress» + EnergyChart.tsx
+      - generic [ref=e433]: ▾
+    - table [ref=e435]:
+      - rowgroup [ref=e436]:
+        - row "Статус Функция / элемент Описание" [ref=e437]:
+          - columnheader "Статус" [ref=e438]
+          - columnheader "Функция / элемент" [ref=e439]
+          - columnheader "Описание" [ref=e440]
+        - row "Готово Сводка по категориям Часы по областям, прогресс-бары целей, инвестировано времени." [ref=e441]:
+          - cell "Готово" [ref=e442]:
+            - generic [ref=e443]: Готово
+          - cell "Сводка по категориям" [ref=e444]
+          - cell "Часы по областям, прогресс-бары целей, инвестировано времени." [ref=e445]
+        - row "Готово Energy Balance / диаграмма Донат «время на задачи» (День/Неделя/Месяц/Год) по выполненным сессиям." [ref=e446]:
+          - cell "Готово" [ref=e447]:
+            - generic [ref=e448]: Готово
+          - cell "Energy Balance / диаграмма" [ref=e449]
+          - cell "Донат «время на задачи» (День/Неделя/Месяц/Год) по выполненным сессиям." [ref=e450]
+        - row "Добавить Сводка по привычкам здесь Дублировать ключевые показатели привычек на общий Прогресс (сейчас только во вкладке привычек)." [ref=e451]:
+          - cell "Добавить" [ref=e452]:
+            - generic [ref=e453]: Добавить
+          - cell "Сводка по привычкам здесь" [ref=e454]
+          - cell "Дублировать ключевые показатели привычек на общий Прогресс (сейчас только во вкладке привычек)." [ref=e455]
+  - generic [ref=e456]:
+    - generic [ref=e457] [cursor=pointer]:
+      - generic [ref=e458]: ✨
+      - generic [ref=e459]:
+        - heading "9. AI День-архитектор" [level=2] [ref=e460]
+        - generic [ref=e461]: AIScheduler.tsx — виды «ai» / «architect»
+      - generic [ref=e462]: ▾
+    - table [ref=e464]:
+      - rowgroup [ref=e465]:
+        - row "Статус Функция / элемент Описание" [ref=e466]:
+          - columnheader "Статус" [ref=e467]
+          - columnheader "Функция / элемент" [ref=e468]
+          - columnheader "Описание" [ref=e469]
+        - row "Готово Preferences (баланс жизни) Подъём/сон, рабочие часы, пик продуктивности, life-blocks." [ref=e470]:
+          - cell "Готово" [ref=e471]:
+            - generic [ref=e472]: Готово
+          - cell "Preferences (баланс жизни)" [ref=e473]
+          - cell "Подъём/сон, рабочие часы, пик продуктивности, life-blocks." [ref=e474]
+        - row "Готово «Generate My Day» Генерация расписания (generateSchedule) из целей/задач/настроек." [ref=e475]:
+          - cell "Готово" [ref=e476]:
+            - generic [ref=e477]: Готово
+          - cell "«Generate My Day»" [ref=e478]
+          - cell "Генерация расписания (generateSchedule) из целей/задач/настроек." [ref=e479]:
+            - text: Генерация расписания (
+            - code [ref=e480]: generateSchedule
+            - text: ) из целей/задач/настроек.
+        - row "Готово Принять / закоммитить день Принять блоки → сессии в расписании (acceptAllBlocks / commitGeneratedDay)." [ref=e481]:
+          - cell "Готово" [ref=e482]:
+            - generic [ref=e483]: Готово
+          - cell "Принять / закоммитить день" [ref=e484]
+          - cell "Принять блоки → сессии в расписании (acceptAllBlocks / commitGeneratedDay)." [ref=e485]
+        - row "Частично «AI» = локальный алгоритм Сейчас эвристика, не реальная модель. См. бэклог — решение по Claude API." [ref=e486]:
+          - cell "Частично" [ref=e487]:
+            - generic [ref=e488]: Частично
+          - cell "«AI» = локальный алгоритм" [ref=e489]
+          - cell "Сейчас эвристика, не реальная модель. См. бэклог — решение по Claude API." [ref=e490]
+        - row "Добавить Реальный Claude API Опционально подключить API (ключ, стоимость, онлайн). Нужно решение." [ref=e491]:
+          - cell "Добавить" [ref=e492]:
+            - generic [ref=e493]: Добавить
+          - cell "Реальный Claude API" [ref=e494]
+          - cell "Опционально подключить API (ключ, стоимость, онлайн). Нужно решение." [ref=e495]
+  - generic [ref=e496]:
+    - generic [ref=e497] [cursor=pointer]:
+      - generic [ref=e498]: 🗄️
+      - generic [ref=e499]:
+        - heading "10. История · Настройки · Уведомления" [level=2] [ref=e500]
+        - generic [ref=e501]: ArchiveView · SettingsView · utils/notifications
+      - generic [ref=e502]: ▾
+    - table [ref=e504]:
+      - rowgroup [ref=e505]:
+        - row "Статус Функция / элемент Описание" [ref=e506]:
+          - columnheader "Статус" [ref=e507]
+          - columnheader "Функция / элемент" [ref=e508]
+          - columnheader "Описание" [ref=e509]
+        - row "Готово История (Archive) Архив выполненного." [ref=e510]:
+          - cell "Готово" [ref=e511]:
+            - generic [ref=e512]: Готово
+          - cell "История (Archive)" [ref=e513]
+          - cell "Архив выполненного." [ref=e514]
+        - row "Готово Настройки — Язык EN / RU / JA." [ref=e515]:
+          - cell "Готово" [ref=e516]:
+            - generic [ref=e517]: Готово
+          - cell "Настройки — Язык" [ref=e518]
+          - cell "EN / RU / JA." [ref=e519]
+        - row "Готово Настройки — Профиль Имя, инициалы." [ref=e520]:
+          - cell "Готово" [ref=e521]:
+            - generic [ref=e522]: Готово
+          - cell "Настройки — Профиль" [ref=e523]
+          - cell "Имя, инициалы." [ref=e524]
+        - row "Готово Настройки — Расписание Начало недели, подъём/сон, пик продуктивности." [ref=e525]:
+          - cell "Готово" [ref=e526]:
+            - generic [ref=e527]: Готово
+          - cell "Настройки — Расписание" [ref=e528]
+          - cell "Начало недели, подъём/сон, пик продуктивности." [ref=e529]
+        - row "Готово Настройки — Уведомления Тогл напоминаний о привычках + дефолтное время." [ref=e530]:
+          - cell "Готово" [ref=e531]:
+            - generic [ref=e532]: Готово
+          - cell "Настройки — Уведомления" [ref=e533]
+          - cell "Тогл напоминаний о привычках + дефолтное время." [ref=e534]
+        - row "Готово Настройки — Внешний вид Плотность Comfortable / Compact." [ref=e535]:
+          - cell "Готово" [ref=e536]:
+            - generic [ref=e537]: Готово
+          - cell "Настройки — Внешний вид" [ref=e538]
+          - cell "Плотность Comfortable / Compact." [ref=e539]
+        - row "Готово Настройки — Данные Сброс всех данных (resetAll)." [ref=e540]:
+          - cell "Готово" [ref=e541]:
+            - generic [ref=e542]: Готово
+          - cell "Настройки — Данные" [ref=e543]
+          - cell "Сброс всех данных (resetAll)." [ref=e544]
+        - row "Готово Локальные уведомления Сессии, задачи (remindAt), привычки. Только native (APK), в браузере no-op." [ref=e545]:
+          - cell "Готово" [ref=e546]:
+            - generic [ref=e547]: Готово
+          - cell "Локальные уведомления" [ref=e548]
+          - cell "Сессии, задачи (remindAt), привычки. Только native (APK), в браузере no-op." [ref=e549]
+        - row "Добавить Кастомизация уведомлений Доп. контроль частоты/контента, иконка уведомления." [ref=e550]:
+          - cell "Добавить" [ref=e551]:
+            - generic [ref=e552]: Добавить
+          - cell "Кастомизация уведомлений" [ref=e553]
+          - cell "Доп. контроль частоты/контента, иконка уведомления." [ref=e554]
+  - generic [ref=e555]:
+    - generic [ref=e556] [cursor=pointer]:
+      - generic [ref=e557]: 🧭
+      - generic [ref=e558]:
+        - heading "11. Бэклог / что добавить дальше" [level=2] [ref=e559]
+        - generic [ref=e560]: Приоритеты
+      - generic [ref=e561]: ▾
+    - generic [ref=e562]:
+      - paragraph [ref=e563]: "Требует твоего решения / крупное:"
+      - list [ref=e564]:
+        - listitem [ref=e565]:
+          - generic [ref=e566]: Решение
+          - text: Реальный Claude API вместо алгоритма (ключ, стоимость, онлайн-зависимость).
+        - listitem [ref=e567]:
+          - generic [ref=e568]: Бэкенд
+          - text: "H5: синхронизация между устройствами + соц-функции (профили, accountability, community). Сервер + авторизация (Supabase/Vercel)."
+      - paragraph [ref=e569]: "Мелкое / полиш:"
+      - list [ref=e570]:
+        - listitem [ref=e571]:
+          - generic [ref=e572]: Добавить
+          - text: Релизная подпись APK (Google Play) + сплэш-экран.
+        - listitem [ref=e573]:
+          - generic [ref=e574]: Добавить
+          - text: Доп. вопросы онбординга (возраст, «откуда узнали»), интро-карусель.
+        - listitem [ref=e575]:
+          - generic [ref=e576]: Добавить
+          - text: Использование
+          - code [ref=e577]: userProfile
+          - text: для подбора стартовых целей/привычек.
+        - listitem [ref=e578]:
+          - generic [ref=e579]: Добавить
+          - text: Сводка привычек на общем экране Прогресса.
+        - listitem [ref=e580]:
+          - generic [ref=e581]: Добавить
+          - text: Вернуть стат-панели / Priority Focus (убраны при редизайне Home).
+        - listitem [ref=e582]:
+          - generic [ref=e583]: Добавить
+          - text: Точечные мобильные правки по новым скриншотам «кривых мест».
+  - contentinfo [ref=e584]: Сгенерировано для разработки · Scheduler · карта актуальна на 2026-06-24

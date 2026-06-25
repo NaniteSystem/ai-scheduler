@@ -1,0 +1,426 @@
+{
+  "version": 3,
+  "updated": "2026-06-25",
+  "_readme": "Источник правды для карты проекта. Claude читает и обновляет этот файл; страница PROJECT-MAP.html импортирует/экспортирует его. Статусы: done | part | todo | block.",
+  "modules": [
+    {
+      "id": "core",
+      "icon": "⚙️",
+      "title": "1. Платформа и оболочка",
+      "sub": "Навигация, хранение, локализация, оформление",
+      "items": [
+        {
+          "status": "done",
+          "title": "Боковая + нижняя навигация",
+          "desc": "Дашборд, Цели, Расписание, GTD, Привычки, Прогресс, AI-архитектор, История, Настройки. Моб: drawer + гамбургер, нижняя навигация 5 пунктов.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Локальное хранилище",
+          "desc": "Zustand + persist (ai-scheduler-store), version 2 + migrate. Без бэкенда.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Локализация EN/RU/JA",
+          "desc": "~707 ключей, полный паритет, переключение в Настройках.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Плотность интерфейса",
+          "desc": "Comfortable / Compact.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Глобальные UI: Drawer, ConfirmModal, Time/Date/IconPicker, FAB",
+          "desc": "Без нативных alert/confirm. FAB прячется при модалках.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Android APK (debug)",
+          "desc": "Capacitor, Scheduler-debug.apk, иконка есть.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Релизная подпись APK",
+          "desc": "keystore + signingConfig + assembleRelease для Google Play.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Сплэш-экран APK",
+          "desc": "assets/splash.png.",
+          "refs": []
+        },
+        {
+          "status": "block",
+          "title": "Синхронизация между устройствами",
+          "desc": "Нужен бэкенд (auth+сервер+БД).",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "📚 Гайд Android UI/UX (референс)",
+          "desc": "Справочник: мобильный UX, Material 3, Figma UI-kit, архитектура, Jetpack Compose. Compose/Figma — справочно (у нас React/Tailwind/WebView); разделы по мобильному UX применимы напрямую.",
+          "refs": [
+            {
+              "label": "docs/android-uiux-guide.md",
+              "url": "docs/android-uiux-guide.md"
+            }
+          ]
+        },
+        {
+          "status": "part",
+          "title": "Свериться с UX-чек-листом гида",
+          "desc": "Пройтись по «Часть 6 — Практические советы по UI» и «7.5 Состояния и крайние случаи»: edge-states (загрузка/пусто/ошибка/оффлайн) на всех экранах, тач-таргеты ≥48dp, зоны досягаемости пальца. Частично уже соблюдено.",
+          "refs": [
+            {
+              "label": "docs/android-uiux-guide.md",
+              "url": "docs/android-uiux-guide.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "onb",
+      "icon": "👋",
+      "title": "2. Онбординг",
+      "sub": "components/Onboarding.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "Опросник 6 шагов",
+          "desc": "Имя → фокус → пик энергии → сон → что мешает → финал. Прогресс-бар, назад, авто-переход.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Применение ответов к настройкам",
+          "desc": "Пик→productivityPeak, сон→wake/sleep, фокус/трудности→userProfile.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Доп. вопросы (возраст, откуда узнал) + интро-карусель",
+          "desc": "Есть в референсах, по желанию.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Использовать userProfile",
+          "desc": "Подбирать стартовые цели/привычки по ответам.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "dash",
+      "icon": "🏠",
+      "title": "3. Дашборд (Home)",
+      "sub": "App.tsx — вид dashboard",
+      "items": [
+        {
+          "status": "done",
+          "title": "Сегодня: Расписание / To-do / Привычки",
+          "desc": "Таймлайн, фокус-задачи, due-привычки + пустые состояния.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Завтра + Expand Schedule",
+          "desc": "",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Вернуть стат-панели / Priority Focus",
+          "desc": "Убраны при редизайне Home.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "goals",
+      "icon": "🎯",
+      "title": "4. Цели",
+      "sub": "App.tsx + GoalDetailView.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "Список целей + мастер создания",
+          "desc": "Активные/завершённые, кольцо, серия, часы, инсайт. GoalWizardModal.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Деталь: Overview / Sessions / Roadmap / AI Insights",
+          "desc": "Heatmap, бэклог-сессии, milestones, динамический goalInsight.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Edit / Complete / Next Session",
+          "desc": "",
+          "refs": []
+        },
+        {
+          "status": "part",
+          "title": "Углубить логику целей",
+          "desc": "Связь milestone↔прогресс, авто-обновление целевых часов.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "sched",
+      "icon": "📅",
+      "title": "5. Расписание",
+      "sub": "ScheduleView.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "День / Неделя / Месяц / Год",
+          "desc": "Неделя на моб = 3 дня + скролл, крупные ячейки.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Создание сессии",
+          "desc": "Название+автоподсказки, цвет, иконка, весь день, начало/конец, мультидень, повтор, оповещение, место/URL/заметка.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Редактирование любой сессии",
+          "desc": "Карточка → Edit → правка на месте.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Перенос / ресайз / длительность в часах",
+          "desc": "Ресайз на моб отключён; fmtDur «1,5 ч».",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Бюджет недели, выполнить/вернуть/удалить",
+          "desc": "",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Focus-таймер из сессии",
+          "desc": "Кнопка Focus в модалке сессии → лаунчер таймера/секундомера; на финише логирует фактическое время в сессию. См. модуль GTD / FocusTimer.tsx.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "gtd",
+      "icon": "📥",
+      "title": "6. GTD Входящие",
+      "sub": "GTDView.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "Захват + парсинг тегов",
+          "desc": "p1, @phone, #work, 30m.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Фильтры и обработка задач",
+          "desc": "Inbox/Next/Project/Waiting/Scheduled/Someday/Reference; контексты, поиск.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Подзадачи, повтор, напоминания, Pomodoro, Weekly review",
+          "desc": "+ GTD→Schedule.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Focus Timer (Помодоро/секундомер)",
+          "desc": "Глобальная плашка над навигацией: обратный отсчёт с регулируемым временем (±5, пресеты 15/25/50) ИЛИ секундомер; пауза/возобновление/стоп. Переживает навигацию и перезагрузку (timestamp в persist). Старт из задачи (иконка таймера/панель Doing) и из модалки сессии (кнопка Focus). На «Готово»: задача→done +completedPomodoros; сессия→лог фактического времени в durationMinutes +done. Уведомления: нативно (Android) ongoing-уведомление в шторке с кнопками Пауза/Стоп + алярм на окончание; веб — Notification+звук. Заменил старый PomodoroWidget.",
+          "refs": [
+            {
+              "label": "FocusTimer.tsx",
+              "url": "src/components/FocusTimer.tsx"
+            },
+            {
+              "label": "timerNotifications.ts",
+              "url": "src/utils/timerNotifications.ts"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "habits",
+      "icon": "🔁",
+      "title": "7. Привычки",
+      "sub": "HabitsView.tsx (H1–H4)",
+      "items": [
+        {
+          "status": "done",
+          "title": "H1 Ядро привычек",
+          "desc": "anchor-группы, Done/Rest/Fail, счётчики, recurrence, серии, связь с целью.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "H2 Аналитика (Stats)",
+          "desc": "Кольцо дня, 14-дн бары, бейджи, heatmap 12нед, серия/рекорд/30д%.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "H3 Рефлексия (Reflect)",
+          "desc": "Настроение, журнал, метрики, корреляция настроение↔привычки.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "H4 Шаблоны рутин + уведомления",
+          "desc": "3 набора «Add all»; тогл напоминаний.",
+          "refs": []
+        },
+        {
+          "status": "block",
+          "title": "H5 Соц/бэкенд",
+          "desc": "Профили, accountability, community, sync — нужен сервер.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "prog",
+      "icon": "📈",
+      "title": "8. Прогресс",
+      "sub": "App.tsx + EnergyChart.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "Сводка по категориям + Energy диаграмма",
+          "desc": "Часы по областям, донат время-на-задачи.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Сводка привычек на общем Прогрессе",
+          "desc": "Сейчас только во вкладке привычек.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "icon": "✨",
+      "title": "9. AI День-архитектор",
+      "sub": "AIScheduler.tsx",
+      "items": [
+        {
+          "status": "done",
+          "title": "Preferences + Generate My Day + принять день",
+          "desc": "Баланс жизни, generateSchedule, commit в расписание.",
+          "refs": []
+        },
+        {
+          "status": "part",
+          "title": "AI = локальный алгоритм",
+          "desc": "Эвристика, не реальная модель.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Реальный Claude API (опц.)",
+          "desc": "Ключ, стоимость, онлайн. Нужно решение.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "rest",
+      "icon": "🗄️",
+      "title": "10. История · Настройки · Уведомления",
+      "sub": "ArchiveView · SettingsView · notifications",
+      "items": [
+        {
+          "status": "done",
+          "title": "История (Archive)",
+          "desc": "Архив выполненного.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Настройки",
+          "desc": "Язык, профиль, расписание, уведомления, плотность, сброс данных.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Локальные уведомления",
+          "desc": "Сессии, задачи, привычки. Только native (APK).",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Кастомизация уведомлений + иконка",
+          "desc": "Частота/контент.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "icon": "🔐",
+      "title": "11. Аккаунт и синхронизация (Firebase)",
+      "sub": "Google-вход + Firestore — в работе",
+      "items": [
+        {
+          "status": "part",
+          "title": "Решение: Firebase Auth + Firestore",
+          "desc": "Выбрано: вход через Google + облачная синхронизация между устройствами. Ждём от владельца firebaseConfig + google-services.json. Чек-лист: docs/FIREBASE-SETUP.md.",
+          "refs": [
+            {
+              "label": "docs/FIREBASE-SETUP.md",
+              "url": "docs/FIREBASE-SETUP.md"
+            }
+          ]
+        },
+        {
+          "status": "todo",
+          "title": "Вход через Google",
+          "desc": "@capacitor-firebase/authentication (нативно на Android) + firebase JS SDK. Экран входа + «продолжить без аккаунта».",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Облачная синхронизация (Firestore)",
+          "desc": "users/{uid} = срез store; pull при входе (merge при первом входе), push с дебаунсом; офлайн-кэш.",
+          "refs": []
+        },
+        {
+          "status": "todo",
+          "title": "Профиль Google + выход + индикатор синка",
+          "desc": "Аватар/имя из Google; logout; статус синхронизации.",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "ideas",
+      "icon": "💡",
+      "title": "12. Мои идеи / новое",
+      "sub": "Добавляй сюда свои функции и референсы",
+      "items": []
+    }
+  ]
+}

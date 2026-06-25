@@ -1,0 +1,145 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - generic [ref=e10]: Scheduler
+  - generic [ref=e361]:
+    - generic [ref=e362]:
+      - button "All Goals" [ref=e363]:
+        - img [ref=e364]
+        - text: All Goals
+      - generic [ref=e366]:
+        - generic [ref=e367]:
+          - generic [ref=e369]:
+            - img [ref=e370]
+            - generic [ref=e374]:
+              - generic [ref=e375]: "0"
+              - generic [ref=e376]: "%"
+          - generic [ref=e377]:
+            - generic [ref=e379]: Language
+            - generic [ref=e380]:
+              - generic [ref=e381]: 🇯🇵
+              - heading "JLPT N2" [level=1] [ref=e383]
+            - generic [ref=e384]:
+              - generic [ref=e385]:
+                - img [ref=e386]
+                - generic [ref=e388]:
+                  - generic [ref=e389]: 12d
+                  - generic [ref=e390]: streak
+              - generic [ref=e391]:
+                - img [ref=e392]
+                - generic [ref=e395]:
+                  - generic [ref=e396]: 2.5h
+                  - generic [ref=e397]: logged
+              - generic [ref=e398]:
+                - img [ref=e399]
+                - generic [ref=e402]:
+                  - generic [ref=e403]: 2/3
+                  - generic [ref=e404]: sessions
+              - generic [ref=e405]:
+                - img [ref=e406]
+                - generic [ref=e409]:
+                  - generic [ref=e410]: 67%
+                  - generic [ref=e411]: completion rate
+        - generic [ref=e412]:
+          - button "Next Session" [ref=e413]:
+            - img [ref=e414]
+            - text: Next Session
+          - button "Edit Goal" [ref=e416]:
+            - img [ref=e417]
+            - text: Edit Goal
+          - button "Complete" [ref=e419]:
+            - img [ref=e420]
+            - text: Complete
+      - generic [ref=e424]:
+        - generic [ref=e425]: 2.5h of 21d 16h estimated
+        - generic [ref=e426]: 21d 14h remaining
+    - generic [ref=e428]:
+      - button "Overview" [ref=e429]:
+        - img [ref=e430]
+        - text: Overview
+      - button "Sessions" [ref=e432]:
+        - img [ref=e433]
+        - text: Sessions
+      - button "Roadmap" [ref=e435]:
+        - img [ref=e436]
+        - text: Roadmap
+      - button "AI Insights" [ref=e440]:
+        - img [ref=e441]
+        - text: AI Insights
+    - generic [ref=e445]:
+      - generic [ref=e446]:
+        - generic [ref=e447]:
+          - generic [ref=e448]:
+            - generic [ref=e449]:
+              - img [ref=e450]
+              - generic [ref=e453]: Hours Logged
+            - generic [ref=e454]: 2.5h
+            - generic [ref=e455]: of 21d 16h
+          - generic [ref=e456]:
+            - generic [ref=e457]:
+              - img [ref=e458]
+              - generic [ref=e461]: Sessions Done
+            - generic [ref=e462]: "2"
+            - generic [ref=e463]: 0 skipped
+          - generic [ref=e464]:
+            - generic [ref=e465]:
+              - img [ref=e466]
+              - generic [ref=e468]: Avg Session
+            - generic [ref=e469]: 75m
+            - generic [ref=e470]: per session
+          - generic [ref=e471]:
+            - generic [ref=e472]:
+              - img [ref=e473]
+              - generic [ref=e476]: Energy
+            - generic [ref=e477]: —
+            - generic [ref=e478]: avg feeling
+        - generic [ref=e479]:
+          - generic [ref=e480]:
+            - heading "Activity — Last 4 Weeks" [level=3] [ref=e481]
+            - generic [ref=e482]: 2 sessions total
+          - generic [ref=e540]:
+            - generic [ref=e541]: May 29
+            - generic [ref=e542]: Today
+        - generic [ref=e543]:
+          - generic [ref=e544]:
+            - heading "Recent Sessions" [level=3] [ref=e545]
+            - button "All" [ref=e546]:
+              - text: All
+              - img [ref=e547]
+          - generic [ref=e549]:
+            - generic [ref=e550] [cursor=pointer]:
+              - img [ref=e552]
+              - generic [ref=e555]:
+                - generic [ref=e556]: Kanji
+                - generic [ref=e557]: Jun 25, 2026 · 90m
+            - generic [ref=e558] [cursor=pointer]:
+              - img [ref=e560]
+              - generic [ref=e563]:
+                - generic [ref=e564]: Grammar
+                - generic [ref=e565]: Jun 25, 2026 · 60m
+      - generic [ref=e566]:
+        - generic [ref=e567]:
+          - generic [ref=e568]:
+            - heading "Milestones" [level=3] [ref=e569]
+            - generic [ref=e570]: 0/0
+          - button "View Roadmap →" [ref=e571]
+        - generic [ref=e572]:
+          - generic [ref=e573]:
+            - img [ref=e574]
+            - generic [ref=e577]: AI Coach
+          - paragraph [ref=e578]: You're at 0% with 2.5h logged. Keep the momentum going.
+  - navigation [ref=e90]:
+    - button "Home" [ref=e91]:
+      - img [ref=e92]
+      - generic [ref=e95]: Home
+    - button "Calendar" [ref=e97]:
+      - img [ref=e98]
+      - generic [ref=e100]: Calendar
+    - button "Quick Capture → GTD" [ref=e101]:
+      - img [ref=e102]
+    - button "Overview" [ref=e103]:
+      - img [ref=e104]
+      - generic [ref=e106]: Overview
+    - button "Profile" [ref=e107]:
+      - img [ref=e108]
+      - generic [ref=e111]: Profile

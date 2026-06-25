@@ -1,0 +1,101 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e10]: Scheduler
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - generic [ref=e16]: Hi, Alex!
+            - generic [ref=e17]: Thursday, 25 June
+          - generic [ref=e18]:
+            - generic [ref=e19]: 🔥 12
+            - button [ref=e20]:
+              - img [ref=e21]
+            - generic [ref=e24]: A
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: Your daily progress
+            - generic [ref=e28]: 0%
+          - generic [ref=e30]: 0 of 2 done today
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - heading "Today · scheduled" [level=3] [ref=e33]:
+            - img [ref=e34]
+            - text: Today · scheduled
+          - button "Expand Schedule ›" [ref=e37]
+        - generic [ref=e38]:
+          - generic [ref=e39] [cursor=pointer]:
+            - generic [ref=e40]:
+              - generic [ref=e41]:
+                - generic [ref=e42]: 🇯🇵
+                - generic [ref=e43]: Kanji
+              - generic [ref=e44]:
+                - img [ref=e45]
+                - text: 09:00 · 1.5 h
+            - button [ref=e48]:
+              - img [ref=e49]
+          - generic [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]:
+              - generic [ref=e54]:
+                - generic [ref=e55]: 🇯🇵
+                - generic [ref=e56]: Grammar
+              - generic [ref=e57]:
+                - img [ref=e58]
+                - text: 09:00 · 1 h
+            - button [ref=e61]:
+              - img [ref=e62]
+      - generic [ref=e65]:
+        - heading "Today · to-do" [level=3] [ref=e66]:
+          - img [ref=e67]
+          - text: Today · to-do
+        - generic [ref=e71]: No to-dos for today.
+      - generic [ref=e72]:
+        - heading "Tomorrow" [level=3] [ref=e73]:
+          - img [ref=e74]
+          - text: Tomorrow
+        - generic [ref=e77]: Nothing planned for tomorrow.
+    - navigation [ref=e78]:
+      - button "Home" [ref=e79]:
+        - img [ref=e80]
+        - generic [ref=e83]: Home
+      - button "Calendar" [ref=e85]:
+        - img [ref=e86]
+        - generic [ref=e88]: Calendar
+      - button "Quick Capture → GTD" [ref=e89]:
+        - img [ref=e90]
+      - button "Overview" [ref=e91]:
+        - img [ref=e92]
+        - generic [ref=e94]: Overview
+      - button "Profile" [ref=e95]:
+        - img [ref=e96]
+        - generic [ref=e99]: Profile
+  - generic [ref=e102]:
+    - generic [ref=e104]:
+      - heading "Create" [level=3] [ref=e105]
+      - button "Close" [ref=e106]:
+        - img [ref=e107]
+    - generic [ref=e110]:
+      - textbox "Add a task…" [active] [ref=e111]
+      - button "Add task..." [ref=e112]:
+        - img [ref=e113]
+    - generic [ref=e114]:
+      - button "Goal Long-term objective" [ref=e115]:
+        - img [ref=e117]
+        - generic [ref=e121]:
+          - generic [ref=e122]: Goal
+          - generic [ref=e123]: Long-term objective
+        - img [ref=e124]
+      - button "Habit Daily routine" [ref=e126]:
+        - img [ref=e128]
+        - generic [ref=e133]:
+          - generic [ref=e134]: Habit
+          - generic [ref=e135]: Daily routine
+        - img [ref=e136]
+      - button "Session Schedule focus time" [ref=e138]:
+        - img [ref=e140]
+        - generic [ref=e142]:
+          - generic [ref=e143]: Session
+          - generic [ref=e144]: Schedule focus time
+        - img [ref=e145]

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scheduler — карта проекта (редактируемая)</title>
+<style>
+  :root{--bg:#0a0a0c;--panel:#131318;--panel2:#1a1a21;--line:#26262e;--text:#e9e9ee;--dim:#9a9aa6;--violet:#8b5cf6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--violet)}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 100px}
+  header.hero h1{font-size:32px;margin:0 0 6px;letter-spacing:-.5px}
+  header.hero p{color:var(--dim);margin:0;max-width:720px}
+  .meta{color:#6a6a76;font-size:12px;margin-top:8px}
+
+  .howto{margin:16px 0;border:1px solid #8b5cf640;background:#8b5cf60d;border-radius:14px;padding:14px 16px;font-size:13px;color:#cfc7ee}
+  .howto b{color:#fff}
+  .howto ol{margin:8px 0 0;padding-left:18px}
+  .howto li{margin:3px 0}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+  .badge .dot{width:8px;height:8px;border-radius:50%}
+  .d-done{background:var(--green)}.d-part{background:var(--amber)}.d-todo{background:var(--dim)}.d-block{background:var(--red)}
+
+  .controls{position:sticky;top:0;z-index:20;background:linear-gradient(var(--bg),var(--bg) 72%,transparent);padding:12px 0 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .filterbtn{cursor:pointer;font-size:13px;font-weight:600;padding:7px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--dim)}
+  .filterbtn.active{background:var(--violet);border-color:var(--violet);color:#fff}
+  #search{flex:1;min-width:160px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:0 12px;font-size:14px;outline:none}
+  #search:focus{border-color:var(--violet)}
+  .btn{cursor:pointer;font-size:13px;font-weight:700;padding:8px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text)}
+  .btn:hover{border-color:var(--violet)}
+  .btn.primary{background:linear-gradient(90deg,#7c3aed,#d946ef);border:none;color:#fff}
+  .btn.ghost{background:transparent;color:var(--dim)}
+  .savestate{font-size:12px;color:#6a6a76;margin-left:4px}
+
+  section.mod{border:1px solid var(--line);border-radius:16px;background:var(--panel);margin:0 0 16px;overflow:hidden}
+  section.mod>.head{display:flex;align-items:center;gap:12px;padding:14px 16px}
+  section.mod>.head .ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:#222;flex:none}
+  section.mod>.head .ttl{flex:1;cursor:pointer}
+  section.mod>.head h2{font-size:17px;margin:0}
+  section.mod>.head .sub{color:var(--dim);font-size:12.5px;display:block;margin-top:2px}
+  section.mod>.head .tools{display:flex;gap:6px;align-items:center}
+  .icobtn{cursor:pointer;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);display:grid;place-items:center;font-size:14px}
+  .icobtn:hover{color:#fff;border-color:var(--violet)}
+  section.mod.collapsed .body{display:none}
+  .body{padding:2px 14px 14px}
+
+  .item{border-top:1px solid var(--line);padding:11px 6px;display:flex;gap:12px;align-items:flex-start}
+  .item:hover{background:#ffffff04}
+  .item .pillwrap{flex:none;width:96px}
+  .item .main{flex:1;min-width:0}
+  .item .t{font-weight:600}
+  .item .d{color:var(--dim);font-size:13.5px;margin-top:2px;white-space:pre-wrap}
+  .item .refs{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .ref{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:8px;border:1px solid var(--line);background:#000;color:#bdb5d6;text-decoration:none}
+  .ref img{width:18px;height:18px;object-fit:cover;border-radius:3px}
+  .ref.imgref{padding:3px}
+  .ref.imgref img{width:34px;height:34px}
+  .item .rowtools{flex:none;display:flex;gap:5px;opacity:0;transition:opacity .15s}
+  .item:hover .rowtools{opacity:1}
+  .additem{margin:10px 2px 2px;cursor:pointer;font-size:13px;font-weight:600;color:var(--violet);display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:9px;border:1px dashed #8b5cf655}
+  .additem:hover{background:#8b5cf610}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--line)}
+  .pill.done{color:#86efac;border-color:#22c55e44;background:#22c55e12}
+  .pill.part{color:#fcd34d;border-color:#f59e0b44;background:#f59e0b12}
+  .pill.todo{color:#c9c9d2;border-color:#55556644;background:#ffffff08}
+  .pill.block{color:#fca5a5;border-color:#ef444444;background:#ef444412}
+  code{background:#000;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;color:#cbb6ff}
+  .hidden{display:none!important}
+
+  /* modal */
+  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+  .ovl.open{display:flex}
+  .modal{width:100%;max-width:560px;max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .modal h3{margin:0 0 14px;font-size:18px}
+  .modal label{display:block;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px}
+  .modal input,.modal textarea,.modal select{width:100%;background:#0d0d0d;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px 12px;font:inherit;font-size:14px;outline:none}
+  .modal input:focus,.modal textarea:focus,.modal select:focus{border-color:var(--violet)}
+  .modal textarea{min-height:80px;resize:vertical}
+  .statusrow{display:flex;gap:8px;flex-wrap:wrap}
+  .statusrow .opt{cursor:pointer;flex:1;min-width:90px;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--dim)}
+  .statusrow .opt.sel{color:#fff}
+  .statusrow .opt.done.sel{background:#22c55e22;border-color:var(--green)}
+  .statusrow .opt.part.sel{background:#f59e0b22;border-color:var(--amber)}
+  .statusrow .opt.todo.sel{background:#ffffff14;border-color:#888}
+  .statusrow .opt.block.sel{background:#ef444422;border-color:var(--red)}
+  .reflist{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .refrow{display:flex;gap:6px;align-items:center}
+  .refrow input{flex:1}
+  .refrow .thumb{width:34px;height:34px;border-radius:6px;object-fit:cover;border:1px solid var(--line);flex:none}
+  .modalfoot{display:flex;gap:8px;margin-top:20px;align-items:center}
+  .modalfoot .grow{flex:1}
+  footer{color:#5a5a66;font-size:12px;text-align:center;margin-top:30px}
+  .empty{color:#6a6a76;font-size:13px;padding:10px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>🗂️ Scheduler — карта проекта</h1>
+  <p>Живая доска проекта: добавляй функции, описания и референсы прямо здесь. Claude читает <code>project-map.json</code> и работает по нему — вся работа отражается тут.</p>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="howto">
+  <b>Как это работает (синхронизация с Claude):</b>
+  <ol>
+    <li>Редактируй прямо на странице — всё сохраняется в браузере автоматически.</li>
+    <li>Нажми <b>«📤 Экспорт для Claude»</b> → сохрани файл <code>project-map.json</code> в папку проекта (рядом с этой страницей).</li>
+    <li>Скажи Claude: «обнови по карте» — он прочитает <code>project-map.json</code>, сделает работу и запишет туда новые статусы/заметки.</li>
+    <li>Нажми <b>«📥 Импорт»</b> и выбери обновлённый <code>project-map.json</code>, чтобы увидеть правки Claude.</li>
+  </ol>
+</div>
+
+<div class="legend">
+  <span class="badge"><span class="dot d-done"></span> Готово</span>
+  <span class="badge"><span class="dot d-part"></span> Частично</span>
+  <span class="badge"><span class="dot d-todo"></span> Добавить</span>
+  <span class="badge"><span class="dot d-block"></span> Нужен бэкенд / решение</span>
+</div>
+
+<div class="controls">
+  <span class="filterbtn active" data-f="all">Всё</span>
+  <span class="filterbtn" data-f="done">Готово</span>
+  <span class="filterbtn" data-f="part">Частично</span>
+  <span class="filterbtn" data-f="todo">Добавить</span>
+  <span class="filterbtn" data-f="block">Заблок.</span>
+  <input id="search" placeholder="Поиск…">
+  <span class="btn primary" id="exportBtn">📤 Экспорт для Claude</span>
+  <span class="btn" id="importBtn">📥 Импорт</span>
+  <span class="btn ghost" id="addModBtn">＋ Модуль</span>
+  <span class="savestate" id="saveState"></span>
+  <input type="file" id="importFile" accept="application/json" class="hidden">
+</div>
+
+<div id="board"></div>
+
+<footer>Живая карта проекта · данные хранятся локально в браузере + в <code>project-map.json</code></footer>
+</div>
+
+<!-- Item editor modal -->
+<div class="ovl" id="ovl">
+  <div class="modal">
+    <h3 id="mTitle">Функция</h3>
+    <label>Статус</label>
+    <div class="statusrow" id="mStatus">
+      <div class="opt done" data-s="done">Готово</div>
+      <div class="opt part" data-s="part">Частично</div>
+      <div class="opt todo" data-s="todo">Добавить</div>
+      <div class="opt block" data-s="block">Заблок.</div>
+    </div>
+    <label>Название</label>
+    <input id="mName" placeholder="Например: Экспорт в PDF">
+    <label>Описание</label>
+    <textarea id="mDesc" placeholder="Что делает, как работает, что нужно…"></textarea>
+    <label>Референсы (ссылки, пути к файлам, заметки)</label>
+    <div class="reflist" id="mRefs"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <span class="btn" id="addRef">＋ Ссылка / путь</span>
+      <span class="btn" id="addImg">🖼️ Прикрепить картинку</span>
+      <input type="file" id="imgFile" accept="image/*" class="hidden" multiple>
+    </div>
+    <div class="modalfoot">
+      <span class="btn ghost" id="delItem" style="color:#fca5a5">🗑 Удалить</span>
+      <span class="grow"></span>
+      <span class="btn" id="cancelItem">Отмена</span>
+      <span class="btn primary" id="saveItem">Сохранить</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ SEED (стартовые данные = текущее состояние проекта) ============ */
+const SEED = {
+  version: 3,
+  updated: "2026-06-24",
+  modules: [
+    { id:"core", icon:"⚙️", title:"1. Платформа и оболочка", sub:"Навигация, хранение, локализация, оформление", items:[
+      {status:"done",title:"Боковая + нижняя навигация",desc:"Дашборд, Цели, Расписание, GTD, Привычки, Прогресс, AI-архитектор, История, Настройки. Моб: drawer + гамбургер, нижняя навигация 5 пунктов.",refs:[]},
+      {status:"done",title:"Локальное хранилище",desc:"Zustand + persist (ai-scheduler-store), version 2 + migrate. Без бэкенда.",refs:[]},
+      {status:"done",title:"Локализация EN/RU/JA",desc:"~707 ключей, полный паритет, переключение в Настройках.",refs:[]},
+      {status:"done",title:"Плотность интерфейса",desc:"Comfortable / Compact.",refs:[]},
+      {status:"done",title:"Глобальные UI: Drawer, ConfirmModal, Time/Date/IconPicker, FAB",desc:"Без нативных alert/confirm. FAB прячется при модалках.",refs:[]},
+      {status:"done",title:"Android APK (debug)",desc:"Capacitor, Scheduler-debug.apk, иконка есть.",refs:[]},
+      {status:"todo",title:"Релизная подпись APK",desc:"keystore + signingConfig + assembleRelease для Google Play.",refs:[]},
+      {status:"todo",title:"Сплэш-экран APK",desc:"assets/splash.png.",refs:[]},
+      {status:"block",title:"Синхронизация между устройствами",desc:"Нужен бэкенд (auth+сервер+БД).",refs:[]},
+      {status:"done",title:"📚 Гайд Android UI/UX (референс)",desc:"Справочник: мобильный UX, Material 3, Figma UI-kit, архитектура, Jetpack Compose. Compose/Figma — справочно (у нас React/Tailwind/WebView); разделы по мобильному UX применимы напрямую.",refs:[{label:"docs/android-uiux-guide.md",url:"docs/android-uiux-guide.md"}]},
+      {status:"part",title:"Свериться с UX-чек-листом гида",desc:"Часть 6 «Практические советы по UI» и 7.5 «Состояния и крайние случаи»: edge-states (загрузка/пусто/ошибка/оффлайн), тач-таргеты ≥48dp, зоны досягаемости. Частично соблюдено.",refs:[{label:"docs/android-uiux-guide.md",url:"docs/android-uiux-guide.md"}]}
+    ]},
+    { id:"onb", icon:"👋", title:"2. Онбординг", sub:"components/Onboarding.tsx", items:[
+      {status:"done",title:"Опросник 6 шагов",desc:"Имя → фокус → пик энергии → сон → что мешает → финал. Прогресс-бар, назад, авто-переход.",refs:[]},
+      {status:"done",title:"Применение ответов к настройкам",desc:"Пик→productivityPeak, сон→wake/sleep, фокус/трудности→userProfile.",refs:[]},
+      {status:"todo",title:"Доп. вопросы (возраст, откуда узнал) + интро-карусель",desc:"Есть в референсах, по желанию.",refs:[]},
+      {status:"todo",title:"Использовать userProfile",desc:"Подбирать стартовые цели/привычки по ответам.",refs:[]}
+    ]},
+    { id:"dash", icon:"🏠", title:"3. Дашборд (Home)", sub:"App.tsx — вид dashboard", items:[
+      {status:"done",title:"Сегодня: Расписание / To-do / Привычки",desc:"Таймлайн, фокус-задачи, due-привычки + пустые состояния.",refs:[]},
+      {status:"done",title:"Завтра + Expand Schedule",desc:"",refs:[]},
+      {status:"todo",title:"Вернуть стат-панели / Priority Focus",desc:"Убраны при редизайне Home.",refs:[]}
+    ]},
+    { id:"goals", icon:"🎯", title:"4. Цели", sub:"App.tsx + GoalDetailView.tsx", items:[
+      {status:"done",title:"Список целей + мастер создания",desc:"Активные/завершённые, кольцо, серия, часы, инсайт. GoalWizardModal.",refs:[]},
+      {status:"done",title:"Деталь: Overview / Sessions / Roadmap / AI Insights",desc:"Heatmap, бэклог-сессии, milestones, динамический goalInsight.",refs:[]},
+      {status:"done",title:"Edit / Complete / Next Session",desc:"",refs:[]},
+      {status:"part",title:"Углубить логику целей",desc:"Связь milestone↔прогресс, авто-обновление целевых часов.",refs:[]}
+    ]},
+    { id:"sched", icon:"📅", title:"5. Расписание", sub:"ScheduleView.tsx", items:[
+      {status:"done",title:"День / Неделя / Месяц / Год",desc:"Неделя на моб = 3 дня + скролл, крупные ячейки.",refs:[]},
+      {status:"done",title:"Создание сессии",desc:"Название+автоподсказки, цвет, иконка, весь день, начало/конец, мультидень, повтор, оповещение, место/URL/заметка.",refs:[]},
+      {status:"done",title:"Редактирование любой сессии",desc:"Карточка → Edit → правка на месте.",refs:[]},
+      {status:"done",title:"Перенос / ресайз / длительность в часах",desc:"Ресайз на моб отключён; fmtDur «1,5 ч».",refs:[]},
+      {status:"done",title:"Бюджет недели, выполнить/вернуть/удалить",desc:"",refs:[]}
+    ]},
+    { id:"gtd", icon:"📥", title:"6. GTD Входящие", sub:"GTDView.tsx", items:[
+      {status:"done",title:"Захват + парсинг тегов",desc:"p1, @phone, #work, 30m.",refs:[]},
+      {status:"done",title:"Фильтры и обработка задач",desc:"Inbox/Next/Project/Waiting/Scheduled/Someday/Reference; контексты, поиск.",refs:[]},
+      {status:"done",title:"Подзадачи, повтор, напоминания, Pomodoro, Weekly review",desc:"+ GTD→Schedule.",refs:[]}
+    ]},
+    { id:"habits", icon:"🔁", title:"7. Привычки", sub:"HabitsView.tsx (H1–H4)", items:[
+      {status:"done",title:"H1 Ядро привычек",desc:"anchor-группы, Done/Rest/Fail, счётчики, recurrence, серии, связь с целью.",refs:[]},
+      {status:"done",title:"H2 Аналитика (Stats)",desc:"Кольцо дня, 14-дн бары, бейджи, heatmap 12нед, серия/рекорд/30д%.",refs:[]},
+      {status:"done",title:"H3 Рефлексия (Reflect)",desc:"Настроение, журнал, метрики, корреляция настроение↔привычки.",refs:[]},
+      {status:"done",title:"H4 Шаблоны рутин + уведомления",desc:"3 набора «Add all»; тогл напоминаний.",refs:[]},
+      {status:"block",title:"H5 Соц/бэкенд",desc:"Профили, accountability, community, sync — нужен сервер.",refs:[]}
+    ]},
+    { id:"prog", icon:"📈", title:"8. Прогресс", sub:"App.tsx + EnergyChart.tsx", items:[
+      {status:"done",title:"Сводка по категориям + Energy диаграмма",desc:"Часы по областям, донат время-на-задачи.",refs:[]},
+      {status:"todo",title:"Сводка привычек на общем Прогрессе",desc:"Сейчас только во вкладке привычек.",refs:[]}
+    ]},
+    { id:"ai", icon:"✨", title:"9. AI День-архитектор", sub:"AIScheduler.tsx", items:[
+      {status:"done",title:"Preferences + Generate My Day + принять день",desc:"Баланс жизни, generateSchedule, commit в расписание.",refs:[]},
+      {status:"part",title:"AI = локальный алгоритм",desc:"Эвристика, не реальная модель.",refs:[]},
+      {status:"todo",title:"Реальный Claude API (опц.)",desc:"Ключ, стоимость, онлайн. Нужно решение.",refs:[]}
+    ]},
+    { id:"rest", icon:"🗄️", title:"10. История · Настройки · Уведомления", sub:"ArchiveView · SettingsView · notifications", items:[
+      {status:"done",title:"История (Archive)",desc:"Архив выполненного.",refs:[]},
+      {status:"done",title:"Настройки",desc:"Язык, профиль, расписание, уведомления, плотность, сброс данных.",refs:[]},
+      {status:"done",title:"Локальные уведомления",desc:"Сессии, задачи, привычки. Только native (APK).",refs:[]},
+      {status:"todo",title:"Кастомизация уведомлений + иконка",desc:"Частота/контент.",refs:[]}
+    ]},
+    { id:"auth", icon:"🔐", title:"11. Аккаунт и синхронизация (Firebase)", sub:"Google-вход + Firestore — в работе", items:[
+      {status:"part",title:"Решение: Firebase Auth + Firestore",desc:"Вход через Google + облачная синхронизация. Ждём firebaseConfig + google-services.json. Чек-лист: docs/FIREBASE-SETUP.md.",refs:[{label:"docs/FIREBASE-SETUP.md",url:"docs/FIREBASE-SETUP.md"}]},
+      {status:"todo",title:"Вход через Google",desc:"@capacitor-firebase/authentication + firebase JS SDK. Экран входа + «продолжить без аккаунта».",refs:[]},
+      {status:"todo",title:"Облачная синхронизация (Firestore)",desc:"users/{uid}=срез store; pull при входе, push с дебаунсом; офлайн-кэш.",refs:[]},
+      {status:"todo",title:"Профиль Google + выход + индикатор синка",desc:"Аватар/имя; logout; статус.",refs:[]}
+    ]},
+    { id:"ideas", icon:"💡", title:"12. Мои идеи / новое", sub:"Добавляй сюда свои функции и референсы", items:[] }
+  ]
+};
+
+/* ============ STATE ============ */
+const LS="project-map-data";
+const STATUS_LABEL={done:"Готово",part:"Частично",todo:"Добавить",block:"Заблок."};
+let data = load();
+let editing = null; // {modIdx, itemIdx|null}
+let activeFilter="all";
+
+function load(){ try{const s=localStorage.getItem(LS); if(s) return JSON.parse(s);}catch(e){} return structuredClone(SEED); }
+function save(){ data.updated=new Date().toISOString().slice(0,10); localStorage.setItem(LS, JSON.stringify(data)); flashSaved(); }
+function flashSaved(){ const e=document.getElementById('saveState'); e.textContent="✓ сохранено"; clearTimeout(flashSaved._t); flashSaved._t=setTimeout(()=>e.textContent="",1500); }
+function uid(){ return 'x'+Math.random().toString(36).slice(2,8); }
+
+/* ============ RENDER ============ */
+function render(){
+  document.getElementById('meta').innerHTML = "Обновлено: "+data.updated+" · модулей: "+data.modules.length+" · пунктов: "+data.modules.reduce((a,m)=>a+m.items.length,0);
+  const board=document.getElementById('board'); board.innerHTML="";
+  data.modules.forEach((m,mi)=>{
+    const done=m.items.filter(i=>i.status==='done').length;
+    const sec=document.createElement('section'); sec.className="mod"; sec.dataset.mi=mi;
+    sec.innerHTML=`
+      <div class="head">
+        <div class="ico">${m.icon||'📦'}</div>
+        <div class="ttl" title="свернуть"><h2>${esc(m.title)}</h2><span class="sub">${esc(m.sub||'')} · ${done}/${m.items.length}</span></div>
+        <div class="tools">
+          <span class="icobtn" data-act="editmod" title="Изменить модуль">✎</span>
+          <span class="icobtn" data-act="delmod" title="Удалить модуль">🗑</span>
+        </div>
+      </div>
+      <div class="body"></div>`;
+    const body=sec.querySelector('.body');
+    if(!m.items.length) body.innerHTML='<div class="empty">Пока пусто — нажми «＋ Функция».</div>';
+    m.items.forEach((it,ii)=>{
+      const row=document.createElement('div'); row.className="item"; row.dataset.s=it.status;
+      row.innerHTML=`
+        <div class="pillwrap"><span class="pill ${it.status}">${STATUS_LABEL[it.status]}</span></div>
+        <div class="main">
+          <div class="t">${esc(it.title)}</div>
+          ${it.desc?`<div class="d">${esc(it.desc)}</div>`:''}
+          ${renderRefs(it.refs)}
+        </div>
+        <div class="rowtools">
+          <span class="icobtn" data-act="edit" data-ii="${ii}" title="Изменить">✎</span>
+        </div>`;
+      body.appendChild(row);
+    });
+    const add=document.createElement('div'); add.className="additem"; add.dataset.act="additem"; add.innerHTML="＋ Функция";
+    body.appendChild(add);
+    board.appendChild(sec);
+  });
+  applyFilter();
+}
+function renderRefs(refs){
+  if(!refs||!refs.length) return '';
+  return '<div class="refs">'+refs.map(r=>{
+    if(r.img) return `<a class="ref imgref" href="${r.img}" target="_blank" title="${esc(r.label||'')}"><img src="${r.img}"></a>`;
+    const safe=esc(r.url||'');
+    const isLink=/^https?:|^file:/.test(r.url||'');
+    return isLink
+      ? `<a class="ref" href="${safe}" target="_blank">🔗 ${esc(r.label||r.url)}</a>`
+      : `<span class="ref" title="${safe}">📎 ${esc(r.label||r.url)}</span>`;
+  }).join('')+'</div>';
+}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ============ FILTER ============ */
+function applyFilter(){
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  document.querySelectorAll('.item').forEach(row=>{
+    const okF=activeFilter==='all'||row.dataset.s===activeFilter;
+    const okQ=!q||row.textContent.toLowerCase().includes(q);
+    row.classList.toggle('hidden',!(okF&&okQ));
+  });
+}
+
+/* ============ EDIT MODAL ============ */
+function openItem(mi,ii){
+  editing={mi,ii};
+  const it = ii==null ? {status:'todo',title:'',desc:'',refs:[]} : data.modules[mi].items[ii];
+  document.getElementById('mTitle').textContent = ii==null?'Новая функция':'Изменить функцию';
+  document.getElementById('mName').value=it.title||'';
+  document.getElementById('mDesc').value=it.desc||'';
+  setStatus(it.status||'todo');
+  modalRefs = (it.refs||[]).map(r=>({...r}));
+  renderModalRefs();
+  document.getElementById('delItem').style.display = ii==null?'none':'';
+  document.getElementById('ovl').classList.add('open');
+  setTimeout(()=>document.getElementById('mName').focus(),50);
+}
+let modalRefs=[]; let curStatus='todo';
+function setStatus(s){curStatus=s;document.querySelectorAll('#mStatus .opt').forEach(o=>o.classList.toggle('sel',o.dataset.s===s));}
+function renderModalRefs(){
+  const box=document.getElementById('mRefs'); box.innerHTML="";
+  modalRefs.forEach((r,i)=>{
+    const row=document.createElement('div'); row.className="refrow";
+    if(r.img){
+      row.innerHTML=`<img class="thumb" src="${r.img}"><input value="${esc(r.label||'')}" data-i="${i}" data-k="label" placeholder="подпись"><span class="icobtn" data-del="${i}">✕</span>`;
+    }else{
+      row.innerHTML=`<input value="${esc(r.label||'')}" data-i="${i}" data-k="label" placeholder="подпись" style="max-width:34%"><input value="${esc(r.url||'')}" data-i="${i}" data-k="url" placeholder="https://… или путь к файлу"><span class="icobtn" data-del="${i}">✕</span>`;
+    }
+    box.appendChild(row);
+  });
+  box.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',e=>{modalRefs[+e.target.dataset.i][e.target.dataset.k]=e.target.value;}));
+  box.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',e=>{modalRefs.splice(+e.target.dataset.del,1);renderModalRefs();}));
+}
+function closeModal(){document.getElementById('ovl').classList.remove('open');editing=null;}
+function saveItemFromModal(){
+  if(!editing) return;
+  const it={status:curStatus,title:document.getElementById('mName').value.trim()||'(без названия)',desc:document.getElementById('mDesc').value.trim(),refs:modalRefs.filter(r=>r.img||r.url||r.label)};
+  const m=data.modules[editing.mi];
+  if(editing.ii==null) m.items.push(it); else m.items[editing.ii]=it;
+  save();closeModal();render();
+}
+
+/* ============ EVENTS ============ */
+document.getElementById('board').addEventListener('click',e=>{
+  const sec=e.target.closest('section.mod'); if(!sec) return; const mi=+sec.dataset.mi;
+  const act=e.target.dataset.act;
+  if(e.target.closest('.ttl') && !act){ sec.classList.toggle('collapsed'); return; }
+  if(act==='edit') openItem(mi,+e.target.dataset.ii);
+  else if(act==='additem') openItem(mi,null);
+  else if(act==='delmod'){ if(confirm('Удалить модуль «'+data.modules[mi].title+'» со всеми пунктами?')){data.modules.splice(mi,1);save();render();} }
+  else if(act==='editmod'){ const t=prompt('Название модуля:',data.modules[mi].title); if(t!=null){data.modules[mi].title=t; const s=prompt('Подпись (что это):',data.modules[mi].sub||''); if(s!=null)data.modules[mi].sub=s; const ic=prompt('Эмодзи-иконка:',data.modules[mi].icon||'📦'); if(ic!=null)data.modules[mi].icon=ic; save();render();} }
+});
+document.querySelectorAll('#mStatus .opt').forEach(o=>o.addEventListener('click',()=>setStatus(o.dataset.s)));
+document.getElementById('saveItem').addEventListener('click',saveItemFromModal);
+document.getElementById('cancelItem').addEventListener('click',closeModal);
+document.getElementById('ovl').addEventListener('click',e=>{if(e.target.id==='ovl')closeModal();});
+document.getElementById('delItem').addEventListener('click',()=>{if(editing&&editing.ii!=null&&confirm('Удалить пункт?')){data.modules[editing.mi].items.splice(editing.ii,1);save();closeModal();render();}});
+document.getElementById('addRef').addEventListener('click',()=>{modalRefs.push({label:'',url:''});renderModalRefs();});
+document.getElementById('addImg').addEventListener('click',()=>document.getElementById('imgFile').click());
+document.getElementById('imgFile').addEventListener('change',e=>{
+  [...e.target.files].forEach(f=>{const rd=new FileReader();rd.onload=()=>{modalRefs.push({label:f.name,img:rd.result});renderModalRefs();};rd.readAsDataURL(f);});
+  e.target.value="";
+});
+document.getElementById('addModBtn').addEventListener('click',()=>{
+  const t=prompt('Название нового модуля:','12. Новый раздел'); if(t==null)return;
+  data.modules.push({id:uid(),icon:'📦',title:t,sub:'',items:[]});save();render();
+});
+document.querySelectorAll('.filterbtn').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.filterbtn').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeFilter=b.dataset.f;applyFilter();}));
+document.getElementById('search').addEventListener('input',applyFilter);
+
+/* export / import */
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='project-map.json';a.click();
+});
+document.getElementById('importBtn').addEventListener('click',()=>document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f)return; const rd=new FileReader();
+  rd.onload=()=>{try{data=JSON.parse(rd.result);save();render();alert('Импортировано ✓');}catch(err){alert('Ошибка JSON: '+err.message);}};
+  rd.readAsText(f); e.target.value="";
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&editing)saveItemFromModal();});
+
+render();
+</script>
+</body>
+</html>

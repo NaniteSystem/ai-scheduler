@@ -1,0 +1,8 @@
+[     316ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f4c9e05e:20102
+[ 2044684ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f4c9e05e:20102
+[ 2255814ms] [ERROR] The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]] [[object Object],[object Object],[object Object],[object Object],[object Object],[object Object], [object Object]] @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f4c9e05e:5627
+[ 2302078ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/components/GTDView.tsx?t=1782206164732:0
+[ 2302079ms] [ERROR] [vite] Failed to reload /src/components/GTDView.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808

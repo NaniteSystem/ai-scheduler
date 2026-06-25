@@ -1,0 +1,77 @@
+- main [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]: Hi, Alex!
+          - generic [ref=e11]: Thursday, 25 June
+        - generic [ref=e12]:
+          - generic [ref=e13]: 🔥 12
+          - button [ref=e14]:
+            - img [ref=e15]
+          - generic [ref=e18]: A
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: Your daily progress
+          - generic [ref=e22]: 67%
+        - generic [ref=e24]: 2 of 3 done today
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - heading "Today · scheduled" [level=3] [ref=e27]:
+          - img [ref=e28]
+          - text: Today · scheduled
+        - button "Expand Schedule ›" [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33] [cursor=pointer]:
+          - generic [ref=e34]:
+            - generic [ref=e35]:
+              - generic [ref=e36]: 🇯🇵
+              - generic [ref=e37]: Grammar
+            - generic [ref=e38]:
+              - img [ref=e39]
+              - text: 09:00 · 1 min
+          - img [ref=e42]
+        - generic [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]: 🇯🇵
+              - generic [ref=e49]: Kanji
+            - generic [ref=e50]:
+              - img [ref=e51]
+              - text: 11:15 · 1.5 h
+          - img [ref=e54]
+        - generic [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic [ref=e60]: 🇯🇵
+              - generic [ref=e61]: Drag me
+            - generic [ref=e62]:
+              - img [ref=e63]
+              - text: 14:30 · 2 h
+          - button [ref=e66]:
+            - img [ref=e67]
+    - generic [ref=e70]:
+      - heading "Today · to-do" [level=3] [ref=e71]:
+        - img [ref=e72]
+        - text: Today · to-do
+      - generic [ref=e76]: No to-dos for today.
+    - generic [ref=e77]:
+      - heading "Tomorrow" [level=3] [ref=e78]:
+        - img [ref=e79]
+        - text: Tomorrow
+      - generic [ref=e82]: Nothing planned for tomorrow.
+  - navigation [ref=e83]:
+    - button "Home" [ref=e84]:
+      - img [ref=e85]
+      - generic [ref=e88]: Home
+    - button "Calendar" [ref=e90]:
+      - img [ref=e91]
+      - generic [ref=e93]: Calendar
+    - button "Quick Capture → GTD" [ref=e94]:
+      - img [ref=e95]
+    - button "Overview" [ref=e96]:
+      - img [ref=e97]
+      - generic [ref=e99]: Overview
+    - button "Profile" [ref=e100]:
+      - img [ref=e101]
+      - generic [ref=e104]: Profile

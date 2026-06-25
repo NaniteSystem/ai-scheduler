@@ -1,0 +1,5 @@
+[      84ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f4c9e05e:20102
+[  882585ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/components/ScheduleView.tsx?t=1782207229030:0
+[  882587ms] [ERROR] [vite] Failed to reload /src/components/ScheduleView.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[  912086ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/components/ScheduleView.tsx?t=1782207258531:0
+[  912086ms] [ERROR] [vite] Failed to reload /src/components/ScheduleView.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808

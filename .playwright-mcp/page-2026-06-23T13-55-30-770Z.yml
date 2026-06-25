@@ -1,0 +1,11 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - heading "Welcome to Scheduler" [level=1] [ref=e10]
+    - paragraph [ref=e11]: Your personal AI planner for goals, sessions and focus. Let's start with your name.
+  - generic [ref=e12]: Your name
+  - textbox "e.g. Alex" [active] [ref=e13]
+  - button "Get started" [disabled] [ref=e14]:
+    - text: Get started
+    - img [ref=e15]
+  - paragraph [ref=e17]: You can change this anytime in Settings.

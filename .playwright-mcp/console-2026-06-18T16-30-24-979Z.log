@@ -1,0 +1,22 @@
+[     702ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[     708ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[    7548ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[    7582ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[    8033ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[    8049ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   69864ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   69886ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   70586ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   70609ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   71123ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   71139ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   71515ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   71532ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   71929ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   71948ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[   72731ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:8000/script.js:88
+[   72772ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8000/cdn-cgi/challenge-platform/scripts/jsd/main.js:0
+[  101971ms] [LOG] ResonatingFace готова. Параметры: window.face.params @ http://127.0.0.1:3000/script.js:81
+[  101983ms] TypeError: Cannot read properties of undefined (reading 'catch')
+    at http://127.0.0.1:3000/script.js:83:5
+[  102014ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:3000/favicon.ico:0

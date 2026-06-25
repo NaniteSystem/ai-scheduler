@@ -1,0 +1,161 @@
+import { useState } from 'react';
+import { useStore } from '../store';
+import { useT } from '../i18n';
+import { User, Info, Clock, Target, Sparkles, Calendar, Sunrise, Check, Languages, LayoutGrid } from 'lucide-react';
+import { TimePicker } from './ui/TimePicker';
+
+const hmToMin = (t: string) => { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const minToHm = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+
+export function SettingsView() {
+  const t = useT();
+  const { goals, sessions, gtdTasks, userName, schedulePrefs, lang, setLang, setUserName, updatePrefs,
+    theme, setTheme } = useStore();
+  const [name, setName] = useState(userName);
+  const [saved, setSaved] = useState(false);
+
+  const initials = userName.trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '·';
+  const weekStartsOn = schedulePrefs.weekStartsOn ?? 1;
+
+  const saveName = () => {
+    const n = name.trim();
+    if (!n) return;
+    setUserName(n);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] space-y-6">
+      <div className="anim-fade">
+        <h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('settings.title')}</h1>
+        <p className="text-[14px] text-[var(--text-dim)] mt-1">{t('settings.subtitle')}</p>
+      </div>
+
+      {/* Language */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-1">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Languages className="w-3.5 h-3.5" /> {t('settings.language')}</div>
+        <div className="text-[12px] text-[var(--text-dim)] mb-3">{t('settings.languageSub')}</div>
+        <div className="flex gap-2">
+          {([['en', t('settings.english')], ['ru', t('settings.russian')], ['ja', t('settings.japanese')]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setLang(val)}
+              className={`flex-1 h-11 rounded-xl text-[13px] font-bold border transition-all flex items-center justify-center gap-2 ${lang === val ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--border)]'}`}>
+              {lang === val && <Check className="w-4 h-4" />}{label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Profile */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-1">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><User className="w-3.5 h-3.5" /> {t('settings.profile')}</div>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center text-[16px] font-bold text-white shadow-lg shrink-0">{initials}</div>
+          <div className="min-w-0">
+            <div className="text-[16px] font-bold text-[var(--text)] truncate">{userName || t('settings.noName')}</div>
+            <div className="text-[12px] text-[var(--text-dim)]">{t('sidebar.personalPlanner')}</div>
+          </div>
+        </div>
+        <label className="block text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">{t('settings.nameLabel')}</label>
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveName(); }}
+            maxLength={40}
+            placeholder={t('settings.yourName')}
+            className="flex-1 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 text-[14px] text-[var(--text)] placeholder:text-[var(--text-mute)] focus:outline-none focus:border-[var(--primary)]/50 transition-colors"
+          />
+          <button onClick={saveName} disabled={!name.trim() || name.trim() === userName} className="h-10 px-4 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold flex items-center gap-1.5 hover:bg-[var(--primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+            {saved ? <><Check className="w-4 h-4" /> {t('settings.saved')}</> : t('common.save')}
+          </button>
+        </div>
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-3 gap-3 md:gap-4 anim-fade anim-delay-1">
+        {[
+          { l: t('settings.statGoals'), v: goals.length, ic: Target, c: '#8b5cf6' },
+          { l: t('settings.statSessions'), v: sessions.length, ic: Clock, c: '#22c55e' },
+          { l: t('settings.statGtd'), v: gtdTasks.filter(t => t.status !== 'trash').length, ic: Sparkles, c: '#f59e0b' },
+        ].map((s, i) => {
+          const Ic = s.ic;
+          return (
+            <div key={i} className="card p-4">
+              <Ic className="w-4 h-4 mb-2" style={{ color: s.c }} />
+              <div className="text-[24px] font-bold text-[var(--text)] mono leading-none">{s.v}</div>
+              <div className="text-[10px] text-[var(--text-dim)] mt-1">{s.l}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Schedule preferences */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-2 space-y-5">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> {t('settings.schedule')}</div>
+
+        {/* Week start */}
+        <div>
+          <div className="text-[12px] text-[var(--text)] font-medium mb-2">{t('settings.weekStart')}</div>
+          <div className="flex gap-2">
+            {([[t('settings.monday'), 1], [t('settings.sunday'), 0]] as const).map(([label, val]) => (
+              <button key={val} onClick={() => updatePrefs({ weekStartsOn: val })}
+                className={`flex-1 h-10 rounded-xl text-[12px] font-bold border transition-all ${weekStartsOn === val ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--border)]'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Wake / sleep */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-[12px] text-[var(--text)] font-medium mb-2 flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5 text-amber-400" /> {t('settings.wake')}</div>
+            <TimePicker label={t('settings.wake')} value={hmToMin(schedulePrefs.wakeTime)} onChange={v => updatePrefs({ wakeTime: minToHm(v) })} />
+          </div>
+          <div>
+            <div className="text-[12px] text-[var(--text)] font-medium mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-indigo-400" /> {t('settings.sleep')}</div>
+            <TimePicker label={t('settings.sleep')} value={hmToMin(schedulePrefs.sleepTime)} onChange={v => updatePrefs({ sleepTime: minToHm(v) })} />
+          </div>
+        </div>
+
+        {/* Productivity peak */}
+        <div>
+          <div className="text-[12px] text-[var(--text)] font-medium mb-2">{t('settings.peak')}</div>
+          <div className="flex gap-2">
+            {([[t('settings.morning'), 'morning'], [t('settings.afternoon'), 'afternoon'], [t('settings.evening'), 'evening']] as const).map(([label, val]) => (
+              <button key={val} onClick={() => updatePrefs({ productivityPeak: val })}
+                className={`flex-1 h-10 rounded-xl text-[12px] font-bold border transition-all ${schedulePrefs.productivityPeak === val ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--border)]'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Appearance / theme */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-2">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><LayoutGrid className="w-3.5 h-3.5" /> {t('settings.appearance')}</div>
+        <div className="text-[12px] text-[var(--text)] font-medium mb-2">{t('settings.theme')}</div>
+        <div className="flex gap-2">
+          {([['light', t('settings.themeLight')], ['dark', t('settings.themeDark')]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setTheme(val)}
+              className={`flex-1 h-10 rounded-xl text-[12px] font-bold border transition-all flex items-center justify-center gap-2 ${theme === val ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--border)]'}`}>
+              {theme === val && <Check className="w-4 h-4" />}{label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* About */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-3">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Info className="w-3.5 h-3.5" /> {t('settings.about')}</div>
+        <div className="space-y-2 text-[12px]">
+          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.appField')}</span><span className="text-[var(--text)]">Scheduler — {t('app.tagline')}</span></div>
+          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.version')}</span><span className="text-[var(--text)] mono">1.0.0</span></div>
+          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.weekStart')}</span><span className="text-[var(--text)]">{weekStartsOn === 1 ? t('settings.monday') : t('settings.sunday')}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}

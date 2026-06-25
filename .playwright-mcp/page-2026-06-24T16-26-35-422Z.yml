@@ -1,0 +1,84 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - generic [ref=e10]: Scheduler
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Hi, Sam!
+          - generic [ref=e17]: Thursday, 25 June
+        - generic [ref=e18]:
+          - generic [ref=e19]: 🔥 6
+          - button [ref=e20]:
+            - img [ref=e21]
+          - generic [ref=e24]: S
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Your daily progress
+          - generic [ref=e28]: 0%
+        - generic [ref=e30]: 0 of 4 done today
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - heading "Today · scheduled" [level=3] [ref=e33]:
+          - img [ref=e34]
+          - text: Today · scheduled
+        - button "Expand Schedule ›" [ref=e37]
+      - generic [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]: 📚
+            - generic [ref=e43]: Listening
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - text: 09:00 · 60m
+        - button [ref=e48]:
+          - img [ref=e49]
+    - generic [ref=e52]:
+      - heading "Today · to-do" [level=3] [ref=e53]:
+        - img [ref=e54]
+        - text: Today · to-do
+      - generic [ref=e58]:
+        - button [ref=e59]:
+          - img [ref=e60]
+        - generic [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]: Email professor
+          - generic [ref=e64]: P1
+    - generic [ref=e65]:
+      - heading "Today · habits" [level=3] [ref=e66]:
+        - img [ref=e67]
+        - text: Today · habits
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: 🧘
+          - generic [ref=e76]: Meditate
+          - button [ref=e77]:
+            - img [ref=e78]
+        - generic [ref=e81]:
+          - generic [ref=e82]: 💧
+          - generic [ref=e83]:
+            - generic [ref=e84]: Drink water
+            - generic [ref=e85]: 0/8 glasses
+          - button "0/8" [ref=e86]:
+            - img [ref=e87]
+            - text: 0/8
+    - generic [ref=e88]:
+      - heading "Tomorrow" [level=3] [ref=e89]:
+        - img [ref=e90]
+        - text: Tomorrow
+      - generic [ref=e93]: Nothing planned for tomorrow.
+  - navigation [ref=e94]:
+    - button "Home" [ref=e95]:
+      - img [ref=e96]
+      - generic [ref=e99]: Home
+    - button "Calendar" [ref=e100]:
+      - img [ref=e101]
+      - generic [ref=e103]: Calendar
+    - button "Quick Capture → GTD" [ref=e104]:
+      - img [ref=e105]
+    - button "Overview" [ref=e106]:
+      - img [ref=e107]
+      - generic [ref=e109]: Overview
+    - button "Profile" [ref=e110]:
+      - img [ref=e111]
+      - generic [ref=e114]: Profile

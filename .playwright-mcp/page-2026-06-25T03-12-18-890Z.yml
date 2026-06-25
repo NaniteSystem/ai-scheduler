@@ -1,0 +1,57 @@
+- main [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - generic [ref=e10]: Scheduler
+  - generic [ref=e164]:
+    - generic [ref=e165]:
+      - generic [ref=e166]:
+        - heading "Habits" [level=1] [ref=e167]
+        - paragraph [ref=e168]: Build routines and track your streaks
+      - generic [ref=e169]:
+        - button "Templates" [ref=e170]:
+          - img [ref=e171]
+          - text: Templates
+        - button "New Habit" [ref=e176]:
+          - img [ref=e177]
+          - text: New Habit
+    - generic [ref=e178]:
+      - button "Today" [ref=e179]:
+        - img [ref=e180]
+        - text: Today
+      - button "Stats" [ref=e182]:
+        - img [ref=e183]
+        - text: Stats
+      - button "Reflect" [ref=e185]:
+        - img [ref=e186]
+        - text: Reflect
+    - generic [ref=e188]:
+      - heading "Anytime" [level=3] [ref=e189]
+      - generic [ref=e191]:
+        - generic [ref=e192]: 💧
+        - generic [ref=e193]:
+          - generic [ref=e195]: Drink water
+          - generic [ref=e196]:
+            - img [ref=e197]
+            - text: Daily
+            - generic [ref=e202]: · 0/8
+        - generic [ref=e203]:
+          - button "0/8" [ref=e204]:
+            - img [ref=e205]
+            - text: 0/8
+          - button [ref=e206]:
+            - img [ref=e207]
+  - navigation [ref=e93]:
+    - button "Home" [ref=e94]:
+      - img [ref=e95]
+      - generic [ref=e98]: Home
+    - button "Calendar" [ref=e100]:
+      - img [ref=e101]
+      - generic [ref=e103]: Calendar
+    - button "Quick Capture → GTD" [ref=e104]:
+      - img [ref=e105]
+    - button "Overview" [ref=e106]:
+      - img [ref=e107]
+      - generic [ref=e109]: Overview
+    - button "Profile" [ref=e110]:
+      - img [ref=e111]
+      - generic [ref=e114]: Profile
