@@ -348,6 +348,10 @@ interface S {
   userProfile: { focus: string[]; struggles: string[]; sleep: string } | null;
   setUserProfile: (p: { focus: string[]; struggles: string[]; sleep: string }) => void;
   onboarded: boolean;
+  aiDisclaimerAcceptedAt: string | null;
+  acceptAiDisclaimer: () => void;
+  pendingGoalId: string | null;
+  setPendingGoalId: (id: string | null) => void;
   lang: 'en' | 'ru' | 'ja';
   setLang: (l: 'en' | 'ru' | 'ja') => void;
   activeView: 'dashboard' | 'goals' | 'week' | 'inbox' | 'habits' | 'progress' | 'ai' | 'architect' | 'planner' | 'archive' | 'settings';
@@ -495,6 +499,10 @@ export const useStore = create<S>()(persist((set) => ({
   userProfile: null,
   setUserProfile: (p) => set({ userProfile: p }),
   onboarded: false,
+  aiDisclaimerAcceptedAt: null,
+  acceptAiDisclaimer: () => set({ aiDisclaimerAcceptedAt: new Date().toISOString() }),
+  pendingGoalId: null,
+  setPendingGoalId: (id) => set({ pendingGoalId: id }),
   lang: (typeof navigator !== 'undefined' && /^ru\b/i.test(navigator.language || '')) ? 'ru' : (typeof navigator !== 'undefined' && /^ja\b/i.test(navigator.language || '')) ? 'ja' : 'en',
   setLang: (l) => set({ lang: l }),
   activeView: 'dashboard',
@@ -844,6 +852,7 @@ export const useStore = create<S>()(persist((set) => ({
     userName: s.userName,
     userProfile: s.userProfile,
     onboarded: s.onboarded,
+    aiDisclaimerAcceptedAt: s.aiDisclaimerAcceptedAt,
     lang: s.lang,
     schedulePrefs: s.schedulePrefs,
     generatedDay: s.generatedDay,
