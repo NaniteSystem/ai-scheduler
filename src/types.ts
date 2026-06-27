@@ -30,6 +30,7 @@ export interface Goal {
   milestones: Milestone[];
   metadata: Record<string, any>;
   aiInsight?: string;
+  roadmap?: GoalRoadmap;
   nextSessionTitle?: string;
   nextSessionDate?: string;
   // ── Completion ──
@@ -37,6 +38,40 @@ export interface Goal {
   status?: 'active' | 'completed';     // default 'active'
   outcome?: 'success' | 'failed';      // set when completed
   completedAt?: string;                // ISO timestamp when marked complete
+}
+
+// ─── Goal-AI Roadmap (Feature 1) ────────────────────────────────────────────
+export type GoalKind = 'learn' | 'acquire' | 'build' | 'other';
+export type RoadmapDepth = 'surface' | 'medium' | 'deep';
+export type RoadmapNodeKind = 'skill' | 'knowledge' | 'task' | 'milestone';
+
+export interface RoadmapResource {
+  label: string;
+  url?: string;
+  kind?: 'video' | 'site' | 'app' | 'course' | 'book';
+}
+export interface RoadmapNode {
+  id: string;
+  title: string;
+  detail?: string;
+  resources?: RoadmapResource[];
+  kind?: RoadmapNodeKind;
+  done: boolean;
+}
+export interface RoadmapPhase {
+  id: string;
+  title: string;
+  summary?: string;
+  nodes: RoadmapNode[];
+}
+export interface GoalRoadmap {
+  depth: RoadmapDepth;
+  kind: GoalKind;
+  phases: RoadmapPhase[];
+  tips: string[];
+  generatedBy: 'ai';
+  model?: string;
+  createdAt: string;
 }
 
 export interface Session {
