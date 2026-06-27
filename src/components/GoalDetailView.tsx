@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useStore, goalInsight, goalProgressPct, goalStreak } from '../store';
 import { CATEGORY_META } from '../types';
-import type { Goal } from '../types';
+import type { Goal, RoadmapNode } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
   TrendingUp, ChevronRight, Check, AlertCircle, Play, BookOpen,
-  Activity, Award, BarChart3, Plus, Edit2, X
+  Activity, Award, BarChart3, Plus, Edit2, X, ExternalLink, Lock
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
@@ -33,7 +33,7 @@ function Ring({ pct, size = 80, stroke = 5, color = '#22c55e', bg = 'var(--borde
 export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => void }) {
   const tr = useT();
   const locale = useDateLocale();
-  const { sessions, openLog, openSessionModal, updateGoal, addSession } = useStore();
+  const { sessions, openLog, openSessionModal, updateGoal, addSession, toggleRoadmapNode } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'milestones' | 'insights'>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -41,6 +41,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const [newDur, setNewDur] = useState(60);
   const [mlTitle, setMlTitle] = useState('');
   const [mlTarget, setMlTarget] = useState(1);
+  const [nodeModal, setNodeModal] = useState<{ phaseTitle: string; node: RoadmapNode } | null>(null);
 
   const addBacklogSession = () => {
     const t = newTitle.trim();
@@ -563,8 +564,61 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
           </div>
         )}
 
-        {/* ── MILESTONES TAB ── */}
-        {activeTab === 'milestones' && (
+        {/* ── ROADMAP (AI, locked) ── */}
+        {activeTab === 'milestones' && goal.roadmap && goal.roadmap.phases.length > 0 && (() => {
+          const rm = goal.roadmap;
+          const allNodes = rm.phases.flatMap((p) => p.nodes);
+          const doneN = allNodes.filter((n) => n.done).length;
+          const pct = allNodes.length ? Math.round((doneN / allNodes.length) * 100) : 0;
+          return (
+            <div className="max-w-[700px]">
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-[18px] md:text-[20px] font-bold text-[var(--text)]">{tr('gd.goalRoadmap')}</h2>
+                  <p className="text-[12px] text-[var(--text-dim)] mt-1">{tr('gr.stepsDone', { a: doneN, b: allNodes.length })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-28 bg-[var(--surface-2)] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: goal.color }} /></div>
+                  <span className="text-[12px] font-bold text-[var(--text)] mono">{pct}%</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] mb-5"><Lock className="w-3 h-3" />{tr('gr.lockedNote')}</div>
+              <div className="space-y-7">
+                {rm.phases.map((ph, pi) => {
+                  const pn = ph.nodes.filter((n) => n.done).length;
+                  return (
+                    <div key={ph.id}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-lg grid place-items-center text-[11px] font-bold shrink-0" style={{ background: `${goal.color}1f`, color: goal.color }}>{pi + 1}</div>
+                        <h3 className="text-[14px] font-bold text-[var(--text)] flex-1 min-w-0">{ph.title}</h3>
+                        <span className="text-[10px] text-[var(--text-dim)] mono shrink-0">{pn}/{ph.nodes.length}</span>
+                      </div>
+                      <div className="relative pl-7 space-y-2">
+                        <div className="absolute left-[11px] top-1 bottom-1 w-[2px] bg-[var(--surface-2)]" />
+                        {ph.nodes.map((n) => (
+                          <div key={n.id} className="relative">
+                            <button onClick={() => toggleRoadmapNode(goal.id, n.id)} title={tr(n.done ? 'gr.markUndone' : 'gr.markDone')}
+                              className={`absolute -left-7 top-2 w-5 h-5 rounded-full border-2 grid place-items-center z-10 transition-all ${n.done ? 'bg-emerald-500 border-emerald-500' : 'bg-[var(--surface)] border-[var(--border)] hover:border-emerald-500/60'}`}>
+                              {n.done && <Check className="w-3 h-3 text-white" strokeWidth={4} />}
+                            </button>
+                            <button onClick={() => setNodeModal({ phaseTitle: ph.title, node: n })}
+                              className={`tcard w-full text-left p-3 flex items-center gap-2 ${n.done ? 'opacity-60' : ''}`}>
+                              <span className={`flex-1 text-[13px] font-semibold ${n.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>{n.title}</span>
+                              <ChevronRight className="w-4 h-4 text-[var(--text-dim)] shrink-0" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── MILESTONES TAB (legacy, no roadmap) ── */}
+        {activeTab === 'milestones' && (!goal.roadmap || goal.roadmap.phases.length === 0) && (
           <div className="max-w-[700px]">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -741,6 +795,40 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
           </div>
         </div>
       )}
+        {nodeModal && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setNodeModal(null)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-md card rounded-b-none sm:rounded-3xl max-h-[85vh] overflow-y-auto anim-sheet sm:anim-pop">
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{nodeModal.phaseTitle}</div>
+                    <h3 className="text-[17px] font-bold text-[var(--text)]">{nodeModal.node.title}</h3>
+                  </div>
+                  <button onClick={() => setNodeModal(null)} className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-dim)] hover:bg-[var(--surface-2)] shrink-0"><X className="w-4 h-4" /></button>
+                </div>
+                {nodeModal.node.detail && <p className="text-[14px] text-[var(--text)] leading-relaxed">{nodeModal.node.detail}</p>}
+                {nodeModal.node.resources && nodeModal.node.resources.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('gr.resources')}</div>
+                    {nodeModal.node.resources.map((r, i) => r.url ? (
+                      <a key={i} href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 hover:border-[var(--primary)] transition-colors">
+                        <ExternalLink className="w-4 h-4 text-[var(--primary)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)] truncate">{r.label}</span>
+                      </a>
+                    ) : (
+                      <div key={i} className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
+                        <BookOpen className="w-4 h-4 text-[var(--text-dim)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)]">{r.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => { toggleRoadmapNode(goal.id, nodeModal.node.id); setNodeModal((m) => m ? { ...m, node: { ...m.node, done: !m.node.done } } : null); }}
+                  className={`w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 ${nodeModal.node.done ? 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)]' : 'bg-emerald-500 text-white'}`}>
+                  <Check className="w-4 h-4" />{tr(nodeModal.node.done ? 'gr.markUndone' : 'gr.markDone')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
