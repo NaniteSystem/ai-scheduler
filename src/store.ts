@@ -121,6 +121,10 @@ export function moodHabitCorrelation(habits: Habit[], reflections: Record<string
  *  Hours-based when an hours estimate exists; otherwise milestone-based (roadmap); else 0.
  *  (Replaces the vestigial stored `progressPercent`.) */
 export function goalProgressPct(goal: Goal, sessions: Session[]): number {
+  if (goal.roadmap && goal.roadmap.phases.length) {
+    const ns = goal.roadmap.phases.flatMap((p) => p.nodes);
+    if (ns.length) return Math.round((ns.filter((n) => n.done).length / ns.length) * 100);
+  }
   const mins = sessions.filter((s) => s.goalId === goal.id && s.status === 'done').reduce((a, s) => a + s.durationMinutes, 0);
   const hours = mins / 60;
   if (goal.totalHoursEstimated > 0) return Math.min(100, Math.round((hours / goal.totalHoursEstimated) * 100));
@@ -400,6 +404,7 @@ interface S {
   addWizardMessage: (m: Message) => void;
   addGoal: (g: Goal) => void;
   updateGoal: (id: string, patch: Partial<Goal>) => void;
+  toggleRoadmapNode: (goalId: string, nodeId: string) => void;
   deleteGoal: (id: string) => void;
   openLog: (id: string) => void;
   closeLog: () => void;
@@ -547,6 +552,12 @@ export const useStore = create<S>()(persist((set) => ({
   addWizardMessage: (m) => set((s) => ({ wizardMessages: [...s.wizardMessages, m] })),
   addGoal: (g) => set((s) => ({ goals: [...s.goals, g] })),
   updateGoal: (id, patch) => set((s) => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...patch } : g) })),
+  toggleRoadmapNode: (goalId, nodeId) => set((s) => ({
+    goals: s.goals.map((g) => {
+      if (g.id !== goalId || !g.roadmap) return g;
+      return { ...g, roadmap: { ...g.roadmap, phases: g.roadmap.phases.map((p) => ({ ...p, nodes: p.nodes.map((n) => n.id === nodeId ? { ...n, done: !n.done } : n) })) } };
+    }),
+  })),
   deleteGoal: (id) => set((s) => ({ goals: s.goals.filter(g => g.id !== id), sessions: s.sessions.map(x => x.goalId === id ? { ...x, goalId: '' } : x) })),
   openLog: (id) => set({ logOpen: true, loggingSessionId: id }),
   closeLog: () => set({ logOpen: false, loggingSessionId: null }),
