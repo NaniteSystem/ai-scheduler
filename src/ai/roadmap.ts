@@ -1,4 +1,5 @@
-import type { GoalKind, RoadmapDepth, GoalRoadmap, RoadmapPhase, RoadmapNode } from '../types';
+import type { GoalKind, RoadmapDepth, GoalRoadmap, RoadmapPhase, RoadmapNode, Category } from '../types';
+import { CATEGORY_META } from '../types';
 import { llmJson, AiUnavailableError } from './llm';
 
 export interface RoadmapInput {
@@ -10,8 +11,8 @@ export interface RoadmapInput {
 }
 
 export type RoadmapResult =
-  | { status: 'ok'; kind: GoalKind; roadmap: GoalRoadmap }
-  | { status: 'reframe'; kind: GoalKind; message: string; roadmap: GoalRoadmap }
+  | { status: 'ok'; kind: GoalKind; category: Category; roadmap: GoalRoadmap }
+  | { status: 'reframe'; kind: GoalKind; category: Category; message: string; roadmap: GoalRoadmap }
   | { status: 'refuse'; reasonType: 'impossible' | 'unsafe' | 'unclear'; message: string; suggestion?: string };
 
 export interface ClarifyResult { questions: string[] }
@@ -30,6 +31,7 @@ const RESULT_SCHEMA = {
   properties: {
     status: { type: 'string', enum: ['ok', 'reframe', 'refuse'] },
     kind: { type: 'string', enum: ['learn', 'acquire', 'build', 'other'] },
+    category: { type: 'string', enum: Object.keys(CATEGORY_META) },
     reasonType: { type: 'string', enum: ['impossible', 'unsafe', 'unclear'] },
     message: { type: 'string' },
     suggestion: { type: 'string' },
@@ -101,7 +103,7 @@ Return JSON { "questions": string[] } with 2-4 SHORT questions whose answers mat
 export async function requestRoadmap(input: RoadmapInput): Promise<RoadmapResult> {
   const answers = (input.answers || []).map((x) => `Q: ${x.q}\nA: ${x.a}`).join('\n');
   const prompt = `Goal intent: "${input.intent}". Category: ${input.category || 'unknown'}. Depth: ${input.depth} (${NODE_BUDGET[input.depth]}).
-${answers ? `Clarifying answers:\n${answers}\n` : ''}Decide status. If ok/reframe, include "kind", "tips" (3-6 short advice strings: apps/courses/channels), and "phases". For refuse, include "reasonType" and "message" (and optional "suggestion"). All user-facing text in language "${input.lang}".`;
+${answers ? `Clarifying answers:\n${answers}\n` : ''}Decide status. If ok/reframe, include "kind", "tips" (3-6 short advice strings: apps/courses/channels), and "phases". For refuse, include "reasonType" and "message" (and optional "suggestion"). For ok/reframe also set "category" to the best fit from: ${Object.keys(CATEGORY_META).join(', ')}. All user-facing text in language "${input.lang}".`;
   const raw = await llmJson<any>({ system: SYSTEM(input.lang), prompt, responseSchema: RESULT_SCHEMA, temperature: 0.6 });
 
   if (raw?.status === 'refuse') {
@@ -109,7 +111,8 @@ ${answers ? `Clarifying answers:\n${answers}\n` : ''}Decide status. If ok/refram
     return { status: 'refuse', reasonType, message: typeof raw.message === 'string' ? raw.message : '', suggestion: typeof raw.suggestion === 'string' ? raw.suggestion : undefined };
   }
   const kind: GoalKind = ['learn', 'acquire', 'build', 'other'].includes(raw?.kind) ? raw.kind : 'other';
+  const category: Category = (raw?.category && raw.category in CATEGORY_META ? raw.category : 'personal') as Category;
   const roadmap = buildRoadmap(raw, input.depth, kind);
-  if (raw?.status === 'reframe') return { status: 'reframe', kind, message: typeof raw.message === 'string' ? raw.message : '', roadmap };
-  return { status: 'ok', kind, roadmap };
+  if (raw?.status === 'reframe') return { status: 'reframe', kind, category, message: typeof raw.message === 'string' ? raw.message : '', roadmap };
+  return { status: 'ok', kind, category, roadmap };
 }
