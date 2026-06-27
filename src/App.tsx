@@ -13,14 +13,14 @@ import { ScheduleView } from './components/ScheduleView';
 import { GoalDetailView } from './components/GoalDetailView';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
-import type { Session, GTDTask, Category, Milestone } from './types';
-import { generateRoadmap, type GoalLevel } from './roadmap';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,ArrowLeft,Wand2 } from 'lucide-react';
+import type { Session, GTDTask } from './types';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2 } from 'lucide-react';
 import { AIScheduler } from './components/AIScheduler';
 import { AIPlanner } from './components/AIPlanner';
 import { EnergyChart } from './components/EnergyChart';
 import { SettingsView } from './components/SettingsView';
 import { Onboarding } from './components/Onboarding';
+import { GoalCreateWizard } from './components/GoalCreateWizard';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { SessionIcon } from './components/ui/IconPicker';
 import { Drawer } from './components/ui/Drawer';
@@ -42,6 +42,7 @@ export default function App(){
   const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,schedulePrefs,density,theme}=store;
   useEffect(()=>{ syncReminders(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits]);
   useEffect(()=>{ initTimerActionListener(); },[]);
+  useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
   const[selectedGoalId,setSelectedGoalId]=useState<string|null>(null);
   const[qt,setQt]=useState('');
   const[qd,setQd]=useState(5);
@@ -574,8 +575,8 @@ export default function App(){
       </div>
     </Drawer>})()}
 
-    {/* ═══════════════════ GOAL WIZARD MODAL ═══════════════════ */}
-    {store.wizardOpen&&<GoalWizardModal/>}
+    {/* ═══════════════════ GOAL CREATE WIZARD ═══════════════════ */}
+    {store.wizardOpen&&<GoalCreateWizard/>}
 
     {/* ═══════════════════ FOCUS TIMER (global bar + launcher) ═══════════════════ */}
     <TimerBar/>
@@ -586,114 +587,3 @@ export default function App(){
   </div>;
 }
 
-/* ─── Goal Wizard Inline ─── */
-type WizStep='category'|'name'|'mode'|'quick'|'detail'|'done';
-function GoalWizardModal(){
-  const t=useT();
-  const store=useStore();
-  const[step,setStep]=useState<WizStep>('category');
-  const[cat,setCat]=useState('');
-  const[title,setTitle]=useState('');
-  const[motivation,setMotivation]=useState('');
-  const[level,setLevel]=useState<GoalLevel|''>('');
-  const[outcome,setOutcome]=useState('');
-  const[completionType,setCompletionType]=useState<'hours'|'date'>('hours');
-  const[totalHours,setTotalHours]=useState(60);
-  const[deadline,setDeadline]=useState('');
-  const[hoursPerWeek,setHoursPerWeek]=useState(5);
-  const[msgs,setMsgs]=useState(()=>store.wizardMessages.map(m=>m.id==='m0'?{...m,content:t('wizard.pickCategory')}:m));
-  const[gen,setGen]=useState(false);
-  const addMsg=(role:'user'|'ai',content:string)=>setMsgs(m=>[...m,{id:`${role[0]}${Date.now()}${Math.random()}`,role,content}]);
-
-  const pickCat=(k:string)=>{setCat(k);addMsg('user',`${CATEGORY_META[k as Category].emoji} ${t('cat.'+k)}`);addMsg('ai',t('wizard.namePrompt'));setStep('name');};
-  const submitName=()=>{if(!title.trim())return;addMsg('user',title.trim());addMsg('ai',t('wizard.chooseMode'));setStep('mode');};
-  const chooseMode=(m:'quick'|'detail')=>{addMsg('user',t(m==='quick'?'wizard.modeQuick':'wizard.modeDetailed'));setStep(m);};
-  const dateInvalid=completionType==='date'&&!deadline;
-
-  const build=()=>{
-    if(dateInvalid)return;
-    setGen(true);
-    setTimeout(()=>{
-      const cm=CATEGORY_META[cat as Category]||CATEGORY_META.personal;
-      const r=generateRoadmap({
-        category:cat as Category,title:title.trim(),
-        motivation:motivation.trim()||undefined,level:level||undefined,outcome:outcome.trim()||undefined,
-        completionType,
-        deadline:completionType==='date'?(deadline||undefined):undefined,
-        totalHours:completionType==='hours'?totalHours:undefined,
-        hoursPerWeek,
-      });
-      const gid=`g${Date.now()}`;
-      const milestones:Milestone[]=r.phases.map((p,i)=>({id:`m${Date.now()}-${i}`,title:t(p.titleKey),targetValue:p.targetValue,done:false}));
-      store.addGoal({
-        id:gid,title:title.trim(),category:cat as any,emoji:cm.emoji,color:cm.color,priority:2,
-        subtitle:outcome.trim()||undefined,
-        totalHoursEstimated:r.totalHoursEstimated,hoursPerWeekTarget:r.hoursPerWeekTarget,
-        sessionsCompleted:0,sessionsTotal:0,hoursLogged:0,
-        completionType,deadline:completionType==='date'?(deadline||undefined):undefined,status:'active',
-        milestones,metadata:{motivation:motivation.trim(),level,outcome:outcome.trim()},
-        aiInsight:t(r.insight.key,r.insight.vars),
-      });
-      store.addSessions(r.starterKeys.map((sk,i)=>({
-        id:`s${Date.now()}-${i}`,goalId:gid,date:'',startHour:0,startMinute:0,
-        durationMinutes:sk.durationMinutes,title:t(sk.key),description:'',tasks:[],
-        sessionType:'regular' as const,status:'planned' as const,color:cm.color,
-      })));
-      addMsg('ai',t('wizard.created',{title:title.trim(),phases:r.phases.length,hours:r.totalHoursEstimated,perWeek:r.hoursPerWeekTarget}));
-      setGen(false);setStep('done');setTimeout(()=>store.closeWizard(),4200);
-    },1400);
-  };
-
-  const fld='w-full h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--primary)]';
-  const lbl='block text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2';
-  const chip=(on:boolean)=>`h-10 rounded-xl text-[12px] font-bold border transition-all ${on?'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]':'border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`;
-  const back=()=>{setStep(step==='name'?'category':step==='mode'?'name':step==='quick'||step==='detail'?'mode':'category');};
-
-  // Target (deadline/hours) + weekly budget — shared by quick & detailed forms.
-  const TargetFields=()=>(<div className="space-y-4">
-    <div>
-      <label className={lbl}>{t('gd.completionCriterion')}</label>
-      <div className="grid grid-cols-2 gap-2">
-        {(['hours','date'] as const).map(ct=>(<button key={ct} onClick={()=>setCompletionType(ct)} className={chip(completionType===ct)}>{t(ct==='hours'?'gd.byHours':'gd.byDate')}</button>))}
-      </div>
-    </div>
-    {completionType==='hours'
-      ? <div><label className={lbl}>{t('wizard.totalHours')}</label><input type="number" min={1} value={totalHours} onChange={e=>setTotalHours(parseInt(e.target.value)||0)} className={`${fld} mono`}/></div>
-      : <div><label className={lbl}>{t('wizard.targetBy')}</label><input type="date" value={deadline} onChange={e=>setDeadline(e.target.value)} className={fld}/></div>}
-    <div><label className={lbl}>{t('wizard.hoursPerWeek')}</label><input type="number" min={0.5} step={0.5} value={hoursPerWeek} onChange={e=>setHoursPerWeek(parseFloat(e.target.value)||0)} className={`${fld} mono`}/></div>
-  </div>);
-
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="w-full max-w-xl card overflow-hidden flex flex-col max-h-[88vh]">
-    <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center"><Sparkles className="w-4 h-4 text-white"/></div><div className="flex-1"><div className="font-bold text-[var(--text)] text-[14px]">{t('wizard.createGoal')}</div>{cat&&<div className="text-[10px] text-[var(--text-dim)]">{CATEGORY_META[cat as Category].emoji} {t('cat.'+cat)}{title?` · ${title}`:''}</div>}</div><button onClick={()=>store.closeWizard()} className="w-8 h-8 rounded-lg hover:bg-[var(--border)] flex items-center justify-center text-[var(--text-dim)]"><X className="w-4 h-4"/></button></div>
-
-    <div className="flex-1 overflow-y-auto p-6 space-y-3">
-      {msgs.map(m=><div key={m.id} className={`flex gap-2.5 ${m.role==='user'?'flex-row-reverse':''}`}>{m.role==='ai'&&<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center text-[11px] shrink-0">🤖</div>}<div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed whitespace-pre-line ${m.role==='user'?'bg-[var(--primary)] border border-[var(--primary)] rounded-br-sm text-white':'bg-[var(--surface-2)] border border-[var(--border)] rounded-bl-sm text-[var(--text)]'}`}>{m.content}</div></div>)}
-      {gen&&<div className="flex items-center gap-2 text-[12px] text-[var(--primary)]"><span className="w-1.5 h-1.5 bg-[var(--primary)] rounded-full animate-bounce"/><span className="w-1.5 h-1.5 bg-[var(--primary)] rounded-full animate-bounce" style={{animationDelay:'.15s'}}/><span className="w-1.5 h-1.5 bg-[var(--primary)] rounded-full animate-bounce" style={{animationDelay:'.3s'}}/>{t('wizard.building')}</div>}
-
-      {/* Step forms */}
-      {!gen&&step==='name'&&<div className="pt-1"><label className={lbl}>{t('wizard.goalName')}</label><input autoFocus value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitName()} placeholder={t('wizard.goalName')} className={fld}/></div>}
-
-      {!gen&&step==='mode'&&<div className="space-y-2.5 pt-1">
-        <button onClick={()=>chooseMode('quick')} className="w-full p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] text-left transition-all lift"><div className="flex items-center gap-2 mb-1"><Wand2 className="w-4 h-4 text-[var(--primary)]"/><span className="font-bold text-[var(--text)] text-[14px]">{t('wizard.modeQuick')}</span></div><div className="text-[12px] text-[var(--text-dim)]">{t('wizard.modeQuickDesc')}</div></button>
-        <button onClick={()=>chooseMode('detail')} className="w-full p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] text-left transition-all lift"><div className="flex items-center gap-2 mb-1"><Target className="w-4 h-4 text-[var(--primary)]"/><span className="font-bold text-[var(--text)] text-[14px]">{t('wizard.modeDetailed')}</span></div><div className="text-[12px] text-[var(--text-dim)]">{t('wizard.modeDetailedDesc')}</div></button>
-      </div>}
-
-      {!gen&&step==='quick'&&<div className="pt-1"><TargetFields/></div>}
-
-      {!gen&&step==='detail'&&<div className="space-y-4 pt-1">
-        <div><label className={lbl}>{t('wizard.motivation')} <span className="text-[var(--text-mute)] normal-case font-normal">· {t('wizard.optional')}</span></label><input value={motivation} onChange={e=>setMotivation(e.target.value)} placeholder={t('wizard.motivationPlaceholder')} className={fld}/></div>
-        <div><label className={lbl}>{t('wizard.level')} <span className="text-[var(--text-mute)] normal-case font-normal">· {t('wizard.optional')}</span></label><div className="grid grid-cols-3 gap-2">{(['beginner','intermediate','advanced'] as const).map(lv=>(<button key={lv} onClick={()=>setLevel(level===lv?'':lv)} className={chip(level===lv)}>{t('wizard.level'+lv[0].toUpperCase()+lv.slice(1))}</button>))}</div></div>
-        <div><label className={lbl}>{t('wizard.outcome')} <span className="text-[var(--text-mute)] normal-case font-normal">· {t('wizard.optional')}</span></label><input value={outcome} onChange={e=>setOutcome(e.target.value)} placeholder={t('wizard.outcomePlaceholder')} className={fld}/></div>
-        <TargetFields/>
-      </div>}
-    </div>
-
-    {/* Footer actions */}
-    {!gen&&step!=='done'&&<div className="border-t border-[var(--border)] p-4 bg-[var(--surface-2)]">
-      {step==='category'&&<div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{Object.entries(CATEGORY_META).map(([k,v])=><button key={k} onClick={()=>pickCat(k)} className="px-3 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)] text-[12px] text-[var(--text)] text-left transition-all">{v.emoji} {t('cat.'+k)}</button>)}</div>}
-      {step==='name'&&<div className="flex gap-2"><button onClick={back} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4"/>{t('wizard.back')}</button><button onClick={submitName} disabled={!title.trim()} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold disabled:opacity-30 flex items-center justify-center gap-1.5">{t('wizard.next')}<ChevronRight className="w-4 h-4"/></button></div>}
-      {step==='mode'&&<button onClick={back} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4"/>{t('wizard.back')}</button>}
-      {(step==='quick'||step==='detail')&&<div className="flex gap-2"><button onClick={back} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4"/>{t('wizard.back')}</button><button onClick={build} disabled={dateInvalid} className="flex-1 h-11 rounded-xl bg-gradient-to-r from-[var(--primary)] to-[var(--primary-2)] text-white text-[12px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"><Wand2 className="w-4 h-4"/>{t('wizard.generateRoadmap')}</button></div>}
-    </div>}
-  </div></div>;
-}
