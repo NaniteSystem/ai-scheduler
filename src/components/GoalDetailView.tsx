@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useStore, goalInsight, goalProgressPct, goalStreak } from '../store';
-import { CATEGORY_META } from '../types';
 import type { Goal, RoadmapNode } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
@@ -9,7 +8,6 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
-import { DatePicker } from './ui/DatePicker';
 import { useT, useDateLocale } from '../i18n';
 
 function Ring({ pct, size = 80, stroke = 5, color = '#22c55e', bg = 'var(--border)', children }: {
@@ -54,8 +52,6 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
     setNewTitle('');
     setNewDur(60);
   };
-
-  const cm = CATEGORY_META[goal.category];
 
   // ── Real Stats from sessions ──────────────────────────────────────────
   const goalSessions = sessions.filter(s => s.goalId === goal.id);
@@ -173,9 +169,6 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2">
-              <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r ${cm.gradient} text-white`}>
-                {tr('cat.' + goal.category)}
-              </span>
               {daysLeft !== null && daysLeft < 30 && (
                 <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
                   <AlertCircle className="w-3 h-3" /> {tr('gd.daysLeft', { n: daysLeft })}
@@ -228,7 +221,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
               </button>
             )}
             <button onClick={() => setEditOpen(true)} className="h-10 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center justify-center gap-2 transition-colors flex-1 md:flex-none">
-              <Edit2 className="w-4 h-4" /> {tr('gd.editGoal')}
+              <Edit2 className="w-4 h-4" /> {tr('gd.rename')}
             </button>
             {isCompleted ? (
               <button onClick={reopenGoal} className="h-10 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center justify-center gap-2 transition-colors flex-1 md:flex-none">
@@ -832,33 +825,13 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   );
 }
 
-const GOAL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899'];
 
 function EditGoalModal({ goal, onClose, onDeleted }: { goal: Goal; onClose: () => void; onDeleted: () => void }) {
   const tr = useT();
-  const { updateGoal, deleteGoal, askConfirm, schedulePrefs } = useStore();
-  const weekStartsOn = schedulePrefs.weekStartsOn ?? 1;
+  const { updateGoal, deleteGoal, askConfirm } = useStore();
   const [title, setTitle] = useState(goal.title);
-  const [subtitle, setSubtitle] = useState(goal.subtitle || '');
-  const [emoji, setEmoji] = useState(goal.emoji);
-  const [category, setCategory] = useState(goal.category);
-  const [color, setColor] = useState(goal.color);
-  const [deadline, setDeadline] = useState(goal.deadline ? goal.deadline.slice(0, 10) : '');
-  const [priority, setPriority] = useState(goal.priority);
-  const [hpw, setHpw] = useState(goal.hoursPerWeekTarget);
-  const [total, setTotal] = useState(goal.totalHoursEstimated);
-  const [completionType, setCompletionType] = useState<'hours' | 'date'>(goal.completionType || 'hours');
 
-  const save = () => {
-    if (!title.trim()) return;
-    updateGoal(goal.id, {
-      title: title.trim(), subtitle: subtitle.trim() || undefined, emoji: emoji.trim() || '🎯',
-      category, color, deadline: deadline || undefined, priority,
-      hoursPerWeekTarget: Math.max(0, hpw), totalHoursEstimated: Math.max(0, total),
-      completionType,
-    });
-    onClose();
-  };
+  const save = () => { if (!title.trim()) return; updateGoal(goal.id, { title: title.trim() }); onClose(); };
 
   const remove = () => askConfirm({
     title: tr('gd.deleteGoalQ'), message: tr('gd.deleteGoalMsg', { title: goal.title }),
@@ -872,111 +845,20 @@ function EditGoalModal({ goal, onClose, onDeleted }: { goal: Goal; onClose: () =
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm anim-fade" onClick={onClose}>
       <div className="w-full max-w-lg card overflow-hidden flex flex-col max-h-[88vh]" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}22`, color }}><Edit2 className="w-4 h-4" /></div>
-          <div className="flex-1 font-bold text-[var(--text)] text-[14px]">{tr('gd.editGoalTitle')}</div>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${goal.color}22`, color: goal.color }}><Edit2 className="w-4 h-4" /></div>
+          <div className="flex-1 font-bold text-[var(--text)] text-[14px]">{tr('gd.rename')}</div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-[var(--border)] grid place-items-center text-[var(--text-dim)]"><Plus className="w-4 h-4 rotate-45" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Emoji + title */}
-          <div className="flex gap-3">
-            <div>
-              <label className={lbl}>{tr('gd.emoji')}</label>
-              <input value={emoji} onChange={e => setEmoji(e.target.value)} maxLength={2}
-                className="w-14 h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-center text-[22px] focus:outline-none focus:border-[var(--border)]" />
-            </div>
-            <div className="flex-1">
-              <label className={lbl}>{tr('gd.name')}</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder={tr('gd.goalNamePlaceholder')} className={field} />
-            </div>
-          </div>
-
+        <div className="p-6 space-y-5">
           <div>
-            <label className={lbl}>{tr('gd.subtitle')}</label>
-            <input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder={tr('gd.subtitlePlaceholder')} className={field} />
+            <label className={lbl}>{tr('gd.name')}</label>
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder={tr('gd.goalNamePlaceholder')} className={field} />
           </div>
-
-          {/* Category */}
-          <div>
-            <label className={lbl}>{tr('gd.category')}</label>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(CATEGORY_META).map(([k, v]: [string, any]) => (
-                <button key={k} onClick={() => setCategory(k as Goal['category'])}
-                  className={`px-3 py-1.5 rounded-xl text-[12px] flex items-center gap-1.5 border transition-all ${category === k ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  <span>{v.emoji}</span>{tr('cat.' + k)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Color */}
-          <div>
-            <label className={lbl}>{tr('gd.color')}</label>
-            <div className="grid grid-cols-6 gap-2.5 justify-items-center">
-              {GOAL_COLORS.map(c => (
-                <button key={c} onClick={() => setColor(c)}
-                  className="w-9 h-9 rounded-full grid place-items-center transition-transform hover:scale-110 active:scale-95"
-                  style={{ background: c, boxShadow: color === c ? `0 0 0 2px var(--surface), 0 0 0 4px ${c}` : 'inset 0 1px 2px rgba(255,255,255,.3), inset 0 -2px 5px rgba(0,0,0,.3)' }}>
-                  {color === c && <Check className="w-4 h-4 text-[var(--text)]" strokeWidth={3} />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Completion criterion */}
-          <div>
-            <label className={lbl}>{tr('gd.completionCriterion')}</label>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {([['hours', tr('gd.byHours')], ['date', tr('gd.byDate')]] as const).map(([v, label]) => (
-                <button key={v} onClick={() => setCompletionType(v)}
-                  className={`h-10 rounded-xl text-[12px] font-bold border transition-all ${completionType === v ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {completionType === 'hours' ? (
-              <div>
-                <div className="text-[11px] text-[var(--text-dim)] mb-1.5">{tr('gd.byHoursDesc')}</div>
-                <input type="number" min={0} step={1} value={total} onChange={e => setTotal(parseFloat(e.target.value) || 0)} className={`${field} mono`} />
-              </div>
-            ) : (
-              <div>
-                <div className="text-[11px] text-[var(--text-dim)] mb-1.5">{tr('gd.byDateDesc')}</div>
-                <DatePicker value={deadline} weekStartsOn={weekStartsOn} onChange={setDeadline} />
-              </div>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className={lbl}>{tr('gd.priority')}</label>
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4].map(p => (
-                <button key={p} onClick={() => setPriority(p)}
-                  className={`h-10 rounded-xl text-[12px] font-bold border transition-all ${priority === p ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  P{p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Weekly target */}
-          <div>
-            <label className={lbl}>{tr('gd.hoursPerWeek')}</label>
-            <input type="number" min={0} step={0.5} value={hpw} onChange={e => setHpw(parseFloat(e.target.value) || 0)} className={`${field} mono`} />
-          </div>
-
-          <button onClick={remove} className="text-[12px] font-bold text-red-400 hover:text-red-300 flex items-center gap-2 pt-1">
-            <AlertCircle className="w-4 h-4" /> {tr('gd.deleteGoal')}
-          </button>
         </div>
-
-        <div className="border-t border-[var(--border)] p-4 flex gap-2">
-          <button onClick={onClose} className="h-11 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[13px] font-bold text-[var(--text)] hover:text-[var(--text)] transition-colors">{tr('common.cancel')}</button>
-          <button onClick={save} disabled={!title.trim()}
-            className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40 flex items-center justify-center gap-2 hover:bg-[var(--primary)] transition-colors">
-            <Check className="w-4 h-4" /> {tr('common.save')}
-          </button>
+        <div className="px-6 py-4 border-t border-[var(--border)] flex gap-2">
+          <button onClick={remove} className="h-11 px-4 rounded-xl border border-red-500/30 text-red-400 text-[12px] font-bold hover:bg-red-500/10 transition-colors">{tr('gd.deleteGoal')}</button>
+          <button onClick={save} disabled={!title.trim()} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold disabled:opacity-40">{tr('common.save')}</button>
         </div>
       </div>
     </div>
