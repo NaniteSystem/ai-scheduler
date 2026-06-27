@@ -11,6 +11,8 @@ When a user creates a goal, AI builds a **locked, date-agnostic path** to achiev
 - **LLM:** Gemini 2.5 Flash, default, behind a self-hosted **free proxy**; provider seam allows swapping to Groq/Claude later.
 - **Roadmap is NOT editable** by the user (AI-authored, locked). Only `done` toggling.
 - **Roadmap is NOT tied to dates/times** — it is a path, not a schedule (scheduling is Feature 2).
+- **AI-only, online required.** No offline/deterministic generation. If offline or the AI is unreachable, block creation and tell the user to connect.
+- **Content safety filter.** Disallowed/harmful goals (e.g., "build a nuclear bomb", weapons, illegal/unsafe acts) are refused with "please set a proper goal" — separate from "impossible" goals.
 - **Depth chosen by user:** Surface (5–10 nodes) / Medium (10–15) / Deep (≤30). Default Medium.
 - **Overview "Energy" stat → replaced with "Current streak (days)".**
 - Activity block → GitHub-style monthly contribution grid.
@@ -25,7 +27,10 @@ When a user creates a goal, AI builds a **locked, date-agnostic path** to achiev
 - Default provider calls a **self-hosted free proxy** that holds the Gemini key server-side. App never embeds the key.
   - Contract: `POST {AI_PROXY_URL}/api/ai` body `{ kind: 'roadmap.questions' | 'roadmap.generate', payload }` → JSON response (schemas below).
   - `AI_PROXY_URL` from build env `VITE_AI_PROXY_URL`, overridable in Settings. Proxy = free Vercel/Cloudflare Worker (deploy is a one-time manual step, documented in the plan).
-- **Fallback:** proxy unreachable / error / 429 / invalid JSON / offline → deterministic generator (adapt `roadmap.ts` to emit the node structure). The app ALWAYS produces a roadmap; mark `generatedBy:'rule'` and show a subtle "offline draft" note.
+- **No offline / no rule-based generation.** The roadmap is ALWAYS produced by the AI. Failure handling:
+  - **Offline** (no network) → block: "Вы офлайн — подключитесь к сети, чтобы создать цель." No goal created.
+  - **Transient** (429 / 5xx / timeout / invalid JSON) → retryable error toast ("ИИ недоступен, попробуйте ещё раз"). No goal created.
+  - The old `src/roadmap.ts` deterministic generator is **no longer used** for creation (left in repo only if still referenced elsewhere; otherwise remove).
 - **Output language:** node titles/detail in the app's `lang` (en/ru/ja); resource links may be English.
 
 ## Data model (`src/types.ts`)
@@ -47,7 +52,7 @@ interface GoalRoadmap {
   kind: GoalKind;
   phases: RoadmapPhase[];
   tips: string[];                // AI Insight advice (apps/courses/channels), read-only
-  generatedBy: 'ai' | 'rule';
+  generatedBy: 'ai';            // always AI (no offline/rule generation)
   model?: string;
   createdAt: string;
 }
@@ -61,12 +66,12 @@ roadmap?: GoalRoadmap;
 2. **Depth:** Surface / Medium / Deep (default Medium), each with a one-line description.
 3. **Disclaimer (one-time):** "AI can be wrong — verify links and facts yourself." User must accept (checkbox) once; stored as `store.aiDisclaimerAcceptedAt` (skipped on later goals). Recorded on the roadmap too.
 4. **Clarifying questions:** Surface → **none**. Medium/Deep → call `kind:'roadmap.questions'` → AI returns up to 2–4 short questions (e.g., current level, target timeframe, sub-focus); user answers via chips/short inputs.
-5. **Generate + feasibility gate:** call `kind:'roadmap.generate'`. AI returns one of:
+5. **Generate + feasibility/safety gate:** call `kind:'roadmap.generate'`. AI returns one of:
    - `{ status:'ok', kind, roadmap }` — feasible learning/build path.
    - `{ status:'reframe', kind:'acquire', message, roadmap }` — e.g. "buy a car" → a savings + buying-decision path; show the reframe message, then the roadmap.
-   - `{ status:'refuse', reason, suggestion? }` — impossible/unsafe ("fly to the moon") → show reason (+ optional realistic alternative), create NO goal; let the user edit intent and retry.
+   - `{ status:'refuse', reasonType:'impossible'|'unsafe'|'unclear', message, suggestion? }` — create NO goal; show the message; let the user edit intent and retry. Examples: `impossible` ("fly to the moon") → explain it's not achievable; `unsafe` ("build a nuclear bomb" / weapons / illegal) → "Пожалуйста, выберите корректную цель."; `unclear` → ask the user to rephrase.
 6. **Save:** on ok/reframe → create the Goal with `roadmap` (locked), open the goal.
-7. **Errors/offline:** deterministic fallback roadmap for the chosen depth + "offline draft" note.
+7. **Offline / errors:** AI-only — no goal is created. Offline → "подключитесь к сети"; transient error → retry toast. (See AI infrastructure.)
 
 **Prompt intent (built by the proxy):** "Act like roadmap.sh. Produce a structured, date-agnostic PATH (phases→nodes) to reach the user's goal. Never assign dates/times. Cite real, well-known online resources (YouTube, sites, apps), prefer English-language. Respect depth: surface 5–10 total nodes / medium 10–15 / deep ≤30; phases ≤ ~8. For purchases produce a savings + buying-decision path. Refuse impossible/unsafe goals with a short reason. Node titles/detail in `{lang}`. Output STRICT JSON matching the schema." (+ schema + intent + answers).
 
@@ -92,13 +97,14 @@ roadmap?: GoalRoadmap;
 Add en/ru/ja keys for: wizard steps, depth labels/descriptions, disclaimer text, feasibility refuse/reframe messages, stages/roadmap section, node popup, activity-grid legend, complete dialog, AI-insight header. (Node CONTENT is AI-authored in the user's language, not i18n keys.)
 
 ## Edge cases
-- Proxy down / offline / 429 / invalid JSON → deterministic fallback roadmap + note; `tips` empty.
-- Refuse → no goal created; show reason; allow edit & retry.
+- Offline → block creation with "connect to the network" message; no goal created.
+- Proxy down / 429 / 5xx / timeout / invalid JSON → retryable error toast; no goal created.
+- Refuse (impossible / unsafe / unclear) → no goal created; show the message; allow edit & retry.
 - Cap deep roadmaps at ≤30 nodes / ≤8 phases.
 - Resource URLs: render only `http(s)` links (sanitize).
 
 ## Implementation order (becomes the plan's phases)
-1. **AI seam + proxy contract + deterministic fallback** (`src/ai/`), plus the `types.ts` additions.
+1. **AI seam + proxy contract + online/error handling** (`src/ai/`), plus the `types.ts` additions. (No offline generation.)
 2. **New goal-creation wizard** (intent → depth → disclaimer → questions → feasibility → generate → save).
 3. **Locked Roadmap (Stages) UI** + node detail popup + progress-by-nodes.
 4. **Goal-detail rework** (header, Overview stats + GitHub activity grid, Sessions, AI-Insight tips, Complete dialog, remove edit/type).
