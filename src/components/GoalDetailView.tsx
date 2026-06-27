@@ -652,7 +652,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
         {/* ── AI INSIGHTS TAB ── */}
         {activeTab === 'insights' && (
           <div className="max-w-[900px] space-y-5">
-            {/* Main insight */}
+            {/* AI tips (roadmap) or fallback insight */}
             <div className="card p-6 bg-gradient-to-br from-[var(--primary)]/10 to-transparent border-[var(--primary)]/20">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center">
@@ -663,7 +663,17 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                   <div className="text-[10px] text-[var(--text-dim)]">{tr('gd.updatedAfter')}</div>
                 </div>
               </div>
-              <p className="text-[14px] text-[var(--text)] leading-relaxed">{insightText}</p>
+              {goal.roadmap && goal.roadmap.tips.length > 0 ? (
+                <ul className="space-y-2.5">
+                  {goal.roadmap.tips.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[14px] text-[var(--text)] leading-relaxed">
+                      <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />{tip}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[14px] text-[var(--text)] leading-relaxed">{insightText}</p>
+              )}
             </div>
 
             {/* Derived insights from real data */}
