@@ -5,7 +5,7 @@ import type { Goal, RoadmapNode } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
   TrendingUp, ChevronRight, Check, AlertCircle, Play, BookOpen,
-  Activity, Award, BarChart3, Plus, Edit2, X, ExternalLink, Lock
+  Activity, Award, BarChart3, Plus, Edit2, X, ExternalLink
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
@@ -582,7 +582,6 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                   <span className="text-[12px] font-bold text-[var(--text)] mono">{pct}%</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] mb-5"><Lock className="w-3 h-3" />{tr('gr.lockedNote')}</div>
               <div className="space-y-7">
                 {rm.phases.map((ph, pi) => {
                   const pn = ph.nodes.filter((n) => n.done).length;
