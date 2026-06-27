@@ -5,9 +5,9 @@ import { CATEGORY_META } from '../types';
 import type { Goal, RoadmapDepth, Category } from '../types';
 import { requestRoadmap, requestRoadmapQuestions, type RoadmapResult } from '../ai/roadmap';
 import { AiOfflineError } from '../ai/llm';
-import { X, ArrowLeft, ArrowRight, Wand2, Sparkles, RotateCcw, AlertTriangle, WifiOff, Check } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, Wand2, Sparkles, RotateCcw, AlertTriangle, WifiOff, Check, Edit2 } from 'lucide-react';
 
-type Step = 'intent' | 'depth' | 'disclaimer' | 'questions' | 'generating' | 'refuse' | 'error';
+type Step = 'mode' | 'intent' | 'manual' | 'depth' | 'disclaimer' | 'questions' | 'generating' | 'refuse' | 'error';
 type ErrKind = 'offline' | 'unavailable';
 
 const DEPTHS: { id: RoadmapDepth; label: string; desc: string }[] = [
@@ -21,8 +21,10 @@ export function GoalCreateWizard() {
   const store = useStore();
   const { lang, aiDisclaimerAcceptedAt } = store;
 
-  const [step, setStep] = useState<Step>('intent');
+  const [step, setStep] = useState<Step>('mode');
   const [intent, setIntent] = useState('');
+  const [manualCat, setManualCat] = useState<Category | ''>('');
+  const [manualSub, setManualSub] = useState('');
   const [depth, setDepth] = useState<RoadmapDepth>('medium');
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -81,6 +83,20 @@ export function GoalCreateWizard() {
     store.setActiveView('goals');
   };
 
+  const createManual = () => {
+    if (!intent.trim() || !manualCat) return;
+    const meta = CATEGORY_META[manualCat as Category] || CATEGORY_META.personal;
+    const id = `g${Date.now()}`;
+    store.addGoal({
+      id, title: intent.trim(), subtitle: manualSub.trim() || undefined,
+      category: manualCat as Category, emoji: meta.emoji, color: meta.color,
+      priority: 2, totalHoursEstimated: 0, hoursPerWeekTarget: 3,
+      sessionsCompleted: 0, sessionsTotal: 0, hoursLogged: 0,
+      milestones: [], metadata: { kind: 'manual' }, status: 'active',
+    });
+    store.setPendingGoalId(id); store.closeWizard(); store.setActiveView('goals');
+  };
+
   const refuseMsg = (r: Extract<RoadmapResult, { status: 'refuse' }>) =>
     r.message || t(r.reasonType === 'impossible' ? 'gw.refuseImpossible' : r.reasonType === 'unsafe' ? 'gw.refuseUnsafe' : 'gw.refuseUnclear');
 
@@ -96,6 +112,41 @@ export function GoalCreateWizard() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
+          {step === 'mode' && (
+            <div className="space-y-3">
+              <div className="text-[13px] font-bold text-[var(--text)]">{t('gw.modeTitle')}</div>
+              <button onClick={() => setStep('intent')} className="w-full p-4 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] text-left transition-all">
+                <div className="flex items-center gap-2 mb-1"><Wand2 className="w-4 h-4 text-[var(--primary)]" /><span className="font-bold text-[var(--text)] text-[14px]">{t('gw.modeAi')}</span></div>
+                <div className="text-[12px] text-[var(--text-dim)]">{t('gw.modeAiDesc')}</div>
+              </button>
+              <button onClick={() => setStep('manual')} className="w-full p-4 rounded-2xl border border-[var(--border)] hover:border-[var(--primary)] text-left transition-all">
+                <div className="flex items-center gap-2 mb-1"><Edit2 className="w-4 h-4 text-[var(--text-dim)]" /><span className="font-bold text-[var(--text)] text-[14px]">{t('gw.modeManual')}</span></div>
+                <div className="text-[12px] text-[var(--text-dim)]">{t('gw.modeManualDesc')}</div>
+              </button>
+            </div>
+          )}
+
+          {step === 'manual' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gw.intentLabel')}</label>
+                <input autoFocus value={intent} onChange={(e) => setIntent(e.target.value)} placeholder={t('gw.intentPlaceholder')} className={fld} />
+              </div>
+              <div>
+                <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gw.category')}</label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {Object.entries(CATEGORY_META).map(([k, v]) => (
+                    <button key={k} onClick={() => setManualCat(k as Category)} className={`px-2 py-2 rounded-xl border text-[11px] text-left transition-all ${manualCat === k ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--text)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{v.emoji} {t('cat.' + k)}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gd.subtitle')}</label>
+                <input value={manualSub} onChange={(e) => setManualSub(e.target.value)} placeholder={t('gw.intentPlaceholder')} className={fld} />
+              </div>
+            </div>
+          )}
+
           {step === 'intent' && (
             <div className="space-y-3">
               <label className="block text-[13px] font-bold text-[var(--text)]">{t('gw.intentLabel')}</label>
@@ -159,9 +210,14 @@ export function GoalCreateWizard() {
         </div>
 
         <div className="border-t border-[var(--border)] p-4 flex gap-2">
-          {step === 'intent' && (
+          {step === 'intent' && (<>
+            <button onClick={() => setStep('mode')} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--text-dim)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{t('gw.back')}</button>
             <button disabled={!intent.trim()} onClick={() => setStep('depth')} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5">{t('gw.next')}<ArrowRight className="w-4 h-4" /></button>
-          )}
+          </>)}
+          {step === 'manual' && (<>
+            <button onClick={() => setStep('mode')} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--text-dim)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{t('gw.back')}</button>
+            <button disabled={!intent.trim() || !manualCat} onClick={createManual} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />{t('gw.create')}</button>
+          </>)}
           {step === 'depth' && (<>
             <button onClick={() => setStep('intent')} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--text-dim)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{t('gw.back')}</button>
             <button onClick={proceedFromDepth} className="flex-1 h-11 rounded-xl bg-gradient-to-r from-[var(--primary)] to-[var(--primary-2)] text-white text-[13px] font-bold flex items-center justify-center gap-1.5"><Wand2 className="w-4 h-4" />{t('gw.generate')}</button>
