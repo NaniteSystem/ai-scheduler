@@ -111,9 +111,9 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
 
   // Activity Heatmap — last 4 weeks
   const today = new Date();
-  const heatmap = Array.from({ length: 28 }, (_, i) => {
+  const heatmap = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(today);
-    d.setDate(d.getDate() - (27 - i));
+    d.setDate(d.getDate() - (29 - i));
     const ds = doneSessions.filter(s => isSameDay(new Date(s.date), d));
     return { date: d, count: ds.length, mins: ds.reduce((sum, s) => sum + s.durationMinutes, 0) };
   });
@@ -307,7 +307,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                   { label: tr('gd.hoursLogged'), value: fmtHours(hoursLogged), sub: tr('gd.ofX', { x: fmtHours(goal.totalHoursEstimated) }), color: goal.color, icon: Clock },
                   { label: tr('gd.sessionsDone'), value: doneCount, sub: tr('gd.nSkipped', { n: skippedSessions.length }), color: '#22c55e', icon: CheckCircle2 },
                   { label: tr('gd.avgSession'), value: avgDuration > 0 ? `${avgDuration}m` : '—', sub: tr('gd.perSession'), color: '#8b5cf6', icon: Activity },
-                  { label: tr('gd.energy'), value: feelingLabel, sub: tr('gd.avgFeeling'), color: '#f59e0b', icon: Award },
+                  { label: tr('gd.mStreak'), value: `${goalStreak(goal, sessions)}d`, sub: tr('gd.streakSub'), color: '#f59e0b', icon: Flame },
                 ].map((s, i) => (
                   <div key={i} className="card p-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -326,26 +326,21 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                   <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('gd.activity4w')}</h3>
                   <span className="text-[10px] text-[var(--text-dim)]">{tr('gd.nSessionsTotal', { n: doneSessions.length })}</span>
                 </div>
-                <div className="flex gap-1">
-                  {heatmap.map((day, i) => (
-                    <div key={i} className="group relative flex-1">
-                      <div
-                        className="w-full rounded-sm transition-all"
-                        style={{
-                          height: 28,
-                          background: day.count > 0 ? goal.color : 'var(--surface-2)',
-                          opacity: day.count > 0 ? Math.min(1, 0.4 + day.count * 0.3) : 1,
-                        }}
-                      />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-[11px] text-[var(--text)] whitespace-nowrap shadow-xl">
-                          {format(day.date, 'MMM d', { locale })}
-                          {day.count > 0 ? ` · ${day.mins}m` : ` · ${tr('gd.rest')}`}
+                <div className="flex flex-wrap gap-1">
+                  {heatmap.map((day, i) => {
+                    const lvl = day.mins === 0 ? 0 : day.mins < 30 ? 1 : day.mins < 60 ? 2 : day.mins < 120 ? 3 : 4;
+                    const op = lvl === 0 ? 1 : lvl === 1 ? 0.3 : lvl === 2 ? 0.5 : lvl === 3 ? 0.75 : 1;
+                    return (
+                      <div key={i} className="group relative">
+                        <div className="w-[13px] h-[13px] rounded-[3px]" style={{ background: lvl === 0 ? 'var(--surface-2)' : goal.color, opacity: op }} />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-10">
+                          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 text-[10px] text-[var(--text)] whitespace-nowrap shadow-xl">
+                            {format(day.date, 'MMM d', { locale })}{day.mins > 0 ? ` · ${day.mins}m` : ` · ${tr('gd.rest')}`}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="flex items-center justify-between mt-2 text-[11px] text-[var(--text-dim)]">
                   <span>{format(heatmap[0].date, 'MMM d', { locale })}</span>
@@ -419,37 +414,6 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                 </div>
               )}
 
-              {/* Milestones mini */}
-              <div className="card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('gd.milestones')}</h3>
-                  <span className="text-[10px] font-bold text-[var(--primary)]">{doneMilestones}/{goal.milestones.length}</span>
-                </div>
-                <div className="space-y-3">
-                  {goal.milestones.map((ml) => (
-                    <div key={ml.id} className="flex items-center gap-2.5">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${ml.done ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)] bg-[var(--surface)]'}`}>
-                        {ml.done && <Check className="w-2.5 h-2.5 text-black" strokeWidth={4} />}
-                      </div>
-                      <span className={`text-[12px] flex-1 truncate ${ml.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>
-                        {ml.title}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setActiveTab('milestones')} className="mt-4 w-full h-8 rounded-lg border border-[var(--border)] text-[10px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors">
-                  {tr('gd.viewRoadmap')}
-                </button>
-              </div>
-
-              {/* AI Insight */}
-              <div className="card p-5 bg-gradient-to-br from-[var(--primary)]/8 to-transparent border-[var(--primary)]/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-[var(--primary)]" />
-                  <span className="text-[10px] font-bold text-[var(--primary)] uppercase tracking-wider">{tr('gd.aiCoach')}</span>
-                </div>
-                <p className="text-[12px] text-[var(--text)] leading-relaxed">{insightText}</p>
-              </div>
             </div>
           </div>
         )}
