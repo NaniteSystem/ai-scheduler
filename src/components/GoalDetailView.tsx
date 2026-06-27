@@ -35,6 +35,8 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'milestones' | 'insights'>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [survey, setSurvey] = useState<'q1' | 'good1' | 'good2' | 'bad1' | 'bad2' | 'thanks'>('q1');
+  const openComplete = () => { setSurvey('q1'); setCompleteOpen(true); };
   const [newTitle, setNewTitle] = useState('');
   const [newDur, setNewDur] = useState(60);
   const [mlTitle, setMlTitle] = useState('');
@@ -228,7 +230,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                 <ArrowLeft className="w-4 h-4" /> {tr('gd.reactivate')}
               </button>
             ) : (
-              <button onClick={() => setCompleteOpen(true)}
+              <button onClick={openComplete}
                 className={`h-10 px-5 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 transition-all flex-1 md:flex-none ${readyToComplete ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-lg shadow-emerald-500/20' : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
                 <CheckCircle2 className="w-4 h-4" /> {tr('gd.complete')}
               </button>
@@ -248,7 +250,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
             </div>
           </div>
         ) : readyToComplete ? (
-          <button onClick={() => setCompleteOpen(true)} className="mt-5 w-full rounded-2xl p-4 flex items-center gap-3 bg-emerald-500/[0.07] border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left">
+          <button onClick={openComplete} className="mt-5 w-full rounded-2xl p-4 flex items-center gap-3 bg-emerald-500/[0.07] border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left">
             <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0 bg-emerald-500/15 text-emerald-400"><CheckCircle2 className="w-5 h-5" /></div>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-bold text-emerald-300">{readyByHours ? tr('gd.hoursReached') : tr('gd.dateReached')}</div>
@@ -735,22 +737,52 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
       </div>
 
       {editOpen && <EditGoalModal goal={goal} onClose={() => setEditOpen(false)} onDeleted={onBack} />}
-      {completeOpen && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm anim-fade" onClick={() => setCompleteOpen(false)}>
-          <div className="w-full max-w-sm card p-6" onClick={e => e.stopPropagation()}>
-            <div className="text-center mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/15 grid place-items-center mx-auto mb-3"><CheckCircle2 className="w-6 h-6 text-[var(--primary)]" /></div>
-              <h3 className="text-[16px] font-bold text-[var(--text)]">{tr('gd.completeGoalQ')}</h3>
-              <p className="text-[12px] text-[var(--text-dim)] mt-1">{tr('gd.completeGoalDesc', { title: goal.title })}</p>
-            </div>
-            <div className="space-y-2">
-              <button onClick={() => completeGoal('success')} className="w-full h-12 rounded-xl bg-emerald-500 text-black text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-emerald-400 transition-colors"><Award className="w-4 h-4" /> {tr('gd.success')}</button>
-              <button onClick={() => completeGoal('failed')} className="w-full h-12 rounded-xl bg-[var(--surface-2)] border border-red-500/20 text-red-400 text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"><AlertCircle className="w-4 h-4" /> {tr('gd.failed')}</button>
-              <button onClick={() => setCompleteOpen(false)} className="w-full h-11 rounded-xl text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">{tr('common.cancel')}</button>
+      {completeOpen && (() => {
+        const opt = (label: string, onClick: () => void, danger = false) => (
+          <button onClick={onClick} className={`w-full h-11 rounded-xl text-[13px] font-bold transition-colors ${danger ? 'bg-[var(--surface-2)] border border-red-500/20 text-red-400 hover:bg-red-500/10' : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] hover:border-[var(--primary)]'}`}>{label}</button>
+        );
+        return (
+          <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm anim-fade" onClick={() => setCompleteOpen(false)}>
+            <div className="w-full sm:max-w-sm card rounded-b-none sm:rounded-3xl p-6 anim-sheet sm:anim-pop" onClick={e => e.stopPropagation()}>
+              {survey === 'q1' && (<>
+                <div className="text-center mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/15 grid place-items-center mx-auto mb-3"><CheckCircle2 className="w-6 h-6 text-[var(--primary)]" /></div>
+                  <h3 className="text-[16px] font-bold text-[var(--text)]">{tr('cs.q1')}</h3>
+                  <p className="text-[12px] text-[var(--text-dim)] mt-1">{goal.title}</p>
+                </div>
+                <div className="space-y-2">
+                  {opt(tr('cs.yes'), () => { completeGoal('success'); setSurvey('good1'); })}
+                  {opt(tr('cs.no'), () => { completeGoal('failed'); setSurvey('bad1'); }, true)}
+                </div>
+              </>)}
+              {survey === 'good1' && (<>
+                <h3 className="text-[15px] font-bold text-[var(--text)] mb-4 text-center">{tr('cs.gQ1')}</h3>
+                <div className="space-y-2">{['cs.gA1a','cs.gA1b','cs.gA1c'].map(k => <span key={k}>{opt(tr(k), () => setSurvey('good2'))}</span>)}</div>
+              </>)}
+              {survey === 'good2' && (<>
+                <h3 className="text-[15px] font-bold text-[var(--text)] mb-4 text-center">{tr('cs.gQ2')}</h3>
+                <div className="space-y-2">{['cs.gA2a','cs.gA2b','cs.gA2c'].map(k => <span key={k}>{opt(tr(k), () => setSurvey('thanks'))}</span>)}</div>
+              </>)}
+              {survey === 'bad1' && (<>
+                <h3 className="text-[15px] font-bold text-[var(--text)] mb-4 text-center">{tr('cs.bQ1')}</h3>
+                <div className="space-y-2">{['cs.bA1a','cs.bA1b','cs.bA1c','cs.bA1d'].map(k => <span key={k}>{opt(tr(k), () => setSurvey('bad2'))}</span>)}</div>
+              </>)}
+              {survey === 'bad2' && (<>
+                <h3 className="text-[15px] font-bold text-[var(--text)] mb-4 text-center">{tr('cs.bQ2')}</h3>
+                <div className="space-y-2">{['cs.bA2a','cs.bA2b','cs.bA2c','cs.bA2d'].map(k => <span key={k}>{opt(tr(k), () => setSurvey('thanks'))}</span>)}</div>
+              </>)}
+              {survey === 'thanks' && (
+                <div className="text-center py-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 grid place-items-center mx-auto mb-3"><Award className="w-7 h-7 text-emerald-500" /></div>
+                  <h3 className="text-[17px] font-bold text-[var(--text)]">{tr('cs.thanks')}</h3>
+                  <p className="text-[12px] text-[var(--text-dim)] mt-1">{tr('cs.thanksSub')}</p>
+                  <button onClick={() => setCompleteOpen(false)} className="mt-5 w-full h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold">{tr('common.done')}</button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
         {nodeModal && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setNodeModal(null)}>
             <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-md card rounded-b-none sm:rounded-3xl max-h-[85vh] overflow-y-auto anim-sheet sm:anim-pop">
