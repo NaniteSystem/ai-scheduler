@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
-import { useT, useDateLocale } from '../i18n';
+import { useT, useDateLocale, useLang } from '../i18n';
+import { lt } from '../utils/localized';
 
 function Ring({ pct, size = 80, stroke = 5, color = '#22c55e', bg = 'var(--border)', children }: {
   pct: number; size?: number; stroke?: number; color?: string; bg?: string; children?: React.ReactNode;
@@ -30,6 +31,7 @@ function Ring({ pct, size = 80, stroke = 5, color = '#22c55e', bg = 'var(--borde
 
 export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => void }) {
   const tr = useT();
+  const lang = useLang();
   const locale = useDateLocale();
   const { sessions, openLog, openSessionModal, updateGoal, addSession, toggleRoadmapNode } = useStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'milestones' | 'insights'>('overview');
@@ -548,7 +550,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                     <div key={ph.id}>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-6 h-6 rounded-lg grid place-items-center text-[11px] font-bold shrink-0" style={{ background: `${goal.color}1f`, color: goal.color }}>{pi + 1}</div>
-                        <h3 className="text-[14px] font-bold text-[var(--text)] flex-1 min-w-0">{ph.title}</h3>
+                        <h3 className="text-[14px] font-bold text-[var(--text)] flex-1 min-w-0">{lt(ph.title, lang)}</h3>
                         <span className="text-[10px] text-[var(--text-dim)] mono shrink-0">{pn}/{ph.nodes.length}</span>
                       </div>
                       <div className="relative pl-7 space-y-2">
@@ -559,9 +561,9 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                               className={`absolute -left-7 top-2 w-5 h-5 rounded-full border-2 grid place-items-center z-10 transition-all ${n.done ? 'bg-emerald-500 border-emerald-500' : 'bg-[var(--surface)] border-[var(--border)] hover:border-emerald-500/60'}`}>
                               {n.done && <Check className="w-3 h-3 text-white" strokeWidth={4} />}
                             </button>
-                            <button onClick={() => setNodeModal({ phaseTitle: ph.title, node: n })}
+                            <button onClick={() => setNodeModal({ phaseTitle: lt(ph.title, lang), node: n })}
                               className={`tcard w-full text-left p-3 flex items-center gap-2 ${n.done ? 'opacity-60' : ''}`}>
-                              <span className={`flex-1 text-[13px] font-semibold ${n.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>{n.title}</span>
+                              <span className={`flex-1 text-[13px] font-semibold ${n.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>{lt(n.title, lang)}</span>
                               <ChevronRight className="w-4 h-4 text-[var(--text-dim)] shrink-0" />
                             </button>
                           </div>
@@ -667,7 +669,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                 <ul className="space-y-2.5">
                   {goal.roadmap.tips.map((tip, i) => (
                     <li key={i} className="flex items-start gap-2.5 text-[14px] text-[var(--text)] leading-relaxed">
-                      <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />{tip}
+                      <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />{lt(tip, lang)}
                     </li>
                   ))}
                 </ul>
@@ -800,21 +802,21 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-1 truncate">{nodeModal.phaseTitle}</div>
-                    <h3 className="text-[17px] font-bold text-[var(--text)]">{nodeModal.node.title}</h3>
+                    <h3 className="text-[17px] font-bold text-[var(--text)]">{lt(nodeModal.node.title, lang)}</h3>
                   </div>
                   <button onClick={() => setNodeModal(null)} className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-dim)] hover:bg-[var(--surface-2)] shrink-0"><X className="w-4 h-4" /></button>
                 </div>
-                {nodeModal.node.detail && <p className="text-[14px] text-[var(--text)] leading-relaxed">{nodeModal.node.detail}</p>}
+                {nodeModal.node.detail && <p className="text-[14px] text-[var(--text)] leading-relaxed">{lt(nodeModal.node.detail, lang)}</p>}
                 {nodeModal.node.resources && nodeModal.node.resources.length > 0 && (
                   <div className="space-y-2">
                     <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('gr.resources')}</div>
                     {nodeModal.node.resources.map((r, i) => r.url ? (
                       <a key={i} href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 hover:border-[var(--primary)] transition-colors">
-                        <ExternalLink className="w-4 h-4 text-[var(--primary)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)] truncate">{r.label}</span>
+                        <ExternalLink className="w-4 h-4 text-[var(--primary)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)] truncate">{lt(r.label, lang)}</span>
                       </a>
                     ) : (
                       <div key={i} className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
-                        <BookOpen className="w-4 h-4 text-[var(--text-dim)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)]">{r.label}</span>
+                        <BookOpen className="w-4 h-4 text-[var(--text-dim)] shrink-0" /><span className="flex-1 text-[13px] text-[var(--text)]">{lt(r.label, lang)}</span>
                       </div>
                     ))}
                   </div>

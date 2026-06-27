@@ -47,32 +47,33 @@ export type RoadmapNodeKind = 'skill' | 'knowledge' | 'task' | 'milestone';
 export type LocalizedText = string | Partial<Record<'en' | 'ru' | 'ja', string>>;
 
 export interface RoadmapResource {
-  label: string;
+  label: LocalizedText;
   url?: string;
   kind?: 'video' | 'site' | 'app' | 'course' | 'book';
 }
 export interface RoadmapNode {
   id: string;
-  title: string;
-  detail?: string;
+  title: LocalizedText;
+  detail?: LocalizedText;
   resources?: RoadmapResource[];
   kind?: RoadmapNodeKind;
   done: boolean;
 }
 export interface RoadmapPhase {
   id: string;
-  title: string;
-  summary?: string;
+  title: LocalizedText;
+  summary?: LocalizedText;
   nodes: RoadmapNode[];
 }
 export interface GoalRoadmap {
   depth: RoadmapDepth;
   kind: GoalKind;
   phases: RoadmapPhase[];
-  tips: string[];
+  tips: LocalizedText[];
   generatedBy: 'ai';
   model?: string;
   createdAt: string;
+  lang?: 'en' | 'ru' | 'ja';
 }
 
 export interface Session {

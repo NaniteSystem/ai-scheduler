@@ -2008,3 +2008,8 @@ export function useT() {
   const lang = useStore((s) => s.lang);
   return (key: string, vars?: Record<string, string | number>) => translate(lang, key, vars);
 }
+
+/** Hook: returns the current app language. */
+export function useLang(): Lang {
+  return useStore((s) => s.lang);
+}
