@@ -1,6 +1,16 @@
 import type { GoalKind, RoadmapDepth, GoalRoadmap, RoadmapPhase, RoadmapNode, Category } from '../types';
 import { CATEGORY_META } from '../types';
-import { llmJson, AiUnavailableError } from './llm';
+import { llmJson, AiUnavailableError, AiOfflineError } from './llm';
+
+// Retry once on transient failures (not when offline) — the first Gemini call sometimes cold-fails.
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); }
+  catch (e) {
+    if (e instanceof AiOfflineError) throw e;
+    await new Promise((r) => setTimeout(r, 700));
+    return await fn();
+  }
+}
 
 export interface RoadmapInput {
   intent: string;
@@ -95,7 +105,7 @@ export async function requestRoadmapQuestions(input: RoadmapInput): Promise<Clar
   const prompt = `Goal intent: "${input.intent}". Category: ${input.category || 'unknown'}. Depth: ${input.depth}.
 Return JSON { "questions": string[] } with 2-4 SHORT questions whose answers materially change the roadmap (e.g. current level, target timeframe, sub-focus). Questions in language "${input.lang}". If no question is needed, return an empty array.`;
   const schema = { type: 'object', properties: { questions: { type: 'array', items: { type: 'string' } } }, required: ['questions'] };
-  const raw = await llmJson<any>({ system: SYSTEM(input.lang), prompt, responseSchema: schema, temperature: 0.4 });
+  const raw = await withRetry(() => llmJson<any>({ system: SYSTEM(input.lang), prompt, responseSchema: schema, temperature: 0.4 }));
   const questions = Array.isArray(raw?.questions) ? raw.questions.filter((q: any) => typeof q === 'string').slice(0, 4) : [];
   return { questions };
 }
@@ -104,7 +114,7 @@ export async function requestRoadmap(input: RoadmapInput): Promise<RoadmapResult
   const answers = (input.answers || []).map((x) => `Q: ${x.q}\nA: ${x.a}`).join('\n');
   const prompt = `Goal intent: "${input.intent}". Category: ${input.category || 'unknown'}. Depth: ${input.depth} (${NODE_BUDGET[input.depth]}).
 ${answers ? `Clarifying answers:\n${answers}\n` : ''}Decide status. If ok/reframe, include "kind", "tips" (3-6 short advice strings: apps/courses/channels), and "phases". For refuse, include "reasonType" and "message" (and optional "suggestion"). For ok/reframe also set "category" to the best fit from: ${Object.keys(CATEGORY_META).join(', ')}. All user-facing text in language "${input.lang}".`;
-  const raw = await llmJson<any>({ system: SYSTEM(input.lang), prompt, responseSchema: RESULT_SCHEMA, temperature: 0.6 });
+  const raw = await withRetry(() => llmJson<any>({ system: SYSTEM(input.lang), prompt, responseSchema: RESULT_SCHEMA, temperature: 0.6 }));
 
   if (raw?.status === 'refuse') {
     const reasonType = ['impossible', 'unsafe', 'unclear'].includes(raw.reasonType) ? raw.reasonType : 'unclear';
