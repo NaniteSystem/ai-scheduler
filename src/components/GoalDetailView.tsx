@@ -73,8 +73,8 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const readyByDate = completionType === 'date' && !!goal.deadline && new Date() >= parseISO(goal.deadline);
   const readyToComplete = !isCompleted && (readyByHours || readyByDate);
   const completeGoal = (outcome: 'success' | 'failed') => {
+    // Note: does NOT close the modal — the Complete survey advances to follow-up questions itself.
     updateGoal(goal.id, { status: 'completed', outcome, completedAt: new Date().toISOString() });
-    setCompleteOpen(false);
   };
   const reopenGoal = () => updateGoal(goal.id, { status: 'active', outcome: undefined, completedAt: undefined });
 
