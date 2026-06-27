@@ -44,6 +44,7 @@ export interface Goal {
 export type GoalKind = 'learn' | 'acquire' | 'build' | 'other';
 export type RoadmapDepth = 'surface' | 'medium' | 'deep';
 export type RoadmapNodeKind = 'skill' | 'knowledge' | 'task' | 'milestone';
+export type LocalizedText = string | Partial<Record<'en' | 'ru' | 'ja', string>>;
 
 export interface RoadmapResource {
   label: string;
