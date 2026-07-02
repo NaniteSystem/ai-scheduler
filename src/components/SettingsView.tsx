@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
-import { User, Info, Clock, Target, Sparkles, Calendar, Sunrise, Check, Languages, LayoutGrid } from 'lucide-react';
-import { TimePicker } from './ui/TimePicker';
-
-const hmToMin = (t: string) => { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-const minToHm = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Trash2 } from 'lucide-react';
 
 export function SettingsView() {
   const t = useT();
+  const store = useStore();
   const { goals, sessions, gtdTasks, userName, schedulePrefs, lang, setLang, setUserName, updatePrefs,
-    theme, setTheme } = useStore();
+    theme, setTheme, askConfirm, resetAll, resetIntroCourse } = store;
   const [name, setName] = useState(userName);
   const [saved, setSaved] = useState(false);
 
@@ -24,6 +21,7 @@ export function SettingsView() {
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
+  const confirmReset = () => askConfirm({ title: t('settings.resetTitle'), message: t('settings.resetMsg'), confirmLabel: t('settings.reset'), danger: true, onConfirm: resetAll });
 
   return (
     <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] space-y-6">
@@ -107,18 +105,6 @@ export function SettingsView() {
           </div>
         </div>
 
-        {/* Wake / sleep */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-[12px] text-[var(--text)] font-medium mb-2 flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5 text-amber-400" /> {t('settings.wake')}</div>
-            <TimePicker label={t('settings.wake')} value={hmToMin(schedulePrefs.wakeTime)} onChange={v => updatePrefs({ wakeTime: minToHm(v) })} />
-          </div>
-          <div>
-            <div className="text-[12px] text-[var(--text)] font-medium mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-indigo-400" /> {t('settings.sleep')}</div>
-            <TimePicker label={t('settings.sleep')} value={hmToMin(schedulePrefs.sleepTime)} onChange={v => updatePrefs({ sleepTime: minToHm(v) })} />
-          </div>
-        </div>
-
         {/* Productivity peak */}
         <div>
           <div className="text-[12px] text-[var(--text)] font-medium mb-2">{t('settings.peak')}</div>
@@ -147,11 +133,31 @@ export function SettingsView() {
         </div>
       </div>
 
+      {/* App guide */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-2">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> {t('settings.guide')}</div>
+        <p className="text-[12px] text-[var(--text-dim)] leading-relaxed mb-4">{t('settings.guideSub')}</p>
+        <button
+          onClick={resetIntroCourse}
+          className="w-full h-10 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[var(--primary)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--primary)]/15 transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />{t('settings.guideOpen')}
+        </button>
+      </div>
+
+      {/* Data export/import actions were retired; keep only reset in the UI. */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-3">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Download className="w-3.5 h-3.5" /> {t('settings.data')}</div>
+        <div className="grid grid-cols-1 gap-2">
+          <button onClick={confirmReset} className="h-10 rounded-xl bg-red-500/10 border border-red-500/30 text-[12px] font-bold text-red-400 flex items-center justify-center gap-1.5"><Trash2 className="w-4 h-4" />{t('settings.reset')}</button>
+        </div>
+      </div>
+
       {/* About */}
       <div className="card p-5 md:p-6 anim-fade anim-delay-3">
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Info className="w-3.5 h-3.5" /> {t('settings.about')}</div>
         <div className="space-y-2 text-[12px]">
-          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.appField')}</span><span className="text-[var(--text)]">Scheduler — {t('app.tagline')}</span></div>
+          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.appField')}</span><span className="text-[var(--text)]">Nebulla — {t('app.tagline')}</span></div>
           <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.version')}</span><span className="text-[var(--text)] mono">1.0.0</span></div>
           <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.weekStart')}</span><span className="text-[var(--text)]">{weekStartsOn === 1 ? t('settings.monday') : t('settings.sunday')}</span></div>
         </div>

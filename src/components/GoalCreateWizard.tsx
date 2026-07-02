@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { CATEGORY_META } from '../types';
@@ -23,7 +23,6 @@ export function GoalCreateWizard() {
 
   const [step, setStep] = useState<Step>('mode');
   const [intent, setIntent] = useState('');
-  const [manualCat, setManualCat] = useState<Category | ''>('');
   const [manualSub, setManualSub] = useState('');
   const [depth, setDepth] = useState<RoadmapDepth>('medium');
   const [questions, setQuestions] = useState<string[]>([]);
@@ -84,12 +83,13 @@ export function GoalCreateWizard() {
   };
 
   const createManual = () => {
-    if (!intent.trim() || !manualCat) return;
-    const meta = CATEGORY_META[manualCat as Category] || CATEGORY_META.personal;
+    if (!intent.trim()) return;
+    const cat: Category = 'personal';
+    const meta = CATEGORY_META[cat] || CATEGORY_META.personal;
     const id = `g${Date.now()}`;
     store.addGoal({
       id, title: intent.trim(), subtitle: manualSub.trim() || undefined,
-      category: manualCat as Category, emoji: meta.emoji, color: meta.color,
+      category: cat, emoji: meta.emoji, color: meta.color,
       priority: 2, totalHoursEstimated: 0, hoursPerWeekTarget: 3,
       sessionsCompleted: 0, sessionsTotal: 0, hoursLogged: 0,
       milestones: [], metadata: { kind: 'manual' }, status: 'active',
@@ -98,7 +98,7 @@ export function GoalCreateWizard() {
   };
 
   const refuseMsg = (r: Extract<RoadmapResult, { status: 'refuse' }>) =>
-    r.message || t(r.reasonType === 'impossible' ? 'gw.refuseImpossible' : r.reasonType === 'unsafe' ? 'gw.refuseUnsafe' : 'gw.refuseUnclear');
+    r.message || t(r.reasonType === 'impossible' ? 'gw.refuseImpossible' : r.reasonType === 'unsafe' ? 'gw.refuseUnsafe' : r.reasonType === 'nonsense' ? 'gw.refuseNonsense' : 'gw.refuseUnclear');
 
   const fld = 'w-full rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[14px] text-[var(--text)] placeholder:text-[var(--text-mute)] focus:outline-none focus:border-[var(--primary)]';
 
@@ -131,14 +131,6 @@ export function GoalCreateWizard() {
               <div>
                 <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gw.intentLabel')}</label>
                 <input autoFocus value={intent} onChange={(e) => setIntent(e.target.value)} placeholder={t('gw.intentPlaceholder')} className={fld} />
-              </div>
-              <div>
-                <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gw.category')}</label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {Object.entries(CATEGORY_META).map(([k, v]) => (
-                    <button key={k} onClick={() => setManualCat(k as Category)} className={`px-2 py-2 rounded-xl border text-[11px] text-left transition-all ${manualCat === k ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--text)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{v.emoji} {t('cat.' + k)}</button>
-                  ))}
-                </div>
               </div>
               <div>
                 <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gd.subtitle')}</label>
@@ -186,12 +178,7 @@ export function GoalCreateWizard() {
             </div>
           )}
 
-          {step === 'generating' && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] grid place-items-center mb-4 animate-pulse"><Sparkles className="w-7 h-7 text-white" /></div>
-              <div className="text-[14px] font-bold text-[var(--text)]">{t('gw.generating')}</div>
-            </div>
-          )}
+          {step === 'generating' && <GeneratingView t={t} />}
 
           {step === 'refuse' && refuse && (
             <div className="space-y-3 text-center py-2">
@@ -216,7 +203,7 @@ export function GoalCreateWizard() {
           </>)}
           {step === 'manual' && (<>
             <button onClick={() => setStep('mode')} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--text-dim)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{t('gw.back')}</button>
-            <button disabled={!intent.trim() || !manualCat} onClick={createManual} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />{t('gw.create')}</button>
+            <button disabled={!intent.trim()} onClick={createManual} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40 flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />{t('gw.create')}</button>
           </>)}
           {step === 'depth' && (<>
             <button onClick={() => setStep('intent')} className="h-11 px-4 rounded-xl border border-[var(--border)] text-[13px] font-bold text-[var(--text-dim)] flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{t('gw.back')}</button>
@@ -237,6 +224,49 @@ export function GoalCreateWizard() {
           </>)}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Animated "generating" screen. No real progress is available (one LLM call ~60s),
+// so we ease a fake percentage toward ~95% and rotate status lines so the wait feels alive.
+function GeneratingView({ t }: { t: (k: string) => string }) {
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      // Ease-out toward 95%: fast at first, asymptotically slowing. TAU≈22s feels right for a ~60s call.
+      setPct(Math.min(95, Math.round(95 * (1 - Math.exp(-elapsed / 22000)))));
+    }, 180);
+    return () => clearInterval(id);
+  }, []);
+
+  const msgKey = pct < 25 ? 'gw.gen1' : pct < 55 ? 'gw.gen2' : pct < 80 ? 'gw.gen3' : 'gw.gen4';
+  const R = 44;
+  const C = 2 * Math.PI * R;
+
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <div className="relative w-28 h-28 mb-5">
+        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+          <circle cx="50" cy="50" r={R} fill="none" stroke="var(--border)" strokeWidth="7" />
+          <circle
+            cx="50" cy="50" r={R} fill="none" stroke="var(--primary)" strokeWidth="7" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)}
+            style={{ transition: 'stroke-dashoffset 0.4s ease-out' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[26px] font-extrabold text-[var(--text)] leading-none tabular-nums">{pct}<span className="text-[15px] text-[var(--text-dim)]">%</span></span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 text-[14px] font-bold text-[var(--text)]">
+        <Sparkles className="w-4 h-4 text-[var(--primary)] animate-pulse" />{t('gw.generating')}
+      </div>
+      <div key={msgKey} className="mt-1.5 text-[12px] text-[var(--text-dim)] anim-pop">{t(msgKey)}</div>
+      <div className="mt-3 text-[11px] text-[var(--text-mute)]">{t('gw.genHint')}</div>
     </div>
   );
 }

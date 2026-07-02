@@ -192,6 +192,36 @@ export function nextDueDate(base: string | undefined, pattern: RecurringPattern)
   return format(d, 'yyyy-MM-dd');
 }
 
+function taskFromSession(session: Session, createdAt = new Date().toISOString()): GTDTask {
+  return {
+    id: `t-${session.id}`,
+    sessionId: session.id,
+    title: session.title,
+    description: session.description || undefined,
+    status: 'scheduled',
+    priority: 3,
+    createdAt,
+    processedAt: createdAt,
+    updatedAt: createdAt,
+    durationMinutes: session.durationMinutes || undefined,
+    scheduledDate: session.date || undefined,
+    context: '@anywhere',
+    tags: [],
+  };
+}
+
+function syncTaskWithSession(task: GTDTask, session: Session): GTDTask {
+  return {
+    ...task,
+    title: session.title || task.title,
+    description: session.description || task.description,
+    durationMinutes: session.durationMinutes || task.durationMinutes,
+    scheduledDate: session.date || task.scheduledDate,
+    status: task.status === 'trash' || task.status === 'done' ? task.status : 'scheduled',
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 const defaultLifeBlocks: LifeBlock[] = [
   { id:'sleep', label:'Sleep', emoji:'😴', color:'#6366f1', category:'essential', hoursPerDay:8, minHours:5, maxHours:10, recommended:8, enabled:true, flexible:false, fixedTime:'23:00', description:'Quality rest is the foundation of productivity' },
   { id:'breakfast', label:'Breakfast', emoji:'🍳', color:'#f59e0b', category:'essential', hoursPerDay:0.5, minHours:0, maxHours:1.5, recommended:0.5, enabled:true, flexible:true, fixedTime:'07:30', description:'Morning fuel' },
@@ -352,6 +382,9 @@ interface S {
   userProfile: { focus: string[]; struggles: string[]; sleep: string } | null;
   setUserProfile: (p: { focus: string[]; struggles: string[]; sleep: string }) => void;
   onboarded: boolean;
+  introCourseCompleted: boolean;
+  completeIntroCourse: () => void;
+  resetIntroCourse: () => void;
   aiDisclaimerAcceptedAt: string | null;
   acceptAiDisclaimer: () => void;
   pendingGoalId: string | null;
@@ -383,8 +416,8 @@ interface S {
   confirmDialog: ConfirmOpts | null;
   askConfirm: (o: ConfirmOpts) => void;
   closeConfirm: () => void;
-  scheduleSeed: { title: string; durationMinutes: number } | null;
-  scheduleFromTask: (title: string, durationMinutes: number) => void;
+  scheduleSeed: { title: string; durationMinutes: number; taskId?: string } | null;
+  scheduleFromTask: (title: string, durationMinutes: number, taskId?: string) => void;
   consumeScheduleSeed: () => void;
   editSessionId: string | null;
   requestEditSession: (id: string) => void;
@@ -392,6 +425,7 @@ interface S {
   setUserName: (name: string) => void;
   completeOnboarding: (name: string) => void;
   resetAll: () => void;
+  restoreBackup: (data: any) => void;
   setActiveView: (v: S['activeView']) => void;
   setGTDFilter: (f: string) => void;
   setActiveContext: (c: string) => void;
@@ -415,6 +449,7 @@ interface S {
   updateSession: (id: string, p: Partial<Session>) => void;
   moveSession: (id: string, newDate: string, newHour?: number, newMinute?: number) => void;
   resizeSession: (id: string, newDuration: number) => void;
+  syncScheduledSessions: () => void;
   openSessionModal: (id: string) => void;
   closeSessionModal: () => void;
   captureTask: (title: string, dur?: number) => void;
@@ -504,6 +539,9 @@ export const useStore = create<S>()(persist((set) => ({
   userProfile: null,
   setUserProfile: (p) => set({ userProfile: p }),
   onboarded: false,
+  introCourseCompleted: false,
+  completeIntroCourse: () => set({ introCourseCompleted: true }),
+  resetIntroCourse: () => set({ introCourseCompleted: false }),
   aiDisclaimerAcceptedAt: null,
   acceptAiDisclaimer: () => set({ aiDisclaimerAcceptedAt: new Date().toISOString() }),
   pendingGoalId: null,
@@ -531,7 +569,7 @@ export const useStore = create<S>()(persist((set) => ({
   askConfirm: (o) => set({ confirmDialog: o }),
   closeConfirm: () => set({ confirmDialog: null }),
   scheduleSeed: null,
-  scheduleFromTask: (title, durationMinutes) => set({ scheduleSeed: { title, durationMinutes }, activeView: 'week' }),
+  scheduleFromTask: (title, durationMinutes, taskId) => set({ scheduleSeed: { title, durationMinutes, taskId }, activeView: 'week' }),
   consumeScheduleSeed: () => set({ scheduleSeed: null }),
   editSessionId: null,
   requestEditSession: (id) => set({ editSessionId: id, sessionModalId: null, activeView: 'week' }),
@@ -539,6 +577,27 @@ export const useStore = create<S>()(persist((set) => ({
   setUserName: (name) => set({ userName: name.trim() }),
   completeOnboarding: (name) => set({ userName: name.trim(), onboarded: true }),
   resetAll: () => set({ goals: [], sessions: [], gtdTasks: [], habits: [], reflections: {}, metricDefs: [], generatedDay: null, weekOffset: 0 }),
+  restoreBackup: (data) => set((s) => ({
+    goals: Array.isArray(data?.goals) ? data.goals : s.goals,
+    sessions: Array.isArray(data?.sessions) ? data.sessions : s.sessions,
+    gtdTasks: Array.isArray(data?.gtdTasks) ? data.gtdTasks : s.gtdTasks,
+    habits: Array.isArray(data?.habits) ? data.habits : s.habits,
+    reflections: data?.reflections && typeof data.reflections === 'object' ? data.reflections : s.reflections,
+    metricDefs: Array.isArray(data?.metricDefs) ? data.metricDefs : s.metricDefs,
+    schedulePrefs: data?.schedulePrefs && typeof data.schedulePrefs === 'object' ? { ...s.schedulePrefs, ...data.schedulePrefs } : s.schedulePrefs,
+    userName: typeof data?.userName === 'string' ? data.userName : s.userName,
+    userProfile: data?.userProfile && typeof data.userProfile === 'object' ? data.userProfile : s.userProfile,
+    onboarded: typeof data?.onboarded === 'boolean' ? data.onboarded : s.onboarded,
+    introCourseCompleted: typeof data?.introCourseCompleted === 'boolean' ? data.introCourseCompleted : s.introCourseCompleted,
+    lang: data?.lang === 'en' || data?.lang === 'ru' || data?.lang === 'ja' ? data.lang : s.lang,
+    theme: data?.theme === 'light' || data?.theme === 'dark' ? data.theme : s.theme,
+    density: data?.density === 'comfortable' || data?.density === 'compact' ? data.density : s.density,
+    habitRemindersEnabled: typeof data?.habitRemindersEnabled === 'boolean' ? data.habitRemindersEnabled : s.habitRemindersEnabled,
+    defaultReminderTime: typeof data?.defaultReminderTime === 'string' ? data.defaultReminderTime : s.defaultReminderTime,
+    generatedDay: data?.generatedDay ?? s.generatedDay,
+    generatedPlan: data?.generatedPlan ?? s.generatedPlan,
+    weekOffset: Number.isFinite(data?.weekOffset) ? data.weekOffset : s.weekOffset,
+  })),
   setActiveView: (v) => set({ activeView: v }),
   setGTDFilter: (f) => set({ gtdFilter: f, activeContext: 'all', activePriority: 'all' }),
   setActiveContext: (c) => set({ activeContext: c }),
@@ -561,22 +620,49 @@ export const useStore = create<S>()(persist((set) => ({
   deleteGoal: (id) => set((s) => ({ goals: s.goals.filter(g => g.id !== id), sessions: s.sessions.map(x => x.goalId === id ? { ...x, goalId: '' } : x) })),
   openLog: (id) => set({ logOpen: true, loggingSessionId: id }),
   closeLog: () => set({ logOpen: false, loggingSessionId: null }),
-  addSession: (sess) => set((s) => ({ sessions: [...s.sessions, sess] })),
-  addSessions: (arr) => set((s) => ({ sessions: [...s.sessions, ...arr] })),
-  deleteSession: (id) => set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) })),
+  addSession: (sess) => set((s) => ({
+    sessions: [...s.sessions, sess],
+    gtdTasks: s.gtdTasks.some((t) => t.sessionId === sess.id) ? s.gtdTasks : [taskFromSession(sess), ...s.gtdTasks],
+  })),
+  addSessions: (arr) => set((s) => {
+    const now = new Date().toISOString();
+    const existing = new Set(s.gtdTasks.map((t) => t.sessionId).filter(Boolean));
+    const linkedTasks = arr.filter((sess) => !existing.has(sess.id)).map((sess) => taskFromSession(sess, now));
+    return { sessions: [...s.sessions, ...arr], gtdTasks: [...linkedTasks, ...s.gtdTasks] };
+  }),
+  deleteSession: (id) => set((s) => ({
+    sessions: s.sessions.filter((x) => x.id !== id),
+    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : t),
+  })),
   deleteSeries: (seriesId) => set((s) => ({ sessions: s.sessions.filter((x) => x.seriesId !== seriesId) })),
-  updateSession: (id, p) => set((s) => ({ sessions: s.sessions.map((x) => x.id === id ? { ...x, ...p } : x) })),
+  updateSession: (id, p) => set((s) => {
+    const updated = s.sessions.map((x) => x.id === id ? { ...x, ...p } : x);
+    const session = updated.find((x) => x.id === id);
+    return {
+      sessions: updated,
+      gtdTasks: session ? s.gtdTasks.map((t) => t.sessionId === id ? syncTaskWithSession(t, session) : t) : s.gtdTasks,
+    };
+  }),
   moveSession: (id, newDate, newHour, newMinute) => set((s) => ({ 
     sessions: s.sessions.map((x) => x.id === id ? { 
       ...x, 
       date: newDate, 
       ...(newHour !== undefined ? { startHour: newHour } : {}),
       ...(newMinute !== undefined ? { startMinute: newMinute } : {}),
-    } : x) 
+    } : x),
+    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, scheduledDate: newDate, updatedAt: new Date().toISOString() } : t),
   })),
   resizeSession: (id, newDuration) => set((s) => ({ 
-    sessions: s.sessions.map((x) => x.id === id ? { ...x, durationMinutes: Math.max(15, newDuration) } : x) 
+    sessions: s.sessions.map((x) => x.id === id ? { ...x, durationMinutes: Math.max(15, newDuration) } : x),
+    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, durationMinutes: Math.max(15, newDuration), updatedAt: new Date().toISOString() } : t),
   })),
+  syncScheduledSessions: () => set((s) => {
+    const linked = new Set(s.gtdTasks.map((t) => t.sessionId).filter(Boolean));
+    const missing = s.sessions.filter((session) => session.date && !linked.has(session.id));
+    if (!missing.length) return {};
+    const now = new Date().toISOString();
+    return { gtdTasks: [...missing.map((session) => taskFromSession(session, now)), ...s.gtdTasks] };
+  }),
   openSessionModal: (id) => set({ sessionModalId: id }),
   closeSessionModal: () => set({ sessionModalId: null }),
   captureTask: (title, dur = 5) => set((s) => ({
@@ -595,6 +681,7 @@ export const useStore = create<S>()(persist((set) => ({
     const now = new Date().toISOString();
     const orig = s.gtdTasks.find((x) => x.id === id);
     const mapped = s.gtdTasks.map((x) => x.id === id ? { ...x, status, processedAt: now, updatedAt: now, completedAt: status === 'done' ? now : x.completedAt, ...ctx } : x);
+    const linkedSessionId = orig?.sessionId;
     // Completing a recurring task spawns the next occurrence (Microsoft To Do behaviour).
     if (status === 'done' && orig && orig.recurring && orig.status !== 'done') {
       const due = nextDueDate(orig.dueDate, orig.recurring);
@@ -613,9 +700,17 @@ export const useStore = create<S>()(persist((set) => ({
         completedPomodoros: 0,
         subtasks: (orig.subtasks || []).map((st) => ({ ...st, done: false })),
       };
-      return { gtdTasks: [next, ...mapped] };
+      return {
+        gtdTasks: [next, ...mapped],
+        sessions: linkedSessionId ? s.sessions.map((x) => x.id === linkedSessionId ? { ...x, status: 'done' } : x) : s.sessions,
+      };
     }
-    return { gtdTasks: mapped };
+    return {
+      gtdTasks: mapped,
+      sessions: linkedSessionId && status === 'done'
+        ? s.sessions.map((x) => x.id === linkedSessionId ? { ...x, status: 'done' } : x)
+        : s.sessions,
+    };
   }),
   updateTask: (id, patch) => set((s) => ({
     gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, ...patch, updatedAt: new Date().toISOString() } : x)
@@ -832,7 +927,8 @@ export const useStore = create<S>()(persist((set) => ({
   // v2: dropped the seeded demo data — start every install on a clean slate.
   // v3: self-heal malformed/legacy sessions (missing tasks[] or startHour) so they
   //     never crash the session drawer or render "undefined:00".
-  version: 3,
+  // v4: add first-run intro course; existing onboarded users are marked complete.
+  version: 4,
   migrate: (persisted: any, version) => {
     if (version < 2 && persisted) {
       return { ...persisted, goals: [], sessions: [], gtdTasks: [], generatedDay: null, userName: '', onboarded: false };
@@ -845,6 +941,9 @@ export const useStore = create<S>()(persist((set) => ({
         startMinute: Number.isFinite(s.startMinute) ? s.startMinute : 0,
         durationMinutes: Number.isFinite(s.durationMinutes) ? s.durationMinutes : 60,
       }));
+    }
+    if (version < 4 && persisted) {
+      persisted.introCourseCompleted = !!persisted.onboarded;
     }
     return persisted;
   },
@@ -863,6 +962,7 @@ export const useStore = create<S>()(persist((set) => ({
     userName: s.userName,
     userProfile: s.userProfile,
     onboarded: s.onboarded,
+    introCourseCompleted: s.introCourseCompleted,
     aiDisclaimerAcceptedAt: s.aiDisclaimerAcceptedAt,
     lang: s.lang,
     schedulePrefs: s.schedulePrefs,

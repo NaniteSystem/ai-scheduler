@@ -58,7 +58,7 @@ export function TimePicker({ value, onChange, label }: { value: number; onChange
       </button>
 
       {open && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm anim-fade" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm anim-fade" onClick={() => setOpen(false)}>
           <div className="w-full max-w-xs card overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3.5 border-b border-[var(--border)] flex items-center gap-2">
               <Clock className="w-4 h-4 text-[var(--primary)]" />

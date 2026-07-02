@@ -1,0 +1,7 @@
+{
+  "name": "scheduler-ai-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Auth proxy (Gemini → OpenRouter failover) for Scheduler roadmap generation. Deployed standalone to Vercel.",
+  "engines": { "node": ">=18" }
+}

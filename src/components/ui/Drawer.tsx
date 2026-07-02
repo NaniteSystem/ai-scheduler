@@ -35,7 +35,7 @@ export function Drawer({ open, onClose, title, subtitle, width = 'md', children,
       {/* Panel — mobile: bottom sheet hugging content (capped); desktop: right-side panel */}
       <div
         ref={ref}
-        className={`absolute inset-x-2 bottom-2 max-h-[88vh] md:inset-x-auto md:top-2 md:right-2 md:bottom-2 md:left-auto md:max-h-none w-auto ${WIDTHS[width]} bg-[var(--surface)] border border-[var(--border)] rounded-2xl pointer-events-auto flex flex-col anim-sheet overflow-hidden`}
+        className={`absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+24px)] max-h-[calc(88vh-env(safe-area-inset-bottom)-24px)] md:inset-x-auto md:top-2 md:right-2 md:bottom-2 md:left-auto md:max-h-none w-auto ${WIDTHS[width]} bg-[var(--surface)] border border-[var(--border)] rounded-2xl pointer-events-auto flex flex-col anim-sheet overflow-hidden`}
         style={{ boxShadow: '0 18px 60px rgba(20,25,50,0.35)' }}
       >
         {/* Grab handle (mobile only) */}

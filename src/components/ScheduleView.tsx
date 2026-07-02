@@ -23,6 +23,17 @@ function minToTime(totalMin: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+const LEGACY_LINKED_NOTES = new Set([
+  'Linked session. Drag to reschedule.',
+  'Связанная сессия. Перетащите, чтобы перенести.',
+  'リンクされたセッション。ドラッグして予定を変更できます。',
+]);
+
+function cleanSessionNote(note?: string) {
+  const value = (note || '').trim();
+  return LEGACY_LINKED_NOTES.has(value) ? '' : value;
+}
+
 interface Props {
   ws: Date;
   days: Date[];
@@ -30,11 +41,6 @@ interface Props {
   goals: Goal[];
   weekOffset: number;
   store: any;
-  qt: string;
-  setQt: (v: string) => void;
-  qd: number;
-  setQd: (v: number) => void;
-  capture: () => void;
   goalColor: (id: string) => string;
   goalEmoji: (id: string) => string;
 }
@@ -53,6 +59,7 @@ interface Draft {
   color?: string;          // custom color override
   icon?: string;           // custom icon key
   sourceId?: string;       // id of an unscheduled backlog session to move (instead of copy)
+  sourceTaskId?: string;   // GTD task that requested calendar scheduling
   editId?: string;         // id of an existing session being edited (update in place instead of create)
   allDay: boolean;
   spanDays: number;        // 1 = single day; >1 creates linked instances across consecutive days
@@ -175,7 +182,7 @@ function layoutDay(items: Session[]): Record<string, { col: number; cols: number
   return res;
 }
 
-export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt, setQt, capture, goalColor, goalEmoji }: Props) {
+export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goalColor, goalEmoji }: Props) {
   const tr = useT();
   const locale = useDateLocale();
   const monthsShort = Array.from({ length: 12 }, (_, i) => format(new Date(2020, i, 1), 'LLL', { locale }));
@@ -202,7 +209,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
     const seed = store.scheduleSeed;
     if (!seed) return;
     setMode('week');
-    setDraft({ title: seed.title, goalId: goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', ...DRAFT_DEFAULTS });
+    setDraft({ title: seed.title, goalId: goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', sourceTaskId: seed.taskId, ...DRAFT_DEFAULTS });
     store.consumeScheduleSeed();
   }, [store.scheduleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -222,7 +229,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
       color: s.color || '', icon: s.icon || '',
       allDay: !!s.allDay, spanDays: 1,
       reminderMinutes: s.reminderMinutes ?? -1,
-      location: s.location || '', url: s.url || '', description: s.description || '',
+      location: s.location || '', url: s.url || '', description: cleanSessionNote(s.description),
       weekdays: [],
     });
     store.consumeEditSession();
@@ -301,8 +308,8 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
   // On touch: hold a block ~0.45s to "pick it up", then drag to move, or drag
   // from the bottom edge to resize. Moving the finger before the hold completes
   // is treated as a scroll and cancels. A plain tap still opens the session.
-  const LONG_PRESS_MS = 450;
-  const PRESS_CANCEL_PX = 10;
+  const LONG_PRESS_MS = 260;
+  const PRESS_CANCEL_PX = 16;
   const [pressSid, setPressSid] = useState<string | null>(null);
   const draggedRef = useRef(false);
   const pressRef = useRef<{ sid: string; startX: number; startY: number; origDur: number; origStartMin: number; kind: 'move' | 'resize'; armed: boolean; touch: boolean; timer: number; tgtDayIdx: number; tgtMin: number } | null>(null);
@@ -451,7 +458,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
       startMinute: m,
       durationMinutes: draft.allDay ? 0 : draft.durationMinutes,
       title: draft.title.trim(),
-      description: note || (linked ? tr('sched.linkedSession') : ''),
+      description: note,
       tasks: [],
       sessionType: draft.sessionType,
       status: 'planned',
@@ -464,6 +471,18 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
       ...(seriesId ? { seriesId } : {}),
       ...(seriesId && draft.recurrence !== 'none' ? { recurrence: draft.recurrence as RecurringPattern } : {}),
     }));
+    if (draft.sourceTaskId && newSessions.length === 1) {
+      const sess = newSessions[0];
+      store.updateTask(draft.sourceTaskId, {
+        sessionId: sess.id,
+        title: sess.title,
+        status: 'scheduled',
+        scheduledDate: sess.date,
+        durationMinutes: sess.durationMinutes || undefined,
+        dueDate: undefined,
+        isTodayFocus: false,
+      });
+    }
     if (newSessions.length === 1) store.addSession(newSessions[0]);
     else store.addSessions(newSessions);
     setDraft(null);
@@ -490,7 +509,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
       {/* Header */}
       <div className="flex flex-col gap-3 mb-5 shrink-0">
         {/* Row 1: title + period navigation */}
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
             <h1 className="display text-[26px] md:text-[36px] text-[var(--text)]">{tr('nav.schedule')}</h1>
             <div className="text-[13px] text-[var(--text-dim)] mt-1 truncate capitalize">
@@ -500,7 +519,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
               {mode === 'year' && format(yearDate, 'yyyy', { locale })}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-start">
             <button onClick={goPrev} className="w-8 h-8 rounded-lg border border-[var(--border)] grid place-items-center hover:bg-[var(--surface-2)] text-[var(--text-dim)] transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -513,21 +532,32 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
           </div>
         </div>
         {/* Row 2: mode toggle + new session */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center p-0.5 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
-            {MODE_LABELS.map(m => (
-              <button key={m.id} onClick={() => setMode(m.id)}
-                className={`h-7 px-3 rounded-md text-[11px] font-bold transition-all ${mode === m.id ? 'bg-[var(--border)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
-                {tr(m.label)}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="inline-flex w-fit max-w-full items-center p-0.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
+              {MODE_LABELS.map(m => (
+                <button key={m.id} onClick={() => setMode(m.id)}
+                  className={`h-7 px-3 rounded-md text-[11px] font-bold transition-all whitespace-nowrap ${mode === m.id ? 'bg-[var(--border)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                  {tr(m.label)}
+                </button>
+              ))}
+            </div>
+            {mode === 'year' ? (
+              <button
+                onClick={() => store.openWizard()}
+                className="h-8 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" /> {tr('goals.newGoal')}
               </button>
-            ))}
+            ) : (
+              <button
+                onClick={() => setDraft({ title: '', goalId: goals[0]?.id ?? '', dayIdx: 0, date: mode === 'day' ? format(selectedDay, 'yyyy-MM-dd') : undefined, startMin: 9 * 60, durationMinutes: 60, sessionType: 'regular', recurrence: 'none', ...DRAFT_DEFAULTS })}
+                className="h-8 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" /> {tr('sched.newSession')}
+              </button>
+            )}
           </div>
-          {mode !== 'year' && (
-            <button onClick={() => setDraft({ title: '', goalId: goals[0]?.id ?? '', dayIdx: 0, date: mode === 'day' ? format(selectedDay, 'yyyy-MM-dd') : undefined, startMin: 9 * 60, durationMinutes: 60, sessionType: 'regular', recurrence: 'none', ...DRAFT_DEFAULTS })}
-              className="h-8 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors">
-              <Plus className="w-3.5 h-3.5" /> {tr('sched.newSession')}
-            </button>
-          )}
         </div>
       </div>
 
@@ -535,7 +565,10 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
       {mode === 'week' && (
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-[calc(env(safe-area-inset-bottom)+96px)] md:pb-0">
         {/* Calendar Grid */}
-        <div className="card overflow-auto min-w-0 h-[62vh] md:h-auto md:flex-1 shrink-0">
+        <div
+          className="card overflow-auto min-w-0 h-[62vh] md:h-auto md:flex-1 shrink-0"
+          style={{ touchAction: 'pan-y' }}
+        >
           {/* Day Headers */}
           <div className="grid grid-cols-[44px_repeat(7,minmax(118px,1fr))] md:grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)] sticky top-0 z-40 bg-[var(--surface)]">
             <div className="h-14" />
@@ -649,7 +682,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
                           background: `${color}${s.status === 'done' ? '44' : 'dd'}`,
                           borderLeft: `3px solid ${color}`,
                           cursor: pressSid === s.id ? 'grabbing' : 'grab',
-                          touchAction: pressSid === s.id ? 'none' : undefined,
+                          touchAction: pressSid === s.id ? 'none' : 'pan-y',
                         }}
                       >
                         {/* Drag handle */}
@@ -667,9 +700,9 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
                               {String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')} · {fmtDur(s.durationMinutes, store.lang)}
                             </div>
                           )}
-                          {height > 55 && (
+                          {height > 55 && cleanSessionNote(s.description) && (
                             <div className={`text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/60'} mt-1 line-clamp-2 leading-snug`}>
-                              {s.description}
+                              {cleanSessionNote(s.description)}
                             </div>
                           )}
                         </div>
@@ -739,16 +772,6 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
             )}
           </button>
 
-          {/* Quick Capture */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">{tr('sched.capture')}</div>
-            <div className="flex gap-1.5">
-              <input value={qt} onChange={e => setQt(e.target.value)} onKeyDown={e => e.key === 'Enter' && capture()} placeholder={tr('sidebar.addTask')}
-                className="flex-1 h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] px-3 text-[11px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--primary)]" />
-              <button onClick={capture} className="w-8 h-8 rounded-lg bg-[var(--primary)] text-white grid place-items-center hover:opacity-90"><Plus className="w-3.5 h-3.5" /></button>
-            </div>
-          </div>
-
           {/* Missed */}
           {sessions.filter(s => !!s.date && isPast(new Date(s.date)) && s.status === 'planned').length > 0 && (
             <div className="card p-4 border-red-500/10 bg-red-500/[.02]">
@@ -763,25 +786,6 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
               </div>
             </div>
           )}
-
-          {/* Upcoming */}
-          <div className="card p-4">
-            <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">{tr('sched.nextUp')}</div>
-            <div className="space-y-2">
-              {sessions.filter(s => !!s.date && s.status === 'planned' && !isPast(new Date(s.date))).slice(0, 4).map(s => {
-                const g = goals.find(x => x.id === s.goalId);
-                return (
-                  <div key={s.id} onClick={() => store.openSessionModal(s.id)} className="card-inner p-2.5 flex items-center gap-2 cursor-pointer hover:bg-[var(--surface-2)] transition-colors">
-                    <span className="text-sm">{g?.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-medium text-[var(--text)] truncate">{s.title}</div>
-                      <div className="text-[11px] text-[var(--text-dim)] mono">{format(new Date(s.date), 'MMM d')} · {String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Hint */}
           <div className="text-[11px] text-[var(--text-dim)] text-center py-2 leading-snug">
@@ -804,7 +808,10 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
         const stripDays = Array.from({ length: 7 }, (_, i) => addDays(stripStart, i));
         return (
           <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-[calc(env(safe-area-inset-bottom)+96px)] md:pb-0">
-            <div className="card overflow-auto min-w-0 h-[62vh] md:h-auto md:flex-1 shrink-0">
+            <div
+              className="card overflow-auto min-w-0 h-[62vh] md:h-auto md:flex-1 shrink-0"
+              style={{ touchAction: 'pan-y' }}
+            >
               {/* Week strip — day selector (как в iOS-календаре) */}
               <div className="sticky top-0 z-40 bg-[var(--surface)] border-b border-[var(--border)] px-1.5 py-2 grid grid-cols-7 gap-1">
                 {stripDays.map(d => {
@@ -858,13 +865,13 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, qt,
                         onClick={(e) => onBlockClick(e, s.id)} onDoubleClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => onBlockPointerDown(e, s)} onPointerMove={onBlockPointerMove} onPointerUp={endBlockPress} onPointerCancel={endBlockPress}
                         className={`absolute rounded-lg overflow-hidden group transition-shadow z-10 hover:z-20 hover:shadow-xl ${dragSid === s.id ? 'opacity-30 z-20 cursor-grabbing' : pressSid === s.id ? 'z-30 shadow-2xl ring-2 ring-[var(--primary)] cursor-grabbing' : 'cursor-pointer'} ${s.status === 'done' ? 'opacity-50' : ''}`}
-                        style={{ top, height, left: `calc(${(lay.col / lay.cols) * 100}% + 6px)`, width: `calc(${100 / lay.cols}% - 10px)`, background: `${color}${s.status === 'done' ? '44' : 'dd'}`, borderLeft: `3px solid ${color}`, touchAction: pressSid === s.id ? 'none' : undefined }}>
+                        style={{ top, height, left: `calc(${(lay.col / lay.cols) * 100}% + 6px)`, width: `calc(${100 / lay.cols}% - 10px)`, background: `${color}${s.status === 'done' ? '44' : 'dd'}`, borderLeft: `3px solid ${color}`, touchAction: pressSid === s.id ? 'none' : 'pan-y' }}>
                         <div className="px-3 py-1.5 h-full flex flex-col">
                           <div className={`text-[11px] font-bold ${s.status === 'done' ? 'text-[var(--text)]' : 'text-white'} truncate leading-tight flex items-center gap-1`}>
                             {s.seriesId && <Repeat className="w-2.5 h-2.5 shrink-0 opacity-80" />}{s.icon ? <SessionIcon name={s.icon} className="w-3 h-3 shrink-0 inline" /> : <span>{goalEmoji(s.goalId)}</span>} {s.title}
                           </div>
                           {height > 34 && <div className={`mono text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/70'} mt-0.5`}>{String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')} · {fmtDur(s.durationMinutes, store.lang)}</div>}
-                          {height > 55 && <div className={`text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/60'} mt-1 line-clamp-2 leading-snug`}>{s.description}</div>}
+                          {height > 55 && cleanSessionNote(s.description) && <div className={`text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/60'} mt-1 line-clamp-2 leading-snug`}>{cleanSessionNote(s.description)}</div>}
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 h-5 flex items-end justify-center pb-1 pointer-events-none"><span className={`w-8 h-1 rounded-full ${s.status === 'done' ? 'bg-[var(--text-mute)]/40' : 'bg-white/45'}`} /></div>
                       </div>
@@ -1192,7 +1199,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
       reminderMinutes: s.reminderMinutes ?? -1,
       location: s.location || '',
       url: s.url || '',
-      description: s.description || '',
+      description: cleanSessionNote(s.description),
       sourceId: s.date ? undefined : s.id,
     });
   };

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
-import { Sparkles, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Moon, Sun } from 'lucide-react';
+import { NebullaMark } from './BrandLogo';
 
 type Opt = { id: string; emoji: string; label: string };
 
@@ -15,7 +16,7 @@ const SLEEP_PREFS: Record<string, { wakeTime: string; sleepTime: string }> = {
 
 export function Onboarding() {
   const t = useT();
-  const { completeOnboarding, updatePrefs, setUserProfile, theme } = useStore();
+  const { completeOnboarding, updatePrefs, setUserProfile, theme, setTheme, lang, setLang } = useStore();
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
@@ -110,9 +111,24 @@ export function Onboarding() {
         <div className="max-w-md mx-auto w-full">
           {step === 0 && (
             <div className="flex flex-col items-center text-center pt-8">
-              <div className="w-16 h-16 rounded-3xl grid place-items-center mb-5 anim-pop" style={{ background: 'linear-gradient(135deg,var(--primary),var(--primary-2))', boxShadow: '0 12px 30px rgba(79,91,213,.35)' }}>
-                <Sparkles className="w-8 h-8 text-white" />
+              <div className="mb-5 grid grid-cols-2 gap-2 w-full max-w-[320px]">
+                <div className="flex rounded-xl bg-[var(--surface)] border border-[var(--border)] p-1">
+                  {(['en','ru','ja'] as const).map(l => (
+                    <button key={l} onClick={() => setLang(l)} className={`h-8 flex-1 px-2 rounded-lg text-[12px] font-bold ${lang === l ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                      {l.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex rounded-xl bg-[var(--surface)] border border-[var(--border)] p-1">
+                  <button onClick={() => setTheme('light')} className={`h-8 flex-1 rounded-lg grid place-items-center ${theme === 'light' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`} aria-label={t('settings.themeLight')}>
+                    <Sun className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setTheme('dark')} className={`h-8 flex-1 rounded-lg grid place-items-center ${theme === 'dark' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`} aria-label={t('settings.themeDark')}>
+                    <Moon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
+              <NebullaMark className="w-24 h-24 mb-5 anim-pop" />
               <h1 className="display text-[32px] text-[var(--text)] leading-tight">{t('onb.welcome')}</h1>
               <p className="text-[14px] text-[var(--text-dim)] mt-2 leading-relaxed">{t('onb.subtitle')}</p>
               <div className="w-full text-left mt-8">

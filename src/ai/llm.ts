@@ -21,9 +21,10 @@ export async function llmJson<T>(req: LlmRequest): Promise<T> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new AiOfflineError();
   let res: Response;
   try {
+    const secret = (import.meta as any).env?.VITE_AI_PROXY_SECRET as string | undefined;
     res = await fetch(`${proxyBase()}/api/ai`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(secret ? { 'x-app-secret': secret } : {}) },
       body: JSON.stringify(req),
     });
   } catch {

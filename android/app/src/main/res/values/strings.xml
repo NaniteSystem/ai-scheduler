@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Scheduler</string>
-    <string name="title_activity_main">Scheduler</string>
+    <string name="app_name">Nebulla</string>
+    <string name="title_activity_main">Nebulla</string>
     <string name="package_name">com.scheduler.app</string>
     <string name="custom_url_scheme">com.scheduler.app</string>
 </resources>

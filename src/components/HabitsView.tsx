@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useStore, habitDueOn, habitStreak, habitBestStreak, habitRate, habitHeatmap, dailyCompletion, moodHabitCorrelation } from '../store';
+import { useStore, habitDueOn, habitStreak, habitBestStreak, habitRate, habitHeatmap, dailyCompletion } from '../store';
 import { useT } from '../i18n';
 import type { Habit, HabitAnchor, HabitRecurrence } from '../types';
 import { Drawer } from './ui/Drawer';
+import { SelectMenu } from './ui/SelectMenu';
+import { TimePicker } from './ui/TimePicker';
 import { format, addDays } from 'date-fns';
-import { Plus, Check, X, Moon, Flame, Repeat, Edit2, Trash2, RotateCcw, Target, BarChart3, Trophy, Award, PenLine, TrendingUp, LayoutGrid } from 'lucide-react';
-
-const MOODS = ['😞', '😕', '😐', '🙂', '😄'];
+import { Plus, Check, X, Moon, Flame, Repeat, Edit2, Trash2, RotateCcw, Target, BarChart3, Trophy, Award, LayoutGrid, ChevronLeft } from 'lucide-react';
 
 type TplHabit = { key: string; emoji: string; color: string; anchor: HabitAnchor; recurrence: HabitRecurrence; targetCount: number; unitKey?: string };
 const TEMPLATES: { id: string; emoji: string; habits: TplHabit[] }[] = [
@@ -33,15 +33,16 @@ const TEMPLATES: { id: string; emoji: string; habits: TplHabit[] }[] = [
 const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899'];
 const EMOJI_SUGGESTIONS = ['💧', '💪', '📖', '🧘', '🏃', '🥗', '💊', '😴', '☀️', '🦷', '🚶', '✍️', '🎯', '🌱', '🧹', '🎧', '☕', '🚭', '🙏', '🎨'];
 const ANCHORS: HabitAnchor[] = ['wake', 'afterBreakfast', 'morning', 'afterLunch', 'afternoon', 'afterDinner', 'evening', 'sleep', 'none'];
-const ANCHOR_EMOJI: Record<HabitAnchor, string> = { wake: '🌅', afterBreakfast: '🍳', morning: '☀️', afterLunch: '🥗', afternoon: '🌤️', afterDinner: '🍽️', evening: '🌆', sleep: '🌙', none: '✨' };
 const RECURRENCES: HabitRecurrence[] = ['daily', 'weekdays', 'weekends', 'weekly', 'everyN'];
+const hmToMin = (t: string) => { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const minToHm = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 
-export function HabitsView() {
+export function HabitsView({ onBack }: { onBack?: () => void }) {
   const tr = useT();
   const { habits, goals, setHabitStatus, incHabit, clearHabitDay } = useStore();
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
   const [templates, setTemplates] = useState(false);
-  const [tab, setTab] = useState<'today' | 'stats' | 'reflect'>('today');
+  const [tab, setTab] = useState<'today' | 'stats'>('today');
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const active = habits.filter(h => !h.archived);
@@ -109,6 +110,7 @@ export function HabitsView() {
       <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] w-full mx-auto space-y-6 pb-24">
         <div className="flex items-end justify-between gap-4 anim-fade">
           <div>
+            {onBack && <button onClick={onBack} className="mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4" />{tr('bottomNav.stats')}</button>}
             <h1 className="display text-[28px] md:text-[44px] text-[var(--text)] leading-none">{tr('habits.title')}</h1>
             <p className="text-[13px] text-[var(--text-dim)] mt-1.5">{tr('habits.subtitle')}</p>
           </div>
@@ -121,14 +123,11 @@ export function HabitsView() {
         <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] w-fit anim-fade">
           <button onClick={() => setTab('today')} className={`h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'today' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><Check className="w-4 h-4" />{tr('habits.tabToday')}</button>
           <button onClick={() => setTab('stats')} className={`h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'stats' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><BarChart3 className="w-4 h-4" />{tr('habits.tabStats')}</button>
-          <button onClick={() => setTab('reflect')} className={`h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'reflect' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><PenLine className="w-4 h-4" />{tr('habits.tabReflect')}</button>
         </div>
 
         {tab === 'stats' && (active.length > 0
           ? <HabitsStats habits={active} />
           : <div className="card border-dashed p-10 text-center text-[13px] text-[var(--text-dim)] anim-fade">{tr('habits.statsEmpty')}</div>)}
-
-        {tab === 'reflect' && <ReflectView habits={active} />}
 
         {tab === 'today' && active.length === 0 && (
           <div className="card border-dashed p-12 text-center anim-fade">
@@ -206,20 +205,15 @@ function TemplatesDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: (
 // ─── Analytics (H2) ────────────────────────────────────────────────────────
 
 function HeatStrip({ h }: { h: Habit }) {
-  const cells = habitHeatmap(h, 91);
-  // pad leading blanks so columns align to weekday (Mon-first)
-  const first = new Date(cells[0].date);
-  const lead = (first.getDay() + 6) % 7;
-  const blanks = Array.from({ length: lead });
+  const cells = habitHeatmap(h, 84);
   return (
-    <div className="grid grid-rows-7 grid-flow-col gap-[3px] w-fit">
-      {blanks.map((_, i) => <div key={`b${i}`} className="w-2.5 h-2.5" />)}
+    <div className="grid grid-cols-12 grid-rows-7 gap-1 w-full">
       {cells.map(c => {
         let style: React.CSSProperties = { background: 'var(--surface-2)' };
         if (c.status === 'failed') style = { background: '#ef444455' };
         else if (c.ratio > 0) style = { background: h.color, opacity: 0.25 + c.ratio * 0.75 };
         else if (c.due) style = { background: 'var(--border)' };
-        return <div key={c.date} title={`${c.date}${c.status ? ' · ' + c.status : ''}`} className="w-2.5 h-2.5 rounded-[3px]" style={style} />;
+        return <div key={c.date} title={`${c.date}${c.status ? ' · ' + c.status : ''}`} className="aspect-square min-w-0 rounded-[5px]" style={style} />;
       })}
     </div>
   );
@@ -290,7 +284,7 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
       {/* Achievements */}
       <section className="anim-fade">
         <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-[.15em] mb-2.5 flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5" />{tr('habits.achievements')}</h3>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-2 max-w-[440px] mx-auto">
           {badges.map(b => (
             <div key={b.id} title={tr('habits.badge.' + b.id + '.desc')} className={`card p-2.5 flex flex-col items-center gap-1 text-center ${b.earned ? '' : 'opacity-30 grayscale'}`}>
               <span className="text-[22px] leading-none">{b.icon}</span>
@@ -308,17 +302,17 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
           const best = habitBestStreak(h);
           const rate = habitRate(h, 30);
           return (
-            <div key={h.id} className="card p-4">
-              <div className="flex items-center gap-3 mb-3">
+            <div key={h.id} className="card p-4 w-full">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{ background: `${h.color}22` }}>{h.emoji || '✅'}</div>
                 <span className="text-[14px] font-bold text-[var(--text)] truncate flex-1">{h.title}</span>
-                <div className="flex items-center gap-3 text-[11px] shrink-0">
+                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] shrink-0">
                   <span className="flex items-center gap-1 text-amber-500 font-bold"><Flame className="w-3.5 h-3.5" />{streak}</span>
                   <span className="text-[var(--text-dim)]">{tr('habits.best')} <b className="text-[var(--text)]">{best}</b></span>
                   <span className="text-[var(--text-dim)]">30d <b className="text-[var(--text)]">{rate == null ? '–' : Math.round(rate * 100) + '%'}</b></span>
                 </div>
               </div>
-              <div className="overflow-x-auto pb-1"><HeatStrip h={h} /></div>
+              <HeatStrip h={h} />
             </div>
           );
         })}
@@ -327,172 +321,13 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
   );
 }
 
-// ─── Reflection (H3) ───────────────────────────────────────────────────────
-
-function ReflectView({ habits }: { habits: Habit[] }) {
-  const tr = useT();
-  const { reflections, metricDefs, setReflection, addMetricDef, deleteMetricDef } = useStore();
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const entry = reflections[today] || { date: today };
-  const [addingMetric, setAddingMetric] = useState(false);
-  const [mName, setMName] = useState('');
-  const [mUnit, setMUnit] = useState('');
-
-  const setMetric = (id: string, v: string) => {
-    const metrics = { ...(entry.metrics || {}) };
-    if (v === '') delete metrics[id]; else metrics[id] = parseFloat(v);
-    setReflection(today, { metrics });
-  };
-  const saveMetricDef = () => {
-    if (!mName.trim()) return;
-    addMetricDef({ id: `m${Date.now()}`, name: mName.trim(), unit: mUnit.trim() || undefined });
-    setMName(''); setMUnit(''); setAddingMetric(false);
-  };
-
-  const corr = moodHabitCorrelation(habits, reflections);
-  const corrLabel = corr.r == null ? null
-    : corr.r >= 0.5 ? tr('habits.corrStrongPos')
-    : corr.r >= 0.2 ? tr('habits.corrWeakPos')
-    : corr.r <= -0.5 ? tr('habits.corrStrongNeg')
-    : corr.r <= -0.2 ? tr('habits.corrWeakNeg')
-    : tr('habits.corrNone');
-
-  // last 30-day series for sparkline (oldest→newest)
-  const series = Array.from({ length: 30 }).map((_, i) => {
-    const d = addDays(new Date(), -(29 - i));
-    const key = format(d, 'yyyy-MM-dd');
-    return { mood: reflections[key]?.mood ?? null, comp: dailyCompletion(habits, d).pct };
-  });
-
-  // recent journal entries (last 21 days, with any content)
-  const history = Array.from({ length: 21 }).map((_, i) => {
-    const key = format(addDays(new Date(), -i), 'yyyy-MM-dd');
-    return reflections[key];
-  }).filter((e): e is NonNullable<typeof e> => !!e && e.date !== today && (e.mood != null || !!e.note || Object.keys(e.metrics || {}).length > 0));
-
-  const lbl = 'block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2';
-
-  return (
-    <div className="space-y-6">
-      {/* Today's reflection */}
-      <section className="card p-5 anim-fade space-y-5">
-        <h3 className="text-[14px] font-bold text-[var(--text)]">{tr('habits.todayReflection')}</h3>
-        <div>
-          <label className={lbl}>{tr('habits.mood')}</label>
-          <div className="flex gap-2">
-            {MOODS.map((m, i) => (
-              <button key={i} onClick={() => setReflection(today, { mood: entry.mood === i + 1 ? undefined : i + 1 })}
-                className={`w-12 h-12 rounded-xl text-[24px] grid place-items-center transition-all ${entry.mood === i + 1 ? 'bg-[var(--primary)]/20 ring-2 ring-[var(--primary)] scale-105' : 'bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border)] grayscale hover:grayscale-0'}`}>{m}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className={lbl}>{tr('habits.journal')}</label>
-          <textarea value={entry.note || ''} onChange={e => setReflection(today, { note: e.target.value })} rows={3}
-            placeholder={tr('habits.journalPlaceholder')}
-            className="w-full rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border)] resize-none" />
-        </div>
-        {/* Metrics */}
-        <div>
-          <label className={lbl}>{tr('habits.metrics')}</label>
-          {metricDefs.length === 0 && !addingMetric && <p className="text-[12px] text-[var(--text-dim)] mb-2">{tr('habits.metricsHint')}</p>}
-          <div className="space-y-2">
-            {metricDefs.map(m => (
-              <div key={m.id} className="flex items-center gap-2">
-                <span className="text-[13px] text-[var(--text)] flex-1 truncate">{m.name}{m.unit ? <span className="text-[var(--text-dim)]"> ({m.unit})</span> : null}</span>
-                <input type="number" value={entry.metrics?.[m.id] ?? ''} onChange={e => setMetric(m.id, e.target.value)}
-                  className="w-24 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-3 text-[13px] text-[var(--text)] mono focus:outline-none focus:border-[var(--border)]" />
-                <button onClick={() => deleteMetricDef(m.id)} className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-mute)] hover:text-red-400 hover:bg-[var(--border)]"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
-          </div>
-          {addingMetric ? (
-            <div className="flex items-center gap-2 mt-2">
-              <input autoFocus value={mName} onChange={e => setMName(e.target.value)} placeholder={tr('habits.metricName')} className="flex-1 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border)]" />
-              <input value={mUnit} onChange={e => setMUnit(e.target.value)} placeholder={tr('habits.metricUnit')} className="w-24 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border)]" />
-              <button onClick={saveMetricDef} disabled={!mName.trim()} className="h-9 px-3 rounded-lg bg-[var(--primary)] text-white text-[12px] font-bold disabled:opacity-40"><Check className="w-4 h-4" /></button>
-              <button onClick={() => { setAddingMetric(false); setMName(''); setMUnit(''); }} className="h-9 px-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px]"><X className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <button onClick={() => setAddingMetric(true)} className="mt-2 text-[12px] font-bold text-[var(--primary)] hover:text-[var(--primary)] flex items-center gap-1.5"><Plus className="w-4 h-4" />{tr('habits.addMetric')}</button>
-          )}
-        </div>
-      </section>
-
-      {/* Correlation */}
-      <section className="card p-5 anim-fade">
-        <h3 className="text-[14px] font-bold text-[var(--text)] flex items-center gap-1.5 mb-1"><TrendingUp className="w-4 h-4 text-[var(--primary)]" />{tr('habits.correlation')}</h3>
-        {corr.r == null ? (
-          <p className="text-[12px] text-[var(--text-dim)]">{tr('habits.corrNeedData')}</p>
-        ) : (
-          <>
-            <p className="text-[12px] text-[var(--text-dim)] mb-3">{corrLabel} · r = <b className="text-[var(--text)] mono">{corr.r.toFixed(2)}</b> · n = {corr.n}</p>
-            <Sparkline series={series} />
-            <div className="flex items-center gap-4 mt-2 text-[10px] text-[var(--text-dim)]">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-[2px] bg-amber-400 inline-block" />{tr('habits.mood')}</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-[2px] bg-[var(--primary)] inline-block" />{tr('habits.completion')}</span>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Journal history */}
-      {history.length > 0 && (
-        <section className="anim-fade space-y-2.5">
-          <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-[.15em]">{tr('habits.journalHistory')}</h3>
-          {history.map(e => (
-            <div key={e.date} className="card p-4 flex gap-3">
-              <span className="text-[22px] leading-none shrink-0">{e.mood ? MOODS[e.mood - 1] : '·'}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] text-[var(--text-dim)] mb-0.5">{format(new Date(e.date), 'EEE, MMM d')}</div>
-                {e.note && <p className="text-[13px] text-[var(--text)] whitespace-pre-wrap break-words">{e.note}</p>}
-                {e.metrics && Object.keys(e.metrics).length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-1.5">
-                    {Object.entries(e.metrics).map(([id, v]) => {
-                      const def = metricDefs.find(m => m.id === id);
-                      return <span key={id} className="text-[11px] text-[var(--text-dim)] bg-[var(--surface)] border border-[var(--border)] rounded-md px-2 py-0.5 mono">{def?.name || '?'}: {v}{def?.unit ? ' ' + def.unit : ''}</span>;
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-    </div>
-  );
-}
-
-function Sparkline({ series }: { series: { mood: number | null; comp: number | null }[] }) {
-  const W = 300, H = 56, n = series.length;
-  const x = (i: number) => (i / (n - 1)) * W;
-  const moodY = (m: number) => H - ((m - 1) / 4) * H;   // 1..5 → bottom..top
-  const compY = (c: number) => H - c * H;                // 0..1 → bottom..top
-  const path = (getY: (i: number) => number | null) => {
-    let d = '', pen = false;
-    for (let i = 0; i < n; i++) {
-      const y = getY(i);
-      if (y == null) { pen = false; continue; }
-      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y.toFixed(1)} `;
-      pen = true;
-    }
-    return d.trim();
-  };
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
-      <path d={path(i => series[i].comp == null ? null : compY(series[i].comp!))} fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={path(i => series[i].mood == null ? null : moodY(series[i].mood!))} fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: () => void }) {
+export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: () => void }) {
   const tr = useT();
   const { addHabit, updateHabit, deleteHabit, askConfirm, goals } = useStore();
   const [title, setTitle] = useState(habit?.title || '');
   const [emoji, setEmoji] = useState(habit?.emoji || '✅');
   const [color, setColor] = useState(habit?.color || '#8b5cf6');
-  const [anchor, setAnchor] = useState<HabitAnchor>(habit?.anchor || 'none');
+  const anchor = habit?.anchor || 'none';
   const [recurrence, setRecurrence] = useState<HabitRecurrence>(habit?.recurrence || 'daily');
   const [intervalDays, setIntervalDays] = useState(habit?.intervalDays || 2);
   const [targetCount, setTargetCount] = useState(habit?.targetCount || 1);
@@ -561,24 +396,22 @@ function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: () => vo
           </div>
         </div>
 
-        {/* When (anchor) — emoji chips */}
+        {/* Time */}
         <div>
-          <label className={lbl}>{tr('habits.anchor')}</label>
-          <div className="flex flex-wrap gap-1.5">
-            {ANCHORS.map(a => (
-              <button key={a} onClick={() => setAnchor(a)} className={`h-9 pl-2 pr-3 rounded-xl text-[12px] font-medium border inline-flex items-center gap-1.5 transition-all active:scale-95 ${anchor === a ? 'border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)] hover:border-[var(--primary)]/40'}`}>
-                <span className="text-[14px] leading-none">{ANCHOR_EMOJI[a]}</span>{tr('habits.anchor.' + a)}
-              </button>
-            ))}
-          </div>
+          <label className={lbl}>{tr('habits.reminder')}</label>
+          <TimePicker
+            label={tr('habits.reminder')}
+            value={hmToMin(reminderTime || '09:00')}
+            onChange={m => setReminderTime(minToHm(m))}
+          />
         </div>
 
         {/* Recurrence */}
         <div>
           <label className={lbl}>{tr('habits.recurrence')}</label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1">
             {RECURRENCES.map(r => (
-              <button key={r} onClick={() => setRecurrence(r)} className={`h-9 px-3.5 rounded-xl text-[12px] font-medium border transition-all active:scale-95 ${recurrence === r ? 'border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)] hover:border-[var(--primary)]/40'}`}>{tr('habits.rec.' + r)}</button>
+              <button key={r} onClick={() => setRecurrence(r)} className={`shrink-0 h-9 px-3.5 rounded-xl text-[12px] font-medium border transition-all active:scale-95 whitespace-nowrap ${recurrence === r ? 'border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)] hover:border-[var(--primary)]/40'}`}>{tr('habits.rec.' + r)}</button>
             ))}
           </div>
           {recurrence === 'everyN' && (
@@ -601,21 +434,21 @@ function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: () => vo
           </div>
         </div>
 
-        {/* Linked goal + reminder */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={lbl}>{tr('habits.linkGoal')}</label>
-            <select value={goalId} onChange={e => setGoalId(e.target.value)} className={`${field} px-3`}>
-              <option value="">{tr('habits.noGoal')}</option>
-              {goals.filter(g => g.status !== 'completed').map(g => <option key={g.id} value={g.id}>{g.emoji} {g.title}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={lbl}>{tr('habits.reminder')}</label>
-            <div className="relative">
-              <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)} className={`${field} px-3 pr-8`} />
-              {reminderTime && <button type="button" onClick={() => setReminderTime('')} aria-label={tr('common.clear')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text)]"><X className="w-3.5 h-3.5" /></button>}
-            </div>
+        {/* Linked goal */}
+        <div>
+          <label className={lbl}>{tr('habits.linkGoal')}</label>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <SelectMenu value={goalId} onChange={setGoalId} ariaLabel={tr('habits.linkGoal')}
+              options={[{ value: '', label: tr('habits.noGoal') }, ...goals.filter(g => g.status !== 'completed').map(g => ({ value: g.id, label: `${g.emoji} ${g.title}` }))]} />
+            <button
+              type="button"
+              onClick={() => setGoalId('')}
+              title={tr('common.clear')}
+              aria-label={tr('common.clear')}
+              className="w-11 h-11 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-dim)] grid place-items-center hover:text-[var(--text)] transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 

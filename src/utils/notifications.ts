@@ -13,6 +13,8 @@ function notifId(sessionId: string): number {
   return Math.abs(h) % 2147483646 + 1;
 }
 
+const TIMER_NOTIFICATION_IDS = new Set([99001, 99002]);
+
 function reminderTime(s: Session): Date | null {
   if (s.reminderMinutes == null || s.reminderMinutes < 0) return null;
   if (s.allDay) {
@@ -81,8 +83,9 @@ export async function syncReminders(sessions: Session[], tasks: GTDTask[] = [], 
     if (!granted) return;
 
     const pending = await LocalNotifications.getPending();
-    if (pending.notifications.length) {
-      await LocalNotifications.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+    const appReminders = pending.notifications.filter(n => !TIMER_NOTIFICATION_IDS.has(n.id));
+    if (appReminders.length) {
+      await LocalNotifications.cancel({ notifications: appReminders.map(n => ({ id: n.id })) });
     }
 
     const lang = useStore.getState().lang;

@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '../store';
+import { nextDueDate, useStore } from '../store';
 import { useT } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
 import { Drawer } from './ui/Drawer';
+import { SelectMenu } from './ui/SelectMenu';
+import { ensureWebNotifPermission } from '../utils/timerNotifications';
 import {
   Inbox, Zap, Folder, Users, Cloud, Trash2, Plus, Search,
-  X, Check, Clock, ChevronRight, ChevronDown, Edit2,
+  X, Check, Clock, ChevronRight, ChevronDown, ChevronLeft, Edit2,
   Wifi, Phone, Home, ShoppingCart,
-  Timer, Circle, CheckCircle2, Calendar, Play, GripVertical,
-  Sun, Sparkles, BookOpen, Layers, Target, Repeat, Bell
+  Timer, Hourglass, Minus, Circle, CheckCircle2, Calendar, Play, GripVertical,
+  SlidersHorizontal, MoreHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+  Sun, Sparkles, BookOpen, Layers, Layers3, Target, Repeat, Bell
 } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 
@@ -40,6 +43,7 @@ const ENERGY_CONFIG = {
 const STATUS_CONFIG: Record<GTDStatus | string, { label: string; icon: any; color: string; desc: string }> = {
   inbox:         { label: 'gtd.status.inbox',         icon: Inbox,      color: '#22c55e', desc: 'gtd.status.inboxDesc' },
   'next-action': { label: 'gtd.status.next-action',   icon: Zap,        color: '#eab308', desc: 'gtd.status.next-actionDesc' },
+  other:         { label: 'gtd.status.other',         icon: Layers,     color: '#64748b', desc: 'gtd.status.otherDesc' },
   project:       { label: 'gtd.status.project',       icon: Folder,     color: '#a855f7', desc: 'gtd.status.projectDesc' },
   'waiting-for': { label: 'gtd.status.waiting-for',   icon: Users,      color: '#f97316', desc: 'gtd.status.waiting-forDesc' },
   scheduled:     { label: 'gtd.status.scheduled',     icon: Calendar,   color: '#3b82f6', desc: 'gtd.status.scheduledDesc' },
@@ -88,22 +92,64 @@ function parseNL(input: string): { title: string; priority?: Priority; context?:
 }
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
-function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean }) {
+function TaskCard({ task, compact = false, selecting = false, selected = false, onSelect }: { task: GTDTask; compact?: boolean; selecting?: boolean; selected?: boolean; onSelect?: () => void }) {
   const tr = useT();
   const { processTask, deleteTask, toggleTodayFocus, openEditTask, openTimerLauncher, setDoingTask, scheduleFromTask } = useStore();
   const [expanded, setExpanded] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const completeTimer = useRef<number | null>(null);
   const p = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG[4];
   const ctx = task.context ? CONTEXT_CONFIG[task.context] : null;
   const isDue = task.dueDate && isPast(parseISO(task.dueDate)) && task.status !== 'done';
   const isTodayDue = task.dueDate && isToday(parseISO(task.dueDate));
   const isTomorrowDue = task.dueDate && isTomorrow(parseISO(task.dueDate));
+  const nextRepeat = task.recurring ? nextDueDate(task.dueDate || task.scheduledDate || task.createdAt.slice(0, 10), task.recurring) : null;
 
   // ── Mobile swipe: right = complete, left = delete ──
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<'h' | 'v' | null>(null);
   const SWIPE_TRIGGER = 80;
-  const swipeEnabled = !compact && task.status !== 'done';
+  const swipeEnabled = !compact && task.status !== 'done' && !(typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (completeTimer.current) window.clearTimeout(completeTimer.current);
+    };
+  }, []);
+
+  const runMoreAction = (fn: () => void) => {
+    fn();
+    setMoreOpen(false);
+  };
+
+  const completeTask = () => {
+    if (task.status === 'done' || completing) return;
+    setCompleting(true);
+    if (completeTimer.current) window.clearTimeout(completeTimer.current);
+    completeTimer.current = window.setTimeout(() => {
+      processTask(task.id, 'done');
+      completeTimer.current = null;
+    }, 220);
+  };
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!swipeEnabled) return;
@@ -120,14 +166,14 @@ function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean 
   };
   const onTouchEnd = () => {
     if (axis.current === 'h') {
-      if (dx > SWIPE_TRIGGER) processTask(task.id, 'done');
+      if (dx > SWIPE_TRIGGER) completeTask();
       else if (dx < -SWIPE_TRIGGER) deleteTask(task.id);
     }
     start.current = null; axis.current = null; setDx(0);
   };
 
   return (
-   <div className="relative rounded-xl overflow-hidden">
+   <div className="relative rounded-xl overflow-visible">
     {/* Swipe reveal backgrounds */}
     {dx !== 0 && (
       <div className="absolute inset-0 flex items-center justify-between px-5 pointer-events-none">
@@ -139,26 +185,42 @@ function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean 
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ transform: `translateX(${dx}px)`, transition: dx === 0 ? 'transform .2s ease' : 'none' }}
+      style={{ transform: `translateX(${dx}px)`, transition: dx === 0 ? 'transform .2s ease, opacity .18s ease, box-shadow .18s ease' : 'none', opacity: completing ? 0.2 : 1 }}
       className={`group relative border rounded-xl ${
         task.status === 'done'
-          ? 'border-[var(--border)] bg-[#080808] opacity-50'
+          ? 'border-[var(--border)] bg-[var(--surface)] opacity-70'
           : isDue
           ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
+          : completing
+          ? 'border-emerald-500/40 bg-emerald-500/10 shadow-lg shadow-emerald-500/10'
           : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border)]'
       }`}
     >
+      {completing && (
+        <div className="absolute inset-0 pointer-events-none grid place-items-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-500 animate-pulse">
+            <Check className="w-6 h-6" />
+          </div>
+        </div>
+      )}
       <div className={`flex items-start gap-3 ${compact ? 'p-3' : 'p-4'}`}>
         {/* Checkbox */}
-        <button
-          onClick={() => processTask(task.id, task.status === 'done' ? 'next-action' : 'done')}
-          className="mt-0.5 shrink-0 transition-transform hover:scale-110"
-        >
-          {task.status === 'done'
-            ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            : <Circle className="w-4 h-4 text-[var(--border)] group-hover:text-[#555]" />
-          }
-        </button>
+        {selecting ? (
+          <button onClick={onSelect} className="mt-0.5 shrink-0 transition-transform hover:scale-110" aria-label={tr('gtd.selectTask')}>
+            {selected ? <CheckCircle2 className="w-4 h-4 text-[var(--primary)]" /> : <Circle className="w-4 h-4 text-[var(--border)]" />}
+          </button>
+        ) : (
+          <button
+            onClick={task.status === 'done' ? () => processTask(task.id, 'next-action') : completeTask}
+            className="mt-0.5 shrink-0 transition-transform hover:scale-110"
+            aria-label={task.status === 'done' ? tr('sm.markUndone') : tr('sm.markDone')}
+          >
+            {task.status === 'done'
+              ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              : <Circle className="w-4 h-4 text-[var(--border)] group-hover:text-[#555]" />
+            }
+          </button>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -207,6 +269,21 @@ function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean 
             {task.recurring && (
               <span className="flex items-center gap-1 text-[10px] text-[var(--primary)]" title={tr('gtd.repeat')}>
                 <Repeat className="w-3 h-3" />{tr('gtd.repeat' + task.recurring.charAt(0).toUpperCase() + task.recurring.slice(1))}
+              </span>
+            )}
+            {nextRepeat && (
+              <span className="flex items-center gap-1 text-[10px] text-[var(--text-dim)]">
+                <ChevronRight className="w-3 h-3" />{tr('gtd.nextRepeat', { d: format(parseISO(nextRepeat), 'MMM d') })}
+              </span>
+            )}
+            {task.scheduledDate && (
+              <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                <Calendar className="w-3 h-3" />{tr('gtd.scheduledFor', { d: format(parseISO(task.scheduledDate), 'MMM d') })}
+              </span>
+            )}
+            {task.project && (
+              <span className="flex items-center gap-1 text-[10px] text-purple-400">
+                <Folder className="w-3 h-3" />{task.project}
               </span>
             )}
             {/* Reminder */}
@@ -263,33 +340,31 @@ function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean 
               <Play className="w-3 h-3" />{tr('gtd.do')}
             </button>
           )}
-          <div className="flex items-center gap-1 hover-actions">
           <button
             onClick={() => toggleTodayFocus(task.id)}
             title={tr('gtd.focusToday')}
-            className={`w-6 h-6 rounded-md grid place-items-center transition-colors ${task.isTodayFocus ? 'text-amber-400' : 'text-[var(--border)] hover:text-amber-400'}`}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${task.isTodayFocus ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-dim)] hover:text-amber-400 hover:bg-[var(--surface-2)]'}`}
           >
             <Sun className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => openTimerLauncher({ linkType: 'task', linkId: task.id, label: task.title })}
-            title={tr('gtd.startPomodoro')}
-            className="w-6 h-6 rounded-md grid place-items-center text-[var(--border)] hover:text-red-400 transition-colors"
-          >
-            <Timer className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => openEditTask(task.id)}
-            className="w-6 h-6 rounded-md grid place-items-center text-[var(--border)] hover:text-[var(--text)] transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => deleteTask(task.id)}
-            className="w-6 h-6 rounded-md grid place-items-center text-[var(--border)] hover:text-red-500 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <div ref={moreRef} className="relative">
+            <button
+              onClick={() => setMoreOpen(v => !v)}
+              aria-label={tr('gtd.moreActions')}
+              className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {moreOpen && (
+              <div className="absolute right-0 bottom-9 z-[420] w-48 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl">
+                <button onClick={() => runMoreAction(() => openEditTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Edit2 className="w-3.5 h-3.5" />{tr('gtd.editTask')}</button>
+                {task.status !== 'inbox' && <button onClick={() => runMoreAction(() => processTask(task.id, 'inbox'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Inbox className="w-3.5 h-3.5" />{tr('gtd.moveInbox')}</button>}
+                {task.status !== 'next-action' && <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Zap className="w-3.5 h-3.5" />{tr('gtd.moveNext')}</button>}
+                {task.status !== 'someday-maybe' && <button onClick={() => runMoreAction(() => processTask(task.id, 'someday-maybe'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Layers className="w-3.5 h-3.5" />{tr('gtd.moveOther')}</button>}
+                <button onClick={() => runMoreAction(() => openTimerLauncher({ linkType: 'task', linkId: task.id, label: task.title }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Timer className="w-3.5 h-3.5" />{tr('gtd.pomodoro')}</button>
+                <button onClick={() => runMoreAction(() => deleteTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-red-400 hover:bg-red-500/10 flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" />{tr('common.delete')}</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -304,12 +379,9 @@ function TaskCard({ task, compact = false }: { task: GTDTask; compact?: boolean 
         <div className="px-4 pb-3 border-t border-[var(--surface-2)] mt-1 pt-3">
           <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">{tr('gtd.whatIsIt')}</div>
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={() => processTask(task.id, 'next-action')} className="h-7 px-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors">{tr('gtd.proc.nextAction')}</button>
-            <button onClick={() => processTask(task.id, 'project')} className="h-7 px-3 rounded-lg bg-[var(--primary)]/10 border border-[var(--primary)]/30 text-[var(--primary)] text-[10px] font-bold hover:bg-[var(--primary)]/20 transition-colors">{tr('gtd.proc.project')}</button>
-            <button onClick={() => processTask(task.id, 'waiting-for')} className="h-7 px-3 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-bold hover:bg-orange-500/20 transition-colors">{tr('gtd.proc.delegate')}</button>
-            <button onClick={() => { processTask(task.id, 'scheduled'); scheduleFromTask(task.title, task.durationMinutes || 60); }} className="h-7 px-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition-colors">{tr('gtd.proc.schedule')}</button>
-            <button onClick={() => processTask(task.id, 'someday-maybe')} className="h-7 px-3 rounded-lg bg-[var(--border)] border border-[var(--border)] text-[var(--text-dim)] text-[10px] hover:text-[var(--text)] transition-colors">{tr('gtd.proc.someday')}</button>
-            <button onClick={() => processTask(task.id, 'reference')} className="h-7 px-3 rounded-lg bg-[var(--border)] border border-[var(--border)] text-[var(--text-dim)] text-[10px] hover:text-[var(--text)] transition-colors">{tr('gtd.proc.reference')}</button>
+            <button onClick={() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false })} className="h-7 px-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors">{tr('gtd.proc.nextAction')}</button>
+            <button onClick={() => processTask(task.id, 'someday-maybe')} className="h-7 px-3 rounded-lg bg-slate-500/10 border border-slate-500/30 text-slate-400 text-[10px] font-bold hover:bg-slate-500/20 transition-colors">{tr('gtd.proc.other')}</button>
+            <button onClick={() => { processTask(task.id, 'scheduled', { dueDate: undefined, isTodayFocus: false }); scheduleFromTask(task.title, task.durationMinutes || 60, task.id); }} className="h-7 px-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition-colors">{tr('gtd.proc.schedule')}</button>
             <button onClick={() => processTask(task.id, 'done')} className="h-7 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/20 transition-colors">{tr('gtd.proc.done')}</button>
             <button onClick={() => deleteTask(task.id)} className="h-7 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] hover:bg-red-500/20 transition-colors">{tr('gtd.proc.trash')}</button>
           </div>
@@ -413,11 +485,27 @@ function EditTaskForm({ task }: { task: GTDTask }) {
   const [newSub, setNewSub] = useState('');
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
   const [delegateTo, setDelegateTo] = useState(task.delegateTo || '');
+  const [project, setProject] = useState(task.project || '');
+  const [scheduledDate, setScheduledDate] = useState(task.scheduledDate || '');
   const [recurring, setRecurring] = useState<RecurringPattern | ''>(task.recurring || '');
   const [remindAt, setRemindAt] = useState(task.remindAt ? task.remindAt.slice(0, 16) : '');
 
   const save = () => {
-    updateTask(task.id, { title, notes, dueDate: dueDate || undefined, priority, context: context as TaskContext || undefined, durationMinutes: duration || undefined, energyLevel: energy as any, delegateTo: delegateTo || undefined, subtasks, recurring: recurring || undefined, remindAt: remindAt || undefined });
+    updateTask(task.id, {
+      title,
+      notes,
+      dueDate: dueDate || undefined,
+      priority,
+      context: context as TaskContext || undefined,
+      durationMinutes: duration || undefined,
+      energyLevel: energy as any,
+      delegateTo: delegateTo || undefined,
+      project: project.trim() || undefined,
+      scheduledDate: scheduledDate || undefined,
+      subtasks,
+      recurring: recurring || undefined,
+      remindAt: remindAt || undefined,
+    });
     if (status !== task.status) processTask(task.id, status);
     closeEditTask();
   };
@@ -448,9 +536,14 @@ function EditTaskForm({ task }: { task: GTDTask }) {
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.statusLabel')}</label>
-              <select value={status} onChange={e => setStatus(e.target.value as GTDStatus)} className="w-full h-7 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none">
-                {Object.entries(STATUS_CONFIG).filter(([k]) => k !== 'trash').map(([k,v]) => <option key={k} value={k}>{tr(v.label)}</option>)}
-              </select>
+              <SelectMenu value={status === 'project' || status === 'waiting-for' || status === 'reference' ? 'someday-maybe' : status} onChange={(v) => setStatus(v as GTDStatus)} size="sm" ariaLabel={tr('gtd.statusLabel')}
+                options={[
+                  { value: 'inbox', label: tr('gtd.status.inbox') },
+                  { value: 'next-action', label: tr('gtd.status.next-action') },
+                  { value: 'scheduled', label: tr('gtd.status.scheduled') },
+                  { value: 'someday-maybe', label: tr('gtd.status.other') },
+                  { value: 'done', label: tr('gtd.status.done') },
+                ]} />
             </div>
           </div>
 
@@ -466,10 +559,20 @@ function EditTaskForm({ task }: { task: GTDTask }) {
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.context')}</label>
-              <select value={context} onChange={e => setContext(e.target.value as TaskContext)} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none">
-                <option value="">{tr('gtd.none')}</option>
-                {Object.entries(CONTEXT_CONFIG).map(([k,v]) => <option key={k} value={k}>{tr(v.label)}</option>)}
-              </select>
+              <SelectMenu value={context} onChange={(v) => setContext(v as TaskContext)} ariaLabel={tr('gtd.context')}
+                options={[{ value: '', label: tr('gtd.none') }, ...Object.entries(CONTEXT_CONFIG).map(([k,v]) => ({ value: k, label: tr(v.label) }))]} />
+            </div>
+          </div>
+
+          {/* Project + Scheduled date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.projectName')}</label>
+              <input value={project} onChange={e => setProject(e.target.value)} placeholder={tr('gtd.projectPlaceholder')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none placeholder:text-[var(--text-dim)]" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.scheduledDate')}</label>
+              <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none" />
             </div>
           </div>
 
@@ -497,13 +600,14 @@ function EditTaskForm({ task }: { task: GTDTask }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.repeat')}</label>
-              <select value={recurring} onChange={e => setRecurring(e.target.value as RecurringPattern | '')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none">
-                <option value="">{tr('gtd.repeatNone')}</option>
-                <option value="daily">{tr('gtd.repeatDaily')}</option>
-                <option value="weekdays">{tr('gtd.repeatWeekdays')}</option>
-                <option value="weekly">{tr('gtd.repeatWeekly')}</option>
-                <option value="monthly">{tr('gtd.repeatMonthly')}</option>
-              </select>
+              <SelectMenu value={recurring} onChange={(v) => setRecurring(v as RecurringPattern | '')} ariaLabel={tr('gtd.repeat')}
+                options={[
+                  { value: '', label: tr('gtd.repeatNone') },
+                  { value: 'daily', label: tr('gtd.repeatDaily') },
+                  { value: 'weekdays', label: tr('gtd.repeatWeekdays') },
+                  { value: 'weekly', label: tr('gtd.repeatWeekly') },
+                  { value: 'monthly', label: tr('gtd.repeatMonthly') },
+                ]} />
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -546,21 +650,6 @@ function EditTaskForm({ task }: { task: GTDTask }) {
           <button onClick={save} className="flex-1 h-10 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold">{tr('gtd.saveChanges')}</button>
         </div>
     </Drawer>
-  );
-}
-
-function Ring({ pct, size=80, stroke=5, color='#22c55e', children }: { pct:number; size?:number; stroke?:number; color?:string; children?:React.ReactNode }) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const off = c - (pct / 100) * c;
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg className="progress-ring" width={size} height={size}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">{children}</div>
-    </div>
   );
 }
 
@@ -620,48 +709,80 @@ function WeeklyReviewModal() {
 }
 
 // ─── Main GTD View (Content Only) ───────────────────────────────────────────
-// Bucket tabs shown inside the GTD Inbox view (replaces the old sidebar "GTD Lists" section).
-const BUCKET_TABS: { id: string; label: string; icon: any; color: string }[] = [
+// Sorted task lists live on the second level. The first level is Inbox triage.
+const SORTED_TABS: { id: string; label: string; icon: any; color: string }[] = [
   { id: 'today',         label: 'gtd.todayBucket',        icon: Sun,         color: '#f59e0b' },
-  { id: 'inbox',         label: 'gtd.status.inbox',        icon: Inbox,       color: '#22c55e' },
   { id: 'next-action',   label: 'gtd.status.next-action', icon: Zap,         color: '#eab308' },
-  { id: 'project',       label: 'gtd.status.project',     icon: Folder,      color: '#a855f7' },
-  { id: 'waiting-for',   label: 'gtd.status.waiting-for', icon: Users,       color: '#f97316' },
   { id: 'scheduled',     label: 'gtd.status.scheduled',   icon: Calendar,    color: '#3b82f6' },
-  { id: 'someday-maybe', label: 'gtd.status.someday-maybe', icon: Cloud,     color: '#64748b' },
-  { id: 'reference',     label: 'gtd.status.reference',   icon: BookOpen,    color: '#14b8a6' },
-  { id: 'all',           label: 'gtd.allBucket',          icon: Layers,      color: 'var(--text-mute)' },
+  { id: 'other',         label: 'gtd.status.other',       icon: Layers,      color: '#64748b' },
   { id: 'done',          label: 'gtd.status.done',        icon: CheckCircle2,color: '#22c55e' },
 ];
 
-export function GTDView() {
+type TriageDestination = 'today' | 'other' | 'next-action' | 'inbox' | 'scheduled';
+
+export function GTDView({ onBack }: { onBack?: () => void }) {
   const tr = useT();
   const {
     gtdTasks, gtdFilter, setGTDFilter, activeContext, setActiveContext,
-    searchQuery, setSearchQuery, reorderTasks,
+    searchQuery, setSearchQuery, reorderTasks, openWeeklyReview,
+    processTask, deleteTask, toggleTodayFocus, scheduleFromTask,
   } = useStore();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'priority' | 'due' | 'created'>('priority');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'inbox' | 'lists'>('inbox');
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const viewSwipeStart = useRef<{ x: number; y: number } | null>(null);
+  const viewSwipeAxis = useRef<'h' | 'v' | null>(null);
+  const [viewSwipeDx, setViewSwipeDx] = useState(0);
+  const triageStart = useRef<{ x: number; y: number } | null>(null);
+  const triageAxis = useRef<'h' | 'v' | null>(null);
+  const [triageDx, setTriageDx] = useState(0);
+  const [triageDy, setTriageDy] = useState(0);
+  const [triageFx, setTriageFx] = useState<{ destination: TriageDestination; x: number; y: number; color: string } | null>(null);
+  const triageFxTimer = useRef<number | null>(null);
 
   const allContexts = ['all', ...Object.keys(CONTEXT_CONFIG)];
+  const selectedCount = selectedIds.length;
+  const currentBucketIndex = Math.max(0, SORTED_TABS.findIndex(b => b.id === gtdFilter));
+  const rawTasks = gtdTasks
+    .filter(t => t.status === 'inbox' && !t.processedAt && !t.isArchived)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const triageTask = rawTasks[0];
+  const otherStatuses: GTDStatus[] = ['project', 'waiting-for', 'someday-maybe', 'reference'];
+  const todayDate = format(new Date(), 'yyyy-MM-dd');
+  const triageFxColors: Record<TriageDestination, string> = {
+    today: '#f59e0b',
+    other: '#64748b',
+    'next-action': '#eab308',
+    inbox: '#10b981',
+    scheduled: '#3b82f6',
+  };
 
   // Count helper for the bucket tabs
   const bucketCount = (id: string) => {
-    if (id === 'today') return gtdTasks.filter(t => (t.isTodayFocus || (t.dueDate && isToday(parseISO(t.dueDate)))) && t.status !== 'done').length;
-    if (id === 'all') return gtdTasks.filter(t => t.status !== 'done' && t.status !== 'trash').length;
-    return gtdTasks.filter(t => t.status === id).length;
+    const activeTasks = gtdTasks.filter(t => t.status !== 'done' && t.status !== 'trash' && !t.isArchived);
+    if (id === 'today') return activeTasks.filter(t => t.status !== 'scheduled' && (t.isTodayFocus || (t.status !== 'next-action' && t.dueDate && isToday(parseISO(t.dueDate))))).length;
+    if (id === 'other') return activeTasks.filter(t => otherStatuses.includes(t.status)).length;
+    if (id === 'next-action') return activeTasks.filter(t => t.status === 'next-action' && !t.isTodayFocus && !(t.dueDate && isToday(parseISO(t.dueDate)))).length;
+    return activeTasks.filter(t => t.status === id).length;
   };
 
   // ── Filtered tasks ────────────────────────────────────────────────────────
   const filtered = gtdTasks
-    .filter(t => t.status !== 'trash' && t.status !== 'done' || gtdFilter === 'done' || gtdFilter === 'trash')
+    .filter(t => (t.status !== 'trash' && t.status !== 'done') || gtdFilter === 'done' || gtdFilter === 'trash')
     .filter(t => {
-      if (gtdFilter === 'today') return t.isTodayFocus || (t.dueDate && isToday(parseISO(t.dueDate)));
-      if (gtdFilter === 'all') return t.status !== 'done' && t.status !== 'trash';
+      if (gtdFilter === 'today') return t.status !== 'scheduled' && (t.isTodayFocus || (t.status !== 'next-action' && t.dueDate && isToday(parseISO(t.dueDate))));
+      if (gtdFilter === 'other') return otherStatuses.includes(t.status);
+      if (gtdFilter === 'next-action') return t.status === 'next-action' && !t.isTodayFocus && !(t.dueDate && isToday(parseISO(t.dueDate)));
       return t.status === gtdFilter;
     })
-    .filter(t => activeContext === 'all' || t.context === activeContext)
+    .filter(t => gtdFilter === 'today' || activeContext === 'all' || t.context === activeContext)
+    .filter(t => gtdFilter === 'today' || priorityFilter === 'all' || t.priority === priorityFilter)
     .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.tags || []).some(tag => tag.includes(searchQuery.toLowerCase())))
     .sort((a, b) => {
       if (sortBy === 'priority') return a.priority - b.priority;
@@ -672,40 +793,192 @@ export function GTDView() {
       return b.createdAt.localeCompare(a.createdAt);
     });
 
+  const projectGroups = Array.from(filtered.reduce((acc, task) => {
+    const name = task.project?.trim() || tr('gtd.noProject');
+    const current = acc.get(name) || { total: 0, next: 0, waiting: 0, scheduled: 0 };
+    current.total += 1;
+    if (task.status === 'next-action') current.next += 1;
+    if (task.status === 'waiting-for') current.waiting += 1;
+    if (task.status === 'scheduled') current.scheduled += 1;
+    acc.set(name, current);
+    return acc;
+  }, new Map<string, { total: number; next: number; waiting: number; scheduled: number }>()).entries());
+
   const doneTasks = gtdTasks.filter(t => t.status === 'done');
   const todayFocusTasks = gtdTasks.filter(t => t.isTodayFocus && t.status !== 'done');
-  const statusConf = STATUS_CONFIG[gtdFilter as GTDStatus] || { label: 'gtd.allTasks', icon: Layers, color: 'var(--text-mute)', desc: '' };
+  const inboxCount = gtdTasks.filter(t => t.status === 'inbox').length;
+  const nextCount = gtdTasks.filter(t => t.status === 'next-action').length;
+  const statusConf = STATUS_CONFIG[gtdFilter as GTDStatus] || STATUS_CONFIG.other;
+  const toggleSelected = (id: string) => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+  const selectedTaskIds = selectedIds.filter(id => gtdTasks.some(t => t.id === id && t.status !== 'trash'));
+  const clearSelection = () => setSelectedIds([]);
+  const runBulk = (action: 'done' | 'next-action' | 'today' | 'trash') => {
+    selectedTaskIds.forEach(id => {
+      if (action === 'today') toggleTodayFocus(id);
+      else if (action === 'trash') deleteTask(id);
+      else processTask(id, action, action === 'next-action' ? { dueDate: undefined, isTodayFocus: false } : undefined);
+    });
+    clearSelection();
+    setSelecting(false);
+  };
+  const goToBucket = (nextIndex: number) => {
+    const next = SORTED_TABS[nextIndex];
+    if (!next || next.id === gtdFilter) return;
+    setGTDFilter(next.id);
+    clearSelection();
+    setSelecting(false);
+  };
+  const commitTriageTask = (destination: TriageDestination) => {
+    if (!triageTask) return;
+    if (destination === 'today') {
+      processTask(triageTask.id, 'inbox', { isTodayFocus: true, dueDate: todayDate });
+    } else if (destination === 'other') {
+      processTask(triageTask.id, 'someday-maybe');
+    } else if (destination === 'next-action') {
+      processTask(triageTask.id, 'next-action', { dueDate: undefined, isTodayFocus: false });
+    } else if (destination === 'scheduled') {
+      processTask(triageTask.id, 'scheduled', { scheduledDate: todayDate, dueDate: undefined, isTodayFocus: false });
+      scheduleFromTask(triageTask.title, triageTask.durationMinutes || 60, triageTask.id);
+    } else {
+      processTask(triageTask.id, destination);
+    }
+    setTriageDx(0);
+    setTriageDy(0);
+  };
+  const processTriageTask = (destination: TriageDestination, releaseX = triageDx, releaseY = triageDy) => {
+    if (!triageTask || triageFx) return;
+    setTriageFx({ destination, x: releaseX, y: releaseY, color: triageFxColors[destination] });
+    if (triageFxTimer.current) window.clearTimeout(triageFxTimer.current);
+    triageFxTimer.current = window.setTimeout(() => {
+      commitTriageTask(destination);
+      setTriageFx(null);
+      triageFxTimer.current = null;
+    }, 680);
+  };
+  const onTriageTouchStart = (e: React.TouchEvent) => {
+    triageStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    triageAxis.current = null;
+  };
+  const onTriageTouchMove = (e: React.TouchEvent) => {
+    if (!triageStart.current) return;
+    const dx = e.touches[0].clientX - triageStart.current.x;
+    const dy = e.touches[0].clientY - triageStart.current.y;
+    if (triageAxis.current === null) triageAxis.current = Math.abs(dx) > Math.abs(dy) + 4 ? 'h' : 'v';
+    setTriageDx(Math.max(-130, Math.min(130, dx)));
+    setTriageDy(Math.max(-130, Math.min(130, dy)));
+  };
+  const onTriageTouchEnd = () => {
+    if (!triageStart.current) return;
+    if (triageAxis.current === 'h' && Math.abs(triageDx) > 72) {
+      processTriageTask(triageDx > 0 ? 'next-action' : 'other', triageDx, triageDy);
+    } else if (triageAxis.current === 'v' && Math.abs(triageDy) > 72) {
+      processTriageTask(triageDy < 0 ? 'today' : 'inbox', triageDx, triageDy);
+    }
+    triageStart.current = null;
+    triageAxis.current = null;
+    setTriageDx(0);
+    setTriageDy(0);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (triageFxTimer.current) window.clearTimeout(triageFxTimer.current);
+    };
+  }, []);
+  const onViewTouchStart = (e: React.TouchEvent) => {
+    if (viewMode !== 'lists') return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button,input,textarea,a,[role="button"],[role="listbox"],[data-no-tab-swipe]')) return;
+    viewSwipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    viewSwipeAxis.current = null;
+    setViewSwipeDx(0);
+  };
+  const onViewTouchMove = (e: React.TouchEvent) => {
+    if (!viewSwipeStart.current) return;
+    const dx = e.touches[0].clientX - viewSwipeStart.current.x;
+    const dy = e.touches[0].clientY - viewSwipeStart.current.y;
+    if (viewSwipeAxis.current === null) viewSwipeAxis.current = Math.abs(dx) > Math.abs(dy) + 8 ? 'h' : 'v';
+    if (viewSwipeAxis.current !== 'h') return;
+    setViewSwipeDx(Math.max(-90, Math.min(90, dx)));
+  };
+  const onViewTouchEnd = () => {
+    if (!viewSwipeStart.current) return;
+    if (viewSwipeAxis.current === 'h' && Math.abs(viewSwipeDx) > 64) {
+      // Swipe left moves the user visually to the right; swipe right moves back left.
+      goToBucket(viewSwipeDx < 0 ? Math.min(currentBucketIndex + 1, SORTED_TABS.length - 1) : Math.max(currentBucketIndex - 1, 0));
+    }
+    viewSwipeStart.current = null;
+    viewSwipeAxis.current = null;
+    setViewSwipeDx(0);
+  };
+
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>(`[data-bucket-id="${gtdFilter}"]`)?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
+  }, [gtdFilter]);
+
+  useEffect(() => {
+    if (viewMode !== 'lists') return;
+    if (gtdFilter === 'all' || gtdFilter === 'inbox') setGTDFilter('today');
+    if (gtdFilter === 'project' || gtdFilter === 'waiting-for' || gtdFilter === 'reference' || gtdFilter === 'someday-maybe') setGTDFilter('other');
+  }, [gtdFilter, setGTDFilter, viewMode]);
+
+  const openSortedLists = () => {
+    setViewMode('lists');
+    if (!SORTED_TABS.some(t => t.id === gtdFilter)) setGTDFilter('today');
+  };
+  const openInboxLevel = () => {
+    setViewMode('inbox');
+    setGTDFilter('inbox');
+    clearSelection();
+    setSelecting(false);
+  };
 
   return (
     <div className="flex flex-col h-full w-full bg-[var(--bg)]">
       {/* Header */}
-      <div className="px-4 md:px-8 py-4 md:py-6 border-b border-[var(--surface-2)] shrink-0 bg-[var(--bg)]">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <h1 className="display text-[24px] md:text-[32px] text-[var(--text)]">
-              {gtdFilter === 'today' ? tr('gtd.todaysFocus') : tr(statusConf.label)}
-            </h1>
-            <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] text-[12px] text-[var(--text-dim)] font-medium border border-[var(--border)]">
-              {tr('gtd.tasksCount',{n:filtered.length})}
-            </span>
+      <div className="px-4 md:px-8 py-5 md:py-6 border-b border-[var(--surface-2)] shrink-0 bg-[var(--bg)]">
+        <div className="space-y-5">
+          <div className="flex items-center gap-4 min-w-0">
+            {onBack && <button
+              onClick={() => {
+                if (viewMode === 'lists' || gtdFilter !== 'inbox') openInboxLevel();
+                else onBack();
+              }}
+              className="w-9 h-9 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"
+              aria-label={tr('bottomNav.stats')}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>}
+            <div className="min-w-0 flex-1 pr-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="display text-[22px] md:text-[32px] text-[var(--text)] truncate" style={{ lineHeight: 1.12 }}>
+                  {viewMode === 'inbox' ? tr('gtd.status.inbox') : gtdFilter === 'today' ? tr('gtd.todaysFocus') : tr(statusConf.label)}
+                </h1>
+                <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] text-[12px] text-[var(--text-dim)] font-medium border border-[var(--border)] shrink-0 ml-1">
+                  {tr('gtd.tasksCount',{n:viewMode === 'inbox' ? rawTasks.length : filtered.length})}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={viewMode === 'inbox' ? openSortedLists : openInboxLevel}
+              className="h-9 px-3 rounded-xl border border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)] text-[12px] font-bold flex items-center justify-center gap-1.5 shrink-0"
+            >
+              {viewMode === 'inbox' ? <><Layers3 className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.sortedLists')}</span></> : <><Inbox className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.backToInbox')}</span></>}
+            </button>
           </div>
-          <div className="flex items-center gap-3">
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="h-9 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] text-[var(--text)] px-3 focus:outline-none hover:border-[var(--border)] transition-colors">
-              <option value="priority">{tr('gtd.sortPriority')}</option>
-              <option value="due">{tr('gtd.sortDue')}</option>
-              <option value="created">{tr('gtd.sortCreated')}</option>
-            </select>
-          </div>
-        </div>
 
-        {/* Bucket tabs (GTD lists) */}
-        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-          {BUCKET_TABS.map(b => {
+          {/* Bucket tabs (GTD lists) */}
+          {viewMode === 'lists' && <div ref={tabsRef} className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-no-tab-swipe>
+          {SORTED_TABS.map(b => {
             const Ic = b.icon;
             const a = gtdFilter === b.id;
             const cnt = bucketCount(b.id);
             return (
-              <button key={b.id} onClick={() => setGTDFilter(b.id)}
+              <button key={b.id} data-bucket-id={b.id} onClick={() => setGTDFilter(b.id)}
                 className={`h-9 px-3 rounded-xl text-[12px] font-medium flex items-center gap-2 shrink-0 border transition-all ${a ? 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}>
                 <Ic className="w-3.5 h-3.5" style={{ color: a ? b.color : undefined }} />
                 {tr(b.label)}
@@ -715,38 +988,254 @@ export function GTDView() {
               </button>
             );
           })}
-        </div>
+          </div>}
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          {viewMode === 'lists' && <div className="flex items-center gap-3">
           {/* Search */}
-          <div className="w-full sm:flex-1 sm:max-w-md flex items-center gap-2 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 focus-within:border-[var(--border)] transition-colors">
+          <div className="flex-1 flex items-center gap-2 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 focus-within:border-[var(--border)] transition-colors">
             <Search className="w-4 h-4 text-[var(--text-dim)]" />
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={tr('gtd.searchPlaceholder')} className="flex-1 bg-transparent text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none" />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X className="w-3.5 h-3.5" /></button>}
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1 sm:pb-0">
-            <div className="h-6 w-px bg-[var(--border)] hidden sm:block" />
-            {allContexts.slice(0, 4).map(c => {
-              const conf = c !== 'all' ? CONTEXT_CONFIG[c] : null;
-              const a = activeContext === c;
-              return (
-                <button key={c} onClick={() => setActiveContext(c)} className={`h-8 px-3 rounded-lg text-[11px] font-medium border transition-all shrink-0 ${a ? 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}
-                  style={a && conf ? { color: conf.color } : {}}>
-                  {c === 'all' ? tr('gtd.allContexts') : tr(conf?.label || '')}
-                </button>
-              );
-            })}
+            <button
+              onClick={() => setFiltersOpen(v => !v)}
+              className={`h-10 px-3 rounded-xl border text-[12px] font-bold shrink-0 flex items-center gap-1.5 ${filtersOpen ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border)] text-[var(--text-dim)] bg-[var(--surface)] hover:text-[var(--text)]'}`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />{tr('gtd.filters')}
+            </button>
+            <button onClick={openWeeklyReview} className="h-10 w-10 rounded-xl bg-[var(--primary)] text-white grid place-items-center shadow-sm shrink-0" aria-label={tr('gtd.weeklyReview')}>
+              <Sparkles className="w-4 h-4" />
+            </button>
+          </div>}
+          {viewMode === 'lists' && filtersOpen && (
+          <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 space-y-3">
+            <SelectMenu value={sortBy} onChange={(v) => setSortBy(v as typeof sortBy)} ariaLabel={tr('gtd.sortPriority')}
+              options={[
+                { value: 'priority', label: tr('gtd.sortPriority') },
+                { value: 'due', label: tr('gtd.sortDue') },
+                { value: 'created', label: tr('gtd.sortCreated') },
+              ]} />
+            <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+              {allContexts.map(c => {
+                const conf = c !== 'all' ? CONTEXT_CONFIG[c] : null;
+                const a = activeContext === c;
+                return (
+                  <button key={c} onClick={() => setActiveContext(c)} className={`h-8 px-3 rounded-lg text-[11px] font-medium border transition-all shrink-0 ${a ? 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}
+                    style={a && conf ? { color: conf.color } : {}}>
+                    {c === 'all' ? tr('gtd.allContexts') : tr(conf?.label || '')}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+              {(['all',1,2,3,4] as const).map(p => {
+                const active = priorityFilter === p;
+                const label = p === 'all' ? tr('gtd.priorityAll') : `P${p}`;
+                return (
+                  <button key={p} onClick={() => setPriorityFilter(p)} className={`h-8 px-3 rounded-lg text-[11px] font-bold border shrink-0 ${active ? 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'}`}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+          )}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 max-w-5xl mx-auto w-full space-y-4">
-        <QuickCaptureBar />
+      <div
+        className="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 max-w-5xl mx-auto w-full space-y-4"
+        onTouchStart={onViewTouchStart}
+        onTouchMove={onViewTouchMove}
+        onTouchEnd={onViewTouchEnd}
+      >
+        {viewMode === 'lists' && <section className="hidden md:grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[
+            { label: tr('gtd.status.inbox'), value: inboxCount, icon: Inbox, color: '#22c55e', action: () => setGTDFilter('inbox') },
+            { label: tr('gtd.status.next-action'), value: nextCount, icon: Zap, color: '#eab308', action: () => setGTDFilter('next-action') },
+            { label: tr('gtd.todaysFocus'), value: todayFocusTasks.length, icon: Sun, color: '#f59e0b', action: () => setGTDFilter('today') },
+            { label: tr('gtd.status.other'), value: bucketCount('other'), icon: Layers, color: '#64748b', action: () => setGTDFilter('other') },
+          ].map(item => {
+            const Ic = item.icon;
+            return (
+              <button key={item.label} onClick={item.action} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 text-left flex items-center gap-3 hover:border-[var(--primary)] transition-colors">
+                <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: `${item.color}18`, color: item.color }}><Ic className="w-4 h-4" /></span>
+                <span className="min-w-0">
+                  <span className="block text-[18px] font-bold text-[var(--text)] mono leading-none">{item.value}</span>
+                  <span className="block text-[11px] text-[var(--text-dim)] truncate mt-1">{item.label}</span>
+                </span>
+              </button>
+            );
+          })}
+        </section>}
 
-        {gtdFilter === 'today' && todayFocusTasks.length === 0 && (
+        {viewMode === 'lists' && <div className="hidden md:block">
+          <QuickCaptureBar />
+        </div>}
+
+        {viewMode === 'inbox' && (
+          <section className="min-h-[430px] flex flex-col items-center justify-center">
+            {triageTask ? (
+              <div className="relative w-full max-w-[390px] h-[390px] mx-auto" data-no-tab-swipe>
+                <button onClick={() => processTriageTask('today')} className={`absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border grid place-items-center text-center text-[11px] font-bold shadow-sm transition-transform ${triageFx?.destination === 'today' ? 'scale-110 ring-4 ring-amber-400/20' : 'bg-amber-500/10 border-amber-500/25 text-amber-500'}`}>
+                  <span><Sun className="w-5 h-5 mx-auto mb-1" />{tr('gtd.todayBucket')}</span>
+                </button>
+                <button onClick={() => processTriageTask('other')} className={`absolute left-0 top-1/2 -translate-y-1/2 w-24 h-24 rounded-full border grid place-items-center text-center text-[11px] font-bold shadow-sm transition-transform ${triageFx?.destination === 'other' ? 'scale-110 ring-4 ring-slate-400/20' : 'bg-slate-500/10 border-slate-500/25 text-slate-500'}`}>
+                  <span><Layers className="w-5 h-5 mx-auto mb-1" />{tr('gtd.status.other')}</span>
+                </button>
+                <button onClick={() => processTriageTask('next-action')} className={`absolute right-0 top-1/2 -translate-y-1/2 w-24 h-24 rounded-full border grid place-items-center text-center text-[11px] font-bold shadow-sm transition-transform ${triageFx?.destination === 'next-action' ? 'scale-110 ring-4 ring-yellow-400/20' : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-500'}`}>
+                  <span><Zap className="w-5 h-5 mx-auto mb-1" />{tr('gtd.status.next-action')}</span>
+                </button>
+                <button onClick={() => processTriageTask('inbox')} className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border grid place-items-center text-center text-[11px] font-bold shadow-sm transition-transform ${triageFx?.destination === 'inbox' ? 'scale-110 ring-4 ring-emerald-400/20' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-500'}`}>
+                  <span><Inbox className="w-5 h-5 mx-auto mb-1" />{tr('gtd.status.inbox')}</span>
+                </button>
+                <button onClick={() => processTriageTask('scheduled')} className={`absolute right-5 top-12 w-20 h-20 rounded-full border grid place-items-center text-center text-[10px] font-bold shadow-sm transition-transform ${triageFx?.destination === 'scheduled' ? 'scale-110 ring-4 ring-blue-400/20' : 'bg-blue-500/10 border-blue-500/25 text-blue-500'}`}>
+                  <span><Calendar className="w-4 h-4 mx-auto mb-1" />{tr('gtd.status.scheduled')}</span>
+                </button>
+                <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-[10px] text-[var(--text-dim)] flex items-center gap-1"><ArrowUp className="w-3 h-3" />{tr('gtd.swipeToday')}</div>
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-[var(--text-dim)] flex items-center gap-1"><ArrowDown className="w-3 h-3" />{tr('gtd.swipeInbox')}</div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 text-[10px] text-[var(--text-dim)]"><ArrowLeft className="w-3 h-3 mx-auto" />{tr('gtd.swipeOther')}</div>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 text-[10px] text-[var(--text-dim)]"><ArrowRight className="w-3 h-3 mx-auto" />{tr('gtd.swipeNext')}</div>
+                </div>
+                {!triageFx && (
+                  <div
+                    onTouchStart={onTriageTouchStart}
+                    onTouchMove={onTriageTouchMove}
+                    onTouchEnd={onTriageTouchEnd}
+                    style={{ transform: `translate(${triageDx}px, ${triageDy}px)`, transition: triageDx === 0 && triageDy === 0 ? 'transform .18s ease' : 'none' }}
+                    className="absolute left-1/2 top-1/2 -ml-[74px] -mt-[74px] w-[148px] h-[148px] rounded-full bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 flex flex-col items-center justify-center text-center touch-none"
+                  >
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-[var(--primary)] mb-1.5">{tr('gtd.triageCard')}</div>
+                    <div className="text-[14px] font-extrabold text-[var(--text)] leading-tight line-clamp-3">{triageTask.title}</div>
+                    <div className="mt-2 flex flex-wrap justify-center gap-1 text-[10px] text-[var(--text-dim)]">
+                      <span>P{triageTask.priority}</span>
+                      {triageTask.context && <span>{triageTask.context}</span>}
+                      {triageTask.durationMinutes && <span>{triageTask.durationMinutes}m</span>}
+                    </div>
+                  </div>
+                )}
+                <AnimatePresence>
+                  {triageFx && (
+                    <motion.div
+                      initial={{ opacity: 1, scale: 1, x: triageFx.x, y: triageFx.y, rotate: 0 }}
+                      animate={{ opacity: [1, 1, 0.65, 0], scale: [1, 0.9, 1.08, 0.05], rotate: [0, -1.5, 1.5, 0] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.64, times: [0, 0.28, 0.48, 1], ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute left-1/2 top-1/2 -ml-[74px] -mt-[74px] w-[148px] h-[148px] rounded-full bg-[var(--surface)] border shadow-2xl p-4 flex flex-col items-center justify-center text-center touch-none pointer-events-none z-20 overflow-visible"
+                      style={{
+                        borderColor: `${triageFx.color}55`,
+                        boxShadow: `0 0 0 1px ${triageFx.color}33, 0 18px 55px ${triageFx.color}22`,
+                      }}
+                    >
+                      <motion.div
+                        className="absolute inset-0 rounded-full border-[3px]"
+                        style={{ borderColor: `${triageFx.color}55` }}
+                        initial={{ scale: 0.86, opacity: 0 }}
+                        animate={{ scale: [0.86, 0.86, 2.05], opacity: [0, 0.75, 0] }}
+                        transition={{ duration: 0.64, times: [0, 0.32, 1], ease: 'easeOut' }}
+                      />
+                      <motion.div
+                        className="absolute inset-7 rounded-full"
+                        style={{ background: `${triageFx.color}22` }}
+                        initial={{ scale: 0.65, opacity: 0 }}
+                        animate={{ scale: [0.65, 0.65, 1.7], opacity: [0, 0.95, 0] }}
+                        transition={{ duration: 0.58, times: [0, 0.3, 1], ease: 'easeOut' }}
+                      />
+                      {Array.from({ length: 14 }, (_, i) => {
+                        const angle = (Math.PI * 2 * i) / 14;
+                        const distance = i % 2 === 0 ? 86 : 66;
+                        return (
+                          <motion.span
+                            key={i}
+                            className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full"
+                            style={{ background: triageFx.color }}
+                            initial={{ x: -4, y: -4, opacity: 0, scale: 0.6 }}
+                            animate={{
+                              x: [-4, -4, Math.cos(angle) * distance - 4],
+                              y: [-4, -4, Math.sin(angle) * distance - 4],
+                              opacity: [0, 1, 0],
+                              scale: [0.6, 1.2, 0.35],
+                            }}
+                            transition={{ duration: 0.62, times: [0, 0.34, 1], ease: 'easeOut' }}
+                          />
+                        );
+                      })}
+                      <motion.div
+                        className="absolute left-1/2 top-1/2 h-1.5 w-24 -ml-12 -mt-[3px] rounded-full"
+                        style={{ background: triageFx.color }}
+                        initial={{ opacity: 0, scaleX: 0.2, rotate: 0 }}
+                        animate={{ opacity: [0, 0.8, 0], scaleX: [0.2, 1.15, 0.1], rotate: [0, 0, 8] }}
+                        transition={{ duration: 0.48, times: [0, 0.42, 1], ease: 'easeOut' }}
+                      />
+                      <motion.div
+                        className="absolute left-1/2 top-1/2 h-1.5 w-24 -ml-12 -mt-[3px] rounded-full"
+                        style={{ background: triageFx.color }}
+                        initial={{ opacity: 0, scaleX: 0.2, rotate: 90 }}
+                        animate={{ opacity: [0, 0.75, 0], scaleX: [0.2, 1, 0.1], rotate: [90, 90, 78] }}
+                        transition={{ duration: 0.48, times: [0, 0.42, 1], ease: 'easeOut' }}
+                      />
+                      <motion.div
+                        initial={{ opacity: 1, scale: 1 }}
+                        animate={{ opacity: [1, 1, 0], scale: [1, 0.96, 0.72] }}
+                        transition={{ duration: 0.42, times: [0, 0.45, 1], ease: 'easeOut' }}
+                        className="relative z-10"
+                      >
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-[var(--primary)] mb-1.5">{tr('gtd.triageCard')}</div>
+                        <div className="text-[14px] font-extrabold text-[var(--text)] leading-tight line-clamp-3">{triageTask.title}</div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-10 text-center max-w-md">
+                <Sparkles className="w-12 h-12 text-[var(--primary)]/25 mx-auto mb-4" />
+                <h3 className="text-[16px] font-bold text-[var(--text)]">{tr('gtd.triageEmpty')}</h3>
+                <p className="text-[13px] text-[var(--text-dim)] mt-2">{tr('gtd.triageEmptyDesc')}</p>
+                <button onClick={openSortedLists} className="mt-5 h-10 px-4 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold">{tr('gtd.sortedLists')}</button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {viewMode === 'lists' && gtdFilter === 'project' && projectGroups.length > 0 && (
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Folder className="w-4 h-4 text-purple-400" />
+              <h2 className="text-[12px] font-bold uppercase tracking-widest text-[var(--text-dim)]">{tr('gtd.projectsOverview')}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {projectGroups.map(([name, stats]) => (
+                <div key={name} className="rounded-xl bg-[var(--surface-2)] border border-[var(--border)] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-bold text-[var(--text)] truncate">{name}</div>
+                      <div className="text-[11px] text-[var(--text-dim)] mt-1">
+                        {tr('gtd.projectStats', { total: stats.total, next: stats.next, waiting: stats.waiting, scheduled: stats.scheduled })}
+                      </div>
+                    </div>
+                    <span className="w-8 h-8 rounded-lg grid place-items-center bg-purple-500/10 text-purple-400 text-[12px] font-bold shrink-0">{stats.total}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {viewMode === 'lists' && selecting && (
+          <div className="sticky top-0 z-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-xl flex flex-wrap items-center gap-2">
+            <span className="mr-auto text-[12px] font-bold text-[var(--text)]">{tr('gtd.selectedN', { n: selectedCount })}</span>
+            <button disabled={selectedCount === 0} onClick={() => runBulk('done')} className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.done')}</button>
+            <button disabled={selectedCount === 0} onClick={() => runBulk('next-action')} className="h-8 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.moveNext')}</button>
+            <button disabled={selectedCount === 0} onClick={() => runBulk('today')} className="h-8 px-3 rounded-lg bg-[var(--surface-2)] text-[var(--text)] text-[11px] font-bold disabled:opacity-40">{tr('gtd.focusToday')}</button>
+            <button disabled={selectedCount === 0} onClick={() => runBulk('trash')} className="h-8 px-3 rounded-lg bg-red-500/10 text-red-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.trash')}</button>
+          </div>
+        )}
+
+        {viewMode === 'lists' && gtdFilter === 'today' && filtered.length === 0 && (
           <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-12 text-center">
             <Sun className="w-12 h-12 text-amber-500/20 mx-auto mb-4" />
             <h3 className="text-[16px] font-medium text-[var(--text)] mb-1">{tr('gtd.noFocusToday')}</h3>
@@ -754,7 +1243,7 @@ export function GTDView() {
           </div>
         )}
 
-        <div className={gtdFilter === 'reference' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-3'}>
+        {viewMode === 'lists' && <div className={gtdFilter === 'reference' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-3'}>
           <AnimatePresence mode="popLayout" initial={false}>
           {filtered.map(task => (
             <motion.div
@@ -767,14 +1256,14 @@ export function GTDView() {
             >
             {/* inner div keeps native HTML5 drag (motion would swallow onDragStart/End) */}
             <div
-              draggable
+              draggable={!selecting}
               onDragStart={(e) => { setDragId(task.id); e.dataTransfer.effectAllowed = 'move'; }}
               onDragOver={(e) => { e.preventDefault(); if (dragId !== task.id) setOverId(task.id); }}
               onDragEnd={() => { if (dragId && overId && dragId !== overId) reorderTasks(dragId, overId); setDragId(null); setOverId(null); }}
               onDrop={(e) => { e.preventDefault(); if (dragId && dragId !== task.id) reorderTasks(dragId, task.id); setDragId(null); setOverId(null); }}
               className={`transition-all cursor-grab active:cursor-grabbing ${overId === task.id && dragId !== task.id ? 'ring-2 ring-[var(--primary)]/50 -translate-y-1 scale-[1.01]' : ''}`}
             >
-              {gtdFilter === 'reference' ? (
+              {gtdFilter === 'reference' && !selecting ? (
                 <div className="card p-5 h-full flex flex-col hover:border-[var(--border)] transition-all bg-[var(--surface)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-teal-400">
@@ -790,15 +1279,15 @@ export function GTDView() {
                   </div>
                 </div>
               ) : (
-                <TaskCard task={task} />
+                <TaskCard task={task} selecting={selecting} selected={selectedIds.includes(task.id)} onSelect={() => toggleSelected(task.id)} />
               )}
             </div>
             </motion.div>
           ))}
           </AnimatePresence>
-        </div>
+        </div>}
 
-        {filtered.length === 0 && gtdFilter !== 'today' && (
+        {viewMode === 'lists' && filtered.length === 0 && gtdFilter !== 'today' && (
           <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-12 text-center mt-8">
             <div className="text-4xl mb-3 opacity-50">{gtdFilter === 'inbox' ? '🎉' : '📭'}</div>
             <h3 className="text-[16px] font-medium text-[var(--text)] mb-1">
@@ -811,7 +1300,7 @@ export function GTDView() {
         )}
 
         {/* Completed section */}
-        {gtdFilter === 'all' && doneTasks.length > 0 && (
+        {viewMode === 'lists' && gtdFilter === 'done' && doneTasks.length > 0 && (
           <details className="group mt-8">
             <summary className="flex items-center gap-2 py-3 cursor-pointer text-[12px] text-[var(--text-dim)] hover:text-[var(--text)] list-none border-t border-[var(--surface-2)]">
               <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
@@ -833,33 +1322,40 @@ export function GTDView() {
 }
 
 // ─── Do Task (Focus Execution) Modal ──────────────────────────────────────────
+const TIMER_PRESETS = [20, 30, 60] as const;
+
 function DoTaskModal() {
   const tr = useT();
-  const { doingTaskId, gtdTasks, setDoingTask, processTask, toggleSubtask, openTimerLauncher } = useStore();
-  const [elapsed, setElapsed] = useState(0);
-  const [running, setRunning] = useState(true);
+  const { doingTaskId, gtdTasks, setDoingTask, toggleSubtask, startTimer } = useStore();
+  const [mode, setMode] = useState<'choose' | 'countdown' | 'stopwatch'>('choose');
+  const [minutes, setMinutes] = useState(30);
 
-  useEffect(() => { setElapsed(0); setRunning(true); }, [doingTaskId]);
   useEffect(() => {
-    if (!running || !doingTaskId) return;
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => clearInterval(t);
-  }, [running, doingTaskId]);
+    setMode('choose');
+    setMinutes(30);
+  }, [doingTaskId]);
 
   if (!doingTaskId) return null;
   const task = gtdTasks.find(t => t.id === doingTaskId);
   if (!task) return null;
 
-  const m = Math.floor(elapsed / 60), s = elapsed % 60;
-  const estMin = task.durationMinutes || 25;
-  const progress = Math.min(100, (elapsed / (estMin * 60)) * 100);
   const subDone = (task.subtasks || []).filter(st => st.done).length;
   const subTotal = (task.subtasks || []).length;
 
-  const complete = () => { processTask(task.id, 'done'); setDoingTask(null); };
+  const startFocus = () => {
+    ensureWebNotifPermission();
+    startTimer({
+      mode: mode === 'stopwatch' ? 'stopwatch' : 'countdown',
+      targetMinutes: mode === 'stopwatch' ? 1 : minutes,
+      linkType: 'task',
+      linkId: task.id,
+      label: task.title,
+    });
+    setDoingTask(null);
+  };
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
       <div className="w-full max-w-lg bg-[var(--surface)] rounded-3xl border border-[var(--border)] shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-[var(--surface-2)] flex items-center justify-between">
@@ -869,31 +1365,59 @@ function DoTaskModal() {
           <button onClick={() => setDoingTask(null)} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X className="w-4 h-4" /></button>
         </div>
 
-        {/* Task & timer */}
-        <div className="p-8 text-center">
-          <div className="mb-1 flex items-center justify-center gap-2">
+        {/* Task summary */}
+        <div className="p-6 text-center border-b border-[var(--surface-2)]">
+          <div className="mb-2 flex items-center justify-center gap-2">
             <div className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[task.priority]?.dot}`} />
-            <span className="text-[11px] text-[var(--text-dim)]">{PRIORITY_CONFIG[task.priority]?.label} · {task.context || '@anywhere'} · ~{estMin}{tr('common.minShort')}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{PRIORITY_CONFIG[task.priority]?.label} · {task.context || '@anywhere'} · ~{task.durationMinutes || 25}{tr('common.minShort')}</span>
           </div>
           <h2 className="text-[22px] font-bold text-[var(--text)] leading-tight px-4">{task.title}</h2>
           {task.notes && <p className="text-[12px] text-[var(--text-dim)] mt-2 px-4">{task.notes}</p>}
+        </div>
 
-          {/* Big timer */}
-          <div className="my-8 flex flex-col items-center">
-            <div className="relative">
-              <Ring pct={progress} size={160} stroke={8} color={progress >= 100 ? '#22c55e' : '#8b5cf6'}>
-                <div className="text-center">
-                  <div className="text-[42px] font-bold text-[var(--text)] mono leading-none">{String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}</div>
-                  <div className="text-[10px] text-[var(--text-dim)] mt-1">{progress >= 100 ? tr('gtd.timesUp') : tr('gtd.ofTime',{t:`${estMin}:00`})}</div>
-                </div>
-              </Ring>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => setRunning(r => !r)} className="h-10 px-5 rounded-xl bg-[var(--surface-2)] text-[var(--text)] text-[12px] font-bold flex items-center gap-2 hover:bg-[var(--border)]">
-                {running ? <><Timer className="w-4 h-4" />{tr('gtd.pause')}</> : <><Timer className="w-4 h-4" />{tr('gtd.resume')}</>}
+        {/* Mode chooser */}
+        <div className="p-4">
+          {mode === 'choose' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setMode('countdown')} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left hover:border-[var(--primary)] transition-colors">
+                <Hourglass className="w-5 h-5 text-[var(--primary)] mb-3" />
+                <div className="text-[15px] font-bold text-[var(--text)]">{tr('timer.modeTimer')}</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">Set a time and start.</div>
+              </button>
+              <button onClick={() => setMode('stopwatch')} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left hover:border-[var(--primary)] transition-colors">
+                <Timer className="w-5 h-5 text-[var(--primary)] mb-3" />
+                <div className="text-[15px] font-bold text-[var(--text)]">{tr('timer.modeStopwatch')}</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">Just run it and track time forward.</div>
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {mode === 'countdown' ? (
+                <div>
+                  <div className="flex items-center justify-center gap-4 mb-3">
+                    <button onClick={() => setMinutes(v => Math.max(5, v - 5))} className="w-11 h-11 rounded-2xl grid place-items-center bg-[var(--surface-2)] text-[var(--text)] active:scale-90 transition-transform"><Minus className="w-5 h-5" /></button>
+                    <div className="text-center min-w-[88px]">
+                      <div className="text-[34px] font-bold text-[var(--text)] mono leading-none tabular-nums">{minutes}</div>
+                      <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-1">{tr('timer.minutes')}</div>
+                    </div>
+                    <button onClick={() => setMinutes(v => Math.min(180, v + 5))} className="w-11 h-11 rounded-2xl grid place-items-center bg-[var(--surface-2)] text-[var(--text)] active:scale-90 transition-transform"><Plus className="w-5 h-5" /></button>
+                  </div>
+                  <div className="flex justify-center gap-2 flex-wrap">
+                    {TIMER_PRESETS.map((p) => (
+                      <button key={p} onClick={() => setMinutes(p)}
+                        className={`h-8 px-4 rounded-full text-[12px] font-bold transition-colors ${minutes === p ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{p}m</button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] p-4 text-center">
+                  <Timer className="w-7 h-7 mx-auto text-[var(--primary)] mb-2" />
+                  <div className="text-[14px] font-bold text-[var(--text)]">{tr('timer.modeStopwatch')}</div>
+                  <div className="text-[12px] text-[var(--text-dim)] mt-1">Counts forward until you stop it.</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Subtasks checklist */}
           {subTotal > 0 && (
@@ -914,8 +1438,12 @@ function DoTaskModal() {
         {/* Footer actions */}
         <div className="p-4 border-t border-[var(--surface-2)] flex gap-2">
           <button onClick={() => { setDoingTask(null); }} className="flex-1 h-11 rounded-xl border border-[var(--border)] text-[12px] text-[var(--text-dim)] hover:bg-[var(--surface-2)]">{tr('gtd.pauseExit')}</button>
-          <button onClick={() => { openTimerLauncher({ linkType: 'task', linkId: task.id, label: task.title }); setDoingTask(null); }} className="h-11 px-4 rounded-xl bg-[var(--surface-2)] text-[12px] text-[var(--primary)] font-bold hover:bg-[var(--border)] flex items-center gap-1.5"><Timer className="w-4 h-4" />{tr('gtd.pomodoro')}</button>
-          <button onClick={complete} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black text-[12px] font-bold flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />{tr('gtd.completeTask')}</button>
+          <button onClick={() => setMode('choose')} className={`h-11 px-4 rounded-xl bg-[var(--surface-2)] text-[12px] text-[var(--text)] font-bold hover:bg-[var(--border)] flex items-center gap-1.5 ${mode === 'choose' ? 'opacity-40 pointer-events-none' : ''}`}>
+            <Timer className="w-4 h-4" />{tr('common.back')}
+          </button>
+          <button onClick={startFocus} disabled={mode === 'choose'} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-40">
+            <Check className="w-4 h-4" />Start
+          </button>
         </div>
       </div>
     </div>

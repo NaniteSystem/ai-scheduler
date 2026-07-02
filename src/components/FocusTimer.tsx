@@ -52,7 +52,7 @@ export function TimerBar() {
   const pct = isCountdown ? Math.min(100, Math.max(0, (elapsed / (ft.targetMinutes * 60000)) * 100)) : 0;
 
   return (
-    <div className="fixed inset-x-0 z-40 px-3 pointer-events-none" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom) + 86px)' }}>
+    <div className="fixed inset-x-0 z-40 px-3 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}>
       <div className="mx-auto w-full max-w-[460px] rounded-2xl bg-[var(--surface)] border border-[var(--border)] pointer-events-auto overflow-hidden anim-pop"
         style={{ boxShadow: '0 12px 30px rgba(40,50,90,.22)' }}>
         {/* countdown progress line */}

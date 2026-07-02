@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { useStore, habitDueOn, goalInsight, goalProgressPct, goalStreak } from './store';
 import { useT, useDateLocale } from './i18n';
 import { syncReminders } from './utils/notifications';
@@ -7,19 +9,21 @@ import { TimerBar, TimerLauncher } from './components/FocusTimer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
 import { GTDView } from './components/GTDView';
-import { HabitsView } from './components/HabitsView';
+import { HabitsView, HabitModal } from './components/HabitsView';
 import { ArchiveView } from './components/ArchiveView';
 import { ScheduleView } from './components/ScheduleView';
 import { GoalDetailView } from './components/GoalDetailView';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
 import type { Session, GTDTask } from './types';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2 } from 'lucide-react';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2 } from 'lucide-react';
 import { AIScheduler } from './components/AIScheduler';
 import { AIPlanner } from './components/AIPlanner';
 import { EnergyChart } from './components/EnergyChart';
 import { SettingsView } from './components/SettingsView';
 import { Onboarding } from './components/Onboarding';
+import { IntroCourse } from './components/IntroCourse';
+import { NebullaMark } from './components/BrandLogo';
 import { GoalCreateWizard } from './components/GoalCreateWizard';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { SessionIcon } from './components/ui/IconPicker';
@@ -35,18 +39,234 @@ function Ring({pct,size=80,stroke=5,color='#22c55e',bg='var(--border)',children}
   </div>;
 }
 
+const LEGACY_LINKED_SESSION_NOTES = new Set([
+  'Linked session. Drag to reschedule.',
+  'Связанная сессия. Перетащите, чтобы перенести.',
+  'リンクされたセッション。ドラッグして予定を変更できます。',
+]);
+const cleanSessionNote = (note?: string) => {
+  const value = (note || '').trim();
+  return LEGACY_LINKED_SESSION_NOTES.has(value) ? '' : value;
+};
+
+function HomeTaskRow({ tk, onOpen }: { tk: GTDTask; onOpen: () => void }) {
+  const store = useStore();
+  const t = useT();
+  const [completing, setCompleting] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const completeTask = () => {
+    if (completing) return;
+    setCompleting(true);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      store.processTask(tk.id, 'done');
+      timerRef.current = null;
+    }, 220);
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: completing ? 0.2 : 1, scale: completing ? 0.98 : 1 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.2 }}
+      className={`tcard p-3.5 flex items-center gap-3 relative overflow-hidden ${completing ? 'border-emerald-500/40 bg-emerald-500/10' : ''}`}
+    >
+      {completing && (
+        <div className="absolute inset-0 pointer-events-none grid place-items-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-500 animate-pulse">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+      )}
+      <button onClick={completeTask} className="shrink-0" aria-label="Mark done">
+        <Circle className={`w-6 h-6 transition-colors ${completing ? 'text-emerald-500' : 'text-[var(--text-mute)] hover:text-emerald-500'}`} />
+      </button>
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
+        <div className={`text-[14px] font-semibold truncate ${completing ? 'text-emerald-500 line-through' : 'text-[var(--text)]'}`}>{tk.title}</div>
+        <div className="text-[11px] text-[var(--text-dim)] mt-0.5">P{tk.priority}{tk.context?` · ${tk.context}`:''}{tk.durationMinutes?` · ${tk.durationMinutes}${t('common.minShort')}`:''}</div>
+      </div>
+    </motion.div>
+  );
+}
+
+function HomeSessionRow({ s, index = 0 }: { s: Session; index?: number }) {
+  const store = useStore();
+  const t = useT();
+  const [completing, setCompleting] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const goal = store.goals.find(x => x.id === s.goalId);
+  const color = s.color || goal?.color || '#22c55e';
+  const emoji = goal?.emoji || '🗓️';
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const fmtStart = (session: Session) => Number.isFinite(session.startHour) ? `${pad2(session.startHour)}:${pad2(session.startMinute || 0)}` : '';
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const completeSession = (ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    if (completing) return;
+    setCompleting(true);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      store.updateSession(s.id, { status: 'done' });
+      timerRef.current = null;
+    }, 260);
+  };
+
+  return (
+    <motion.div
+      key={s.id}
+      {...listItem(index)}
+      animate={{ opacity: completing ? 0.18 : 1, scale: completing ? 0.98 : 1, y: completing ? -4 : 0 }}
+      exit={{ opacity: 0, scale: 0.97, y: -8 }}
+      onClick={() => store.openSessionModal(s.id)}
+      className={`tcard p-3.5 flex items-center gap-3 cursor-pointer border-l-[4px] active:scale-[.99] transition-transform relative overflow-hidden ${completing ? 'bg-emerald-500/10 border-emerald-500/40' : ''}`}
+      style={{ borderLeftColor: completing ? '#10b981' : color }}
+    >
+      {completing && (
+        <div className="absolute inset-0 pointer-events-none grid place-items-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-500 animate-pulse">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          {s.icon ? <SessionIcon name={s.icon} className="w-3.5 h-3.5 text-[var(--text-dim)]" /> : <span className="text-sm leading-none">{emoji}</span>}
+          <span className={`font-bold text-[14px] truncate ${completing ? 'text-emerald-500 line-through' : 'text-[var(--text)]'}`}>{s.title}</span>
+        </div>
+        <div className="text-[12px] text-[var(--text-dim)] mt-1 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5" />
+          {s.allDay ? t('home.allDay') : `${fmtStart(s) ? fmtStart(s) + ' · ' : ''}${fmtDur(s.durationMinutes, store.lang)}`}
+        </div>
+      </div>
+      <button onClick={completeSession} className="w-9 h-9 rounded-xl bg-[var(--surface-2)] text-[var(--text-dim)] grid place-items-center hover:bg-emerald-500 hover:text-[var(--text)] transition-colors shrink-0" aria-label="Mark done">
+        <CheckCircle2 className="w-4 h-4" />
+      </button>
+    </motion.div>
+  );
+}
+
 export default function App(){
   const t=useT();
   const locale=useDateLocale();
   const store=useStore();
-  const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,schedulePrefs,density,theme}=store;
+  const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,introCourseCompleted,schedulePrefs,density,theme}=store;
   useEffect(()=>{ syncReminders(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits]);
+  useEffect(()=>{ store.syncScheduledSessions(); },[sessions.length,gtdTasks.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{ initTimerActionListener(); },[]);
   useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
   const[selectedGoalId,setSelectedGoalId]=useState<string|null>(null);
   const[qt,setQt]=useState('');
-  const[qd,setQd]=useState(5);
+  const[qd]=useState(5);
   const[captureOpen,setCaptureOpen]=useState(false);
+  const[quickHabitOpen,setQuickHabitOpen]=useState(false);
+  const[logMetric,setLogMetric]=useState('progress');
+  const[logValue,setLogValue]=useState('1');
+  const[logFeeling,setLogFeeling]=useState<'bad'|'ok'|'good'|'great'>('good');
+  const[logNotes,setLogNotes]=useState('');
+  const[overviewChild,setOverviewChild]=useState(false);
+  const touchScrollRef=useRef<{x:number;y:number;lastY:number;lastT:number;el:HTMLElement;active:boolean;velocity:number;raf:number|null}|null>(null);
+
+  const findScrollableParent=(start:EventTarget|null)=>{
+    let el=start instanceof HTMLElement?start:null;
+    while(el){
+      const style=window.getComputedStyle(el);
+      const canScrollY=(style.overflowY==='auto'||style.overflowY==='scroll')&&el.scrollHeight>el.clientHeight+1;
+      if(canScrollY) return el;
+      el=el.parentElement;
+    }
+    return null;
+  };
+
+  const onAppTouchStart=(e:React.TouchEvent<HTMLDivElement>)=>{
+    const touch=e.touches[0];
+    if(!touch) return;
+    const el=findScrollableParent(e.target);
+    if(!el) { touchScrollRef.current=null; return; }
+    if(touchScrollRef.current?.raf) cancelAnimationFrame(touchScrollRef.current.raf);
+    touchScrollRef.current={x:touch.clientX,y:touch.clientY,lastY:touch.clientY,lastT:performance.now(),el,active:false,velocity:0,raf:null};
+  };
+
+  const onAppTouchMove=(e:React.TouchEvent<HTMLDivElement>)=>{
+    const info=touchScrollRef.current;
+    const touch=e.touches[0];
+    if(!info||!touch) return;
+    const now=performance.now();
+    const dx=touch.clientX-info.x;
+    const dy=touch.clientY-info.y;
+    if(!info.active){
+      if(Math.abs(dy)<6) return;
+      if(Math.abs(dy)<=Math.abs(dx)) { touchScrollRef.current=null; return; }
+      info.active=true;
+    }
+    const dt=Math.max(8,now-info.lastT);
+    const deltaY=touch.clientY-info.lastY;
+    info.velocity=(-deltaY)/dt;
+    info.el.scrollTop-=deltaY;
+    info.lastY=touch.clientY;
+    info.lastT=now;
+    if(e.cancelable) e.preventDefault();
+  };
+
+  const onAppTouchEnd=()=>{
+    const info=touchScrollRef.current;
+    if(!info) return;
+    if(!info.active||Math.abs(info.velocity)<0.05){touchScrollRef.current=null;return;}
+    let velocity=Math.max(-1.8,Math.min(1.8,info.velocity));
+    let last=performance.now();
+    const step=(now:number)=>{
+      const current=touchScrollRef.current;
+      if(!current) return;
+      const dt=Math.min(32,now-last);
+      last=now;
+      const before=current.el.scrollTop;
+      current.el.scrollTop+=velocity*dt;
+      const atEdge=current.el.scrollTop===before&&(current.el.scrollTop<=0||current.el.scrollTop>=current.el.scrollHeight-current.el.clientHeight-1);
+      velocity*=Math.pow(0.92,dt/16);
+      if(Math.abs(velocity)<0.02||atEdge){touchScrollRef.current=null;return;}
+      current.raf=requestAnimationFrame(step);
+    };
+    info.raf=requestAnimationFrame(step);
+  };
+  useEffect(()=>{
+    if(!Capacitor.isNativePlatform()) return;
+    let handle: { remove: () => Promise<void> } | undefined;
+    let disposed=false;
+    CapacitorApp.addListener('backButton',()=>{
+      const st=useStore.getState();
+      if(st.confirmDialog){st.closeConfirm();return;}
+      if(captureOpen){setCaptureOpen(false);return;}
+      if(st.wizardOpen){st.closeWizard();return;}
+      if(st.timerLauncher){st.closeTimerLauncher();return;}
+      if(st.sessionModalId){st.closeSessionModal();return;}
+      if(st.logOpen){st.closeLog();return;}
+      if(st.gtdEditTaskId){st.closeEditTask();return;}
+      if(st.weeklyReviewOpen){st.closeWeeklyReview();return;}
+      if(st.doingTaskId){st.setDoingTask(null);return;}
+      if(selectedGoalId||st.activeView!=='dashboard'){
+        setSelectedGoalId(null);
+        setOverviewChild(false);
+        st.setActiveView('dashboard');
+        return;
+      }
+      CapacitorApp.exitApp();
+    }).then((h)=>{if(disposed)h.remove();else handle=h;});
+    return ()=>{disposed=true;handle?.remove();};
+  },[captureOpen,selectedGoalId]);
   const ws=startOfWeek(addDays(new Date(),weekOffset*7),{weekStartsOn:(schedulePrefs.weekStartsOn??1)});
   const days=Array.from({length:7},(_,i)=>addDays(ws,i));
   const doneW=sessions.filter(s=>s.status==='done').length;
@@ -54,9 +274,6 @@ export default function App(){
   const adherence=totalW?Math.round((doneW/totalW)*100):0;
 
   // ── Real stats helpers ────────────────────────────────────────────────
-  const totalHoursLogged=+(sessions.filter(s=>s.status==='done').reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
-  const nextActionCount=gtdTasks.filter(t=>t.status==='next-action').length;
-
   // Per category stats
   const catSessions=(cat:string)=>sessions.filter(s=>goals.find(g=>g.id===s.goalId)?.category===cat&&s.status==='done');
   const langHours=+(catSessions('language').reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
@@ -66,6 +283,8 @@ export default function App(){
   const capture=()=>{const t=qt.trim();if(!t)return;store.captureTask(t,qd);setQt('')};
   const goalColor=(gid:string)=>goals.find(g=>g.id===gid)?.color||'#22c55e';
   const goalEmoji=(gid:string)=>goals.find(g=>g.id===gid)?.emoji||'✓';
+  const overviewSectionViews = new Set(['goals', 'habits', 'inbox', 'archive', 'planner']);
+  const bottomNavActiveView = overviewChild && overviewSectionViews.has(activeView) ? 'progress' : activeView;
 
   // ── Home "Today / Tomorrow" data ──────────────────────────────────────
   const _now=new Date();
@@ -73,15 +292,15 @@ export default function App(){
   const byStart=(a:Session,b:Session)=>(a.startHour*60+(a.startMinute||0))-(b.startHour*60+(b.startMinute||0));
   const taskActive=(tk:GTDTask)=>tk.status!=='done'&&tk.status!=='trash';
   const sessionsOn=(d:Date)=>sessions.filter(s=>!!s.date&&isSameDay(parseISO(s.date),d));
-  const timedToday=sessionsOn(_now).filter(s=>!s.allDay).sort(byStart);
-  const allDayToday=sessionsOn(_now).filter(s=>s.allDay);
+  const sessionsTodayAll=sessionsOn(_now);
+  const sessionsTomorrowAll=sessionsOn(_tomorrow);
+  const visibleSession=(s:Session)=>s.status!=='done';
+  const timedToday=sessionsTodayAll.filter(s=>!s.allDay&&visibleSession(s)).sort(byStart);
+  const allDayToday=sessionsTodayAll.filter(s=>s.allDay&&visibleSession(s));
   const tasksToday=gtdTasks.filter(tk=>taskActive(tk)&&(tk.isTodayFocus||(tk.dueDate&&isSameDay(parseISO(tk.dueDate),_now))));
-  const timedTomorrow=sessionsOn(_tomorrow).filter(s=>!s.allDay).sort(byStart);
-  const allDayTomorrow=sessionsOn(_tomorrow).filter(s=>s.allDay);
+  const timedTomorrow=sessionsTomorrowAll.filter(s=>!s.allDay&&visibleSession(s)).sort(byStart);
+  const allDayTomorrow=sessionsTomorrowAll.filter(s=>s.allDay&&visibleSession(s));
   const tasksTomorrow=gtdTasks.filter(tk=>taskActive(tk)&&tk.dueDate&&isSameDay(parseISO(tk.dueDate),_tomorrow));
-  const pad2=(n:number)=>String(n).padStart(2,'0');
-  // Time label that tolerates malformed/legacy sessions (undefined startHour) — never renders "undefined:00".
-  const fmtStart=(s:Session)=>Number.isFinite(s.startHour)?`${pad2(s.startHour)}:${pad2(s.startMinute||0)}`:'';
   const _todayStr=format(_now,'yyyy-MM-dd');
   const dueHabitsToday=habits.filter(h=>!h.archived&&habitDueOn(h,_now));
 
@@ -97,22 +316,11 @@ export default function App(){
         : <button onClick={()=>store.setHabitStatus(h.id,_todayStr,st==='done'?'rest':'done')} className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 transition-colors ${st==='done'?'bg-emerald-500 text-white':'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-emerald-500'}`}><CheckCircle2 className="w-4 h-4"/></button>}
     </motion.div>);};
 
-  const renderSessionRow=(s:Session,i=0)=>{const g=goals.find(x=>x.id===s.goalId);const c=s.color||g?.color||'#22c55e';const e=g?.emoji||'🗓️';return (
-    <motion.div key={s.id} {...listItem(i)} onClick={()=>store.openSessionModal(s.id)} className="tcard p-3.5 flex items-center gap-3 cursor-pointer border-l-[4px] active:scale-[.99] transition-transform" style={{borderLeftColor:c}}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">{s.icon?<SessionIcon name={s.icon} className="w-3.5 h-3.5 text-[var(--text-dim)]"/>:<span className="text-sm leading-none">{e}</span>}<span className="font-bold text-[var(--text)] text-[14px] truncate">{s.title}</span></div>
-        <div className="text-[12px] text-[var(--text-dim)] mt-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/>{s.allDay?t('home.allDay'):`${fmtStart(s)?fmtStart(s)+' · ':''}${fmtDur(s.durationMinutes,store.lang)}`}</div>
-      </div>
-      {s.status==='done'?<CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0"/>:<button onClick={ev=>{ev.stopPropagation();store.updateSession(s.id,{status:'done'})}} className="w-9 h-9 rounded-xl bg-[var(--surface-2)] text-[var(--text-dim)] grid place-items-center hover:bg-emerald-500 hover:text-[var(--text)] transition-colors shrink-0"><CheckCircle2 className="w-4 h-4"/></button>}
-    </motion.div>);};
+  const renderSessionRow=(s:Session,i=0)=><HomeSessionRow key={s.id} s={s} index={i} />;
 
   const renderTaskRow=(tk:GTDTask,i=0)=>(
-    <motion.div key={tk.id} {...listItem(i)} className="tcard p-3.5 flex items-center gap-3">
-      <button onClick={()=>store.processTask(tk.id,'done')} className="shrink-0"><Circle className="w-6 h-6 text-[var(--text-mute)] hover:text-emerald-500 transition-colors"/></button>
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>store.setActiveView('inbox')}>
-        <div className="text-[14px] font-semibold text-[var(--text)] truncate">{tk.title}</div>
-        <div className="text-[11px] text-[var(--text-dim)] mt-0.5">P{tk.priority}{tk.context?` · ${tk.context}`:''}{tk.durationMinutes?` · ${tk.durationMinutes}${t('common.minShort')}`:''}</div>
-      </div>
+    <motion.div key={tk.id} {...listItem(i)}>
+      <HomeTaskRow tk={tk} onOpen={()=>{store.setActiveView('inbox');setOverviewChild(false);}} />
     </motion.div>);
 
   /* ─── NAV ─── */
@@ -120,24 +328,31 @@ export default function App(){
 
 
   if(!onboarded) return <Onboarding/>;
+  if(!introCourseCompleted) return <IntroCourse/>;
 
-  return <div className={`${theme==='dark'?'theme-dark ':''}h-[100dvh] w-full max-w-full flex bg-[var(--bg)] text-[var(--text)] overflow-hidden${density==='compact'?' density-compact':''}`}>
+  return <div
+    className={`${theme==='dark'?'theme-dark ':''}h-[100dvh] w-full max-w-full flex bg-[var(--bg)] text-[var(--text)] overflow-hidden${density==='compact'?' density-compact':''}`}
+    onTouchStart={onAppTouchStart}
+    onTouchMove={onAppTouchMove}
+    onTouchEnd={onAppTouchEnd}
+    onTouchCancel={onAppTouchEnd}
+  >
 
     {/* ═══════════════════ MAIN ═══════════════════ */}
     <main className="relative flex-1 flex flex-col min-w-0 bg-[var(--bg)]">
-      {/* Mobile safe-area spacer (replaces the old "Scheduler" top bar) */}
+      {/* Mobile safe-area spacer */}
       <div className="md:hidden shrink-0" style={{height:'env(safe-area-inset-top)'}} />
       {/* ═══════════════ DESKTOP TOP NAV (md+) ═══════════════ */}
       <div className="hidden md:flex items-center gap-1 h-16 px-6 border-b border-[var(--border)] bg-[var(--surface)] shrink-0">
         <div className="flex items-center gap-2 mr-5">
-          <div className="w-8 h-8 rounded-xl grid place-items-center" style={{background:'linear-gradient(135deg,var(--primary),var(--primary-2))'}}><Sparkles className="w-4 h-4 text-white"/></div>
-          <span className="text-[16px] font-bold text-[var(--text)]">Scheduler</span>
+          <NebullaMark className="w-8 h-8" />
+          <span className="text-[16px] font-bold text-[var(--text)]">Nebulla</span>
         </div>
         {(()=>{
           const topTab=(id:string,label:string,Ic:any)=>{
             const a=activeView===id;
             return (
-              <button key={id} onClick={()=>{store.setActiveView(id as any);setSelectedGoalId(null);}}
+              <button key={id} onClick={()=>{store.setActiveView(id as any);setSelectedGoalId(null);setOverviewChild(false);}}
                 className={`h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors ${a?'bg-[var(--primary)]/12 text-[var(--primary)]':'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}>
                 <Ic className="w-[18px] h-[18px]" strokeWidth={a?2.5:2}/>{label}
               </button>
@@ -164,7 +379,7 @@ export default function App(){
 {activeView==='planner'&&<AIPlanner/>}
 
 {/* ═══════════════════ SYSTEM HISTORY ═══════════════════ */}
-{activeView==='archive'&&<ArchiveView/>}
+{activeView==='archive'&&<ArchiveView onBack={overviewChild?()=>{store.setActiveView('progress');setOverviewChild(false);}:undefined}/>}
 
 {/* ═══════════════════ SETTINGS ═══════════════════ */}
 {activeView==='settings'&&<SettingsView/>}
@@ -173,8 +388,8 @@ export default function App(){
 {activeView==='dashboard'&&(()=>{
   const initials=(userName||'').trim().split(/\s+/).filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'·';
   const streak=Math.max(0,...goals.map(g=>goalStreak(g,sessions)));
-  const doneToday=timedToday.filter(s=>s.status==='done').length+allDayToday.filter(s=>s.status==='done').length+dueHabitsToday.filter(h=>h.log[_todayStr]?.status==='done').length;
-  const totalToday=timedToday.length+allDayToday.length+tasksToday.length+dueHabitsToday.length;
+  const doneToday=sessionsTodayAll.filter(s=>s.status==='done').length+dueHabitsToday.filter(h=>h.log[_todayStr]?.status==='done').length;
+  const totalToday=sessionsTodayAll.length+tasksToday.length+dueHabitsToday.length;
   const pct=totalToday?Math.round(doneToday/totalToday*100):0;
   const emptyBox=(txt:string)=><div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center text-[13px] text-[var(--text-dim)]">{txt}</div>;
   const head=(icon:React.ReactNode,txt:string)=><h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] mb-3 flex items-center gap-2">{icon}{txt}</h3>;
@@ -206,7 +421,7 @@ export default function App(){
   <section className="anim-fade anim-delay-1">
     <div className="flex items-center justify-between mb-3">
       {head(<Clock className="w-3.5 h-3.5"/>,t('home.todayScheduled'))}
-      <button onClick={()=>store.setActiveView('week')} className="text-[11px] text-[var(--primary)] hover:opacity-80 font-bold uppercase tracking-wider pb-3">{t('dash.expandSchedule')}</button>
+      <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} className="text-[11px] text-[var(--primary)] hover:opacity-80 font-bold uppercase tracking-wider pb-3">{t('dash.expandSchedule')}</button>
     </div>
     <div className="space-y-2.5">
       {timedToday.length>0 ? timedToday.map(renderSessionRow) : emptyBox(t('home.noScheduled'))}
@@ -250,6 +465,7 @@ export default function App(){
   return <div className="px-4 md:px-10 py-6 md:py-8 max-w-[1500px] space-y-6 md:space-y-8 pb-32">
     <div className="flex items-end justify-between anim-fade">
       <div>
+        {overviewChild&&<button onClick={()=>{store.setActiveView('progress');setOverviewChild(false);setSelectedGoalId(null);}} className="mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4"/>{t('bottomNav.stats')}</button>}
         <h1 className="display text-[30px] md:text-[48px] text-[var(--text)]">{t('goals.title')}</h1>
         <p className="text-[15px] text-[var(--text-dim)] mt-1">{t('goals.count',{n:activeGoals.length})}{completedGoals.length>0?t('goals.completedSuffix',{n:completedGoals.length}):''}</p>
       </div>
@@ -338,13 +554,13 @@ export default function App(){
 })()}
 
 {/* ═══════════════════ SCHEDULE ═══════════════════ */}
-{activeView==='week'&&<ScheduleView ws={ws} days={days} sessions={sessions} goals={goals} weekOffset={weekOffset} store={store} qt={qt} setQt={setQt} qd={qd} setQd={setQd} capture={capture} goalColor={goalColor} goalEmoji={goalEmoji}/>}
+{activeView==='week'&&<ScheduleView ws={ws} days={days} sessions={sessions} goals={goals} weekOffset={weekOffset} store={store} goalColor={goalColor} goalEmoji={goalEmoji}/>}
 
 {/* ═══════════════════ GTD INBOX ═══════════════════ */}
-{activeView==='inbox'&&<GTDView/>}
+{activeView==='inbox'&&<GTDView onBack={overviewChild?()=>{store.setActiveView('progress');setOverviewChild(false);}:undefined}/>}
 
 {/* ═══════════════════ HABITS ═══════════════════ */}
-{activeView==='habits'&&<HabitsView/>}
+{activeView==='habits'&&<HabitsView onBack={overviewChild?()=>{store.setActiveView('progress');setOverviewChild(false);}:undefined}/>}
 
 {/* ═══════════════════ PROGRESS ═══════════════════ */}
 {activeView==='progress'&&(()=>{
@@ -364,7 +580,7 @@ export default function App(){
   <div className="anim-fade"><h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('progress.title')}</h1><p className="text-[14px] text-[var(--text-dim)] mt-1">{t('progress.allTime',{n:sessions.filter(s=>s.status==='done').length})}</p></div>
 
   {/* ── AI Scheduler feature card ── */}
-  <button onClick={()=>{store.setActiveView('planner');setSelectedGoalId(null);}}
+  <button onClick={()=>{store.setActiveView('planner');setSelectedGoalId(null);setOverviewChild(false);}}
     className="anim-fade lift w-full text-left rounded-3xl border border-[var(--primary)]/25 bg-gradient-to-br from-[var(--primary)]/12 via-[var(--surface)] to-[var(--surface)] p-5 flex items-center gap-4">
     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] grid place-items-center shrink-0 shadow-lg shadow-[var(--primary)]/30"><Wand2 className="w-6 h-6 text-white"/></div>
     <div className="min-w-0 flex-1">
@@ -379,7 +595,7 @@ export default function App(){
     <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-3">{t('overview.manage')}</div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {tiles.map(ti=>(
-        <button key={ti.id} onClick={()=>{store.setActiveView(ti.id as any);setSelectedGoalId(null);}}
+        <button key={ti.id} onClick={()=>{store.setActiveView(ti.id as any);setSelectedGoalId(null);setOverviewChild(true);}}
           className="tcard lift p-4 text-left flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl grid place-items-center shrink-0" style={{background:`${ti.c}18`,color:ti.c}}><ti.Ic className="w-[22px] h-[22px]"/></div>
           <div className="min-w-0">
@@ -412,7 +628,7 @@ export default function App(){
       const gDone=sessions.filter(s=>s.goalId===g.id&&s.status==='done');
       const gHours=+(gDone.reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
       const pct=goalProgressPct(g,sessions);
-      return <button key={g.id} onClick={()=>{store.setActiveView('goals');setSelectedGoalId(g.id)}} className="w-full flex items-center gap-4 group hover:opacity-90 transition-opacity">
+      return <button key={g.id} onClick={()=>{store.setActiveView('goals');setSelectedGoalId(g.id);setOverviewChild(true);}} className="w-full flex items-center gap-4 group hover:opacity-90 transition-opacity">
         <span className="text-xl w-8 text-center">{g.emoji}</span>
         <div className="w-36 text-[13px] font-medium text-[var(--text)] truncate text-left">{g.title.split(' ').slice(0,3).join(' ')}</div>
         <div className="flex-1 h-2.5 bg-[var(--surface-2)] rounded-full overflow-hidden"><motion.div className="h-full rounded-full" style={{background:g.color}} {...fillBar(pct)}/></div>
@@ -427,10 +643,10 @@ export default function App(){
   {recurringTasks.length>0&&<div className="tcard p-6 anim-fade anim-delay-3">
     <div className="flex items-center justify-between mb-4">
       <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{t('overview.recurring')}</div>
-      <button onClick={()=>store.setActiveView('inbox')} className="text-[11px] font-semibold text-[var(--primary)]">{t('overview.viewAll')}</button>
+      <button onClick={()=>{store.setActiveView('inbox');setOverviewChild(true);}} className="text-[11px] font-semibold text-[var(--primary)]">{t('overview.viewAll')}</button>
     </div>
     <div className="space-y-2">{recurringTasks.slice(0,6).map(tk=>(
-      <button key={tk.id} onClick={()=>store.setActiveView('inbox')} className="w-full flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-left hover:border-[var(--primary)] transition-colors">
+      <button key={tk.id} onClick={()=>{store.setActiveView('inbox');setOverviewChild(true);}} className="w-full flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-left hover:border-[var(--primary)] transition-colors">
         <Repeat2 className="w-4 h-4 text-[var(--primary)] shrink-0"/>
         <span className="flex-1 text-[13px] text-[var(--text)] truncate">{tk.title}</span>
         <span className="text-[10px] font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-2 py-1 rounded-md shrink-0">{repeatLabel(tk.recurring!)}</span>
@@ -438,12 +654,6 @@ export default function App(){
     ))}</div>
   </div>}
 
-  {/* ── AI review ── */}
-  <div className="tcard p-6 anim-fade anim-delay-3"><div className="flex items-start gap-3"><div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-white"/></div><div><h3 className="font-bold text-[var(--text)]">{t('progress.aiReview')}</h3><p className="text-[13px] text-[var(--text-dim)] mt-2 leading-relaxed">
-    {adherence>=80?t('progress.reviewExcellent',{p:adherence}):adherence>=60?t('progress.reviewGood',{p:adherence}):t('progress.reviewLow',{p:adherence})}
-    {' '}{totalHoursLogged>0?t('progress.reviewInvested',{h:fmtHours(totalHoursLogged),n:sessions.filter(s=>s.status==='done').length}):''}
-    {' '}{nextActionCount>0?t('progress.reviewQueued',{n:nextActionCount}):''}
-  </p></div></div></div>
 </div>;
 })()}
 
@@ -455,9 +665,9 @@ export default function App(){
         <nav className="relative flex items-end justify-around bg-[var(--surface)] rounded-[28px] border border-[var(--border)] mx-auto w-full max-w-[460px] overflow-visible pointer-events-auto" style={{boxShadow:'0 10px 30px rgba(40,50,90,.18)'}}>
           {(()=>{
             const navBtn=(id:string,label:string,Ic:any)=>{
-              const a=activeView===id;
+              const a=bottomNavActiveView===id;
               return (
-                <button key={id} onClick={()=>{store.setActiveView(id as any);setSelectedGoalId(null);}}
+                <button key={id} onClick={()=>{store.setActiveView(id as any);setSelectedGoalId(null);setOverviewChild(false);}}
                   className={`relative flex-1 min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors ${a?'text-[var(--primary)]':'text-[var(--text-mute)] active:text-[var(--text)]'}`}>
                   <Ic className="w-[22px] h-[22px]" strokeWidth={a?2.5:2}/>
                   <span className="text-[10px] font-semibold leading-none">{label}</span>
@@ -490,12 +700,11 @@ export default function App(){
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]"/>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[17px] font-bold text-[var(--text)]">{t('create.title')}</h3>
-            <button onClick={()=>setCaptureOpen(false)} aria-label="Close" className="w-8 h-8 rounded-full grid place-items-center text-[var(--text-dim)] hover:bg-[var(--surface-2)] transition-colors"><X className="w-4 h-4"/></button>
+            <button onClick={()=>setCaptureOpen(false)} aria-label={t('common.close')} className="w-8 h-8 rounded-full grid place-items-center text-[var(--text-dim)] hover:bg-[var(--surface-2)] transition-colors"><X className="w-4 h-4"/></button>
           </div>
           {/* Quick task capture */}
           <div className="flex gap-2 mb-3">
             <input
-              autoFocus
               value={qt}
               onChange={e=>setQt(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter')capture();if(e.key==='Escape')setCaptureOpen(false);}}
@@ -510,8 +719,8 @@ export default function App(){
           <div className="space-y-2">
             {[
               {Ic:Target,c:'#4f5bd5',l:t('create.goal'),s:t('create.goalSub'),act:()=>{store.openWizard();setCaptureOpen(false);}},
-              {Ic:Repeat2,c:'#e0532f',l:t('create.habit'),s:t('create.habitSub'),act:()=>{store.setActiveView('habits');setSelectedGoalId(null);setCaptureOpen(false);}},
-              {Ic:Calendar,c:'#0d9488',l:t('create.session'),s:t('create.sessionSub'),act:()=>{store.setActiveView('week');setSelectedGoalId(null);setCaptureOpen(false);}},
+              {Ic:Repeat2,c:'#e0532f',l:t('create.habit'),s:t('create.habitSub'),act:()=>{setQuickHabitOpen(true);setCaptureOpen(false);}},
+              {Ic:Calendar,c:'#0d9488',l:t('create.session'),s:t('create.sessionSub'),act:()=>{store.scheduleFromTask('',60);setSelectedGoalId(null);setOverviewChild(false);setCaptureOpen(false);}},
             ].map((o,i)=>(
               <button key={i} onClick={o.act} className="w-full flex items-center gap-3 rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] p-3 text-left hover:border-[var(--primary)] transition-colors active:scale-[.98]">
                 <div className="w-10 h-10 rounded-2xl grid place-items-center shrink-0" style={{background:`${o.c}18`,color:o.c}}><o.Ic className="w-5 h-5"/></div>
@@ -526,11 +735,13 @@ export default function App(){
         </div>
       </div>
     </>}
+    {quickHabitOpen && <HabitModal habit={null} onClose={() => setQuickHabitOpen(false)} />}
 
     {/* ═══════════════════ SESSION DRAWER (soft side panel) ═══════════════════ */}
     {store.sessionModalId&&(()=>{const s=sessions.find(x=>x.id===store.sessionModalId);if(!s)return null;const g=goals.find(x=>x.id===s.goalId);const gColor=g?.color||'#22c55e';const gEmoji=g?.emoji||'🗓️';const sColor=s.color||gColor;
     const remLabel=s.reminderMinutes==null||s.reminderMinutes<0?null:s.reminderMinutes===0?t('sm.remAtStart'):s.reminderMinutes>=1440?t('sm.remDays',{n:Math.round(s.reminderMinutes/1440)}):s.reminderMinutes>=60?t('sm.remHours',{n:Math.round(s.reminderMinutes/60)}):t('sm.remMins',{n:s.reminderMinutes});
     const tlabel=Number.isFinite(s.startHour)?`${String(s.startHour).padStart(2,'0')}:${String(s.startMinute||0).padStart(2,'0')}`:'';
+    const sessionNote=cleanSessionNote(s.description);
     const sTasks=s.tasks||[];
     return <Drawer open={true} onClose={()=>store.closeSessionModal()} width="md"
         title={`${gEmoji} ${s.title}`}
@@ -544,12 +755,12 @@ export default function App(){
           {s.url&&<a href={s.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors"><LinkIcon className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--primary)] truncate underline">{s.url}</span></a>}
           {s.seriesId&&<div className="flex items-center gap-3 px-4 py-3"><Calendar className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--text)]">{t('sm.partOfSeries')}</span></div>}
         </div>
-        {s.description&&<div className="rounded-xl border p-4" style={{background:`${sColor}08`,borderColor:`${sColor}30`}}>
+        {sessionNote&&<div className="rounded-xl border p-4" style={{background:`${sColor}08`,borderColor:`${sColor}30`}}>
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-4 h-4" style={{color:sColor}}/>
             <span className="text-[10px] font-bold uppercase tracking-wider" style={{color:sColor}}>{t('sm.note')}</span>
           </div>
-          <p className="text-[13px] text-[var(--text)] leading-relaxed whitespace-pre-line">{s.description}</p>
+          <p className="text-[13px] text-[var(--text)] leading-relaxed whitespace-pre-line">{sessionNote}</p>
         </div>}
         {sTasks.length>0&&<div>
           <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -575,6 +786,40 @@ export default function App(){
       </div>
     </Drawer>})()}
 
+    {store.logOpen&&(()=>{const s=sessions.find(x=>x.id===store.loggingSessionId);if(!s)return null;
+      const submit=()=>{
+        const value=Number(logValue);
+        store.updateSession(s.id,{status:'done',progressLog:{metric:logMetric.trim()||'progress',value:Number.isFinite(value)?value:1,feeling:logFeeling,notes:logNotes.trim()||undefined}});
+        store.closeLog();setLogMetric('progress');setLogValue('1');setLogFeeling('good');setLogNotes('');
+      };
+      return <Drawer open={true} onClose={()=>store.closeLog()} width="sm" title={t('log.title')} subtitle={s.title}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{t('log.metric')}</label>
+            <input value={logMetric} onChange={e=>setLogMetric(e.target.value)} className="w-full h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] focus:outline-none focus:border-[var(--primary)]"/>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{t('log.value')}</label>
+            <input type="number" value={logValue} onChange={e=>setLogValue(e.target.value)} className="w-full h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] mono focus:outline-none focus:border-[var(--primary)]"/>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{t('log.feeling')}</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['bad','ok','good','great'] as const).map(f=><button key={f} onClick={()=>setLogFeeling(f)} className={`h-10 rounded-xl border text-[12px] font-bold ${logFeeling===f?'bg-[var(--primary)] text-white border-[var(--primary)]':'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)]'}`}>{t('log.feeling.'+f)}</button>)}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{t('sched.note')}</label>
+            <textarea value={logNotes} onChange={e=>setLogNotes(e.target.value)} rows={3} className="w-full rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[14px] text-[var(--text)] focus:outline-none focus:border-[var(--primary)] resize-none"/>
+          </div>
+          <div className="flex gap-2 pt-2 border-t border-[var(--border)]">
+            <button onClick={()=>store.closeLog()} className="h-11 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[13px] font-bold text-[var(--text)]">{t('common.cancel')}</button>
+            <button onClick={submit} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black text-[13px] font-bold flex items-center justify-center gap-1.5"><CheckCircle2 className="w-4 h-4"/>{t('sm.markDone')}</button>
+          </div>
+        </div>
+      </Drawer>;
+    })()}
+
     {/* ═══════════════════ GOAL CREATE WIZARD ═══════════════════ */}
     {store.wizardOpen&&<GoalCreateWizard/>}
 
@@ -586,4 +831,3 @@ export default function App(){
     <ConfirmModal/>
   </div>;
 }
-

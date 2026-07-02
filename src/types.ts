@@ -126,6 +126,7 @@ export type RecurringPattern = 'daily' | 'weekly' | 'monthly' | 'weekdays' | 'we
 
 export interface GTDTask {
   id: string;
+  sessionId?: string;
   title: string;
   description?: string;
   notes?: string;
