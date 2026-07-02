@@ -51,7 +51,9 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
   const allDone = due.length > 0 && due.every(h => h.log[today]?.status === 'done');
 
   // group due habits by anchor (in ANCHORS order)
-  const grouped = ANCHORS.map(a => ({ anchor: a, items: due.filter(h => h.anchor === a) })).filter(g => g.items.length > 0);
+  // Habits with a missing/unknown anchor (older data) fall into the 'none' bucket instead of vanishing.
+  const anchorOf = (h: Habit): HabitAnchor => (ANCHORS.includes(h.anchor) ? h.anchor : 'none');
+  const grouped = ANCHORS.map(a => ({ anchor: a, items: due.filter(h => anchorOf(h) === a) })).filter(g => g.items.length > 0);
 
   const HabitRow = ({ h, dim = false }: { h: Habit; dim?: boolean }) => {
     const entry = h.log[today];
@@ -68,7 +70,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
             {streak > 0 && <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-500 shrink-0"><Flame className="w-3 h-3" />{streak}</span>}
           </div>
           <div className="text-[10px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1.5">
-            <Repeat className="w-3 h-3" />{tr('habits.rec.' + h.recurrence)}
+            <Repeat className="w-3 h-3" />{tr('habits.rec.' + (h.recurrence || 'daily'))}
             {isCounter && <span>· {count}/{h.targetCount}{h.unit ? ' ' + h.unit : ''}</span>}
             {h.goalId && goals.find(g => g.id === h.goalId) && <span>· {goals.find(g => g.id === h.goalId)!.emoji}</span>}
           </div>
@@ -108,7 +110,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
   return (
     <div className="flex flex-col h-full w-full bg-[var(--bg)] overflow-y-auto">
       <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] w-full mx-auto space-y-6 pb-24">
-        <div className="flex items-end justify-between gap-4 anim-fade">
+        <div className="flex flex-wrap items-end justify-between gap-3 anim-fade">
           <div>
             {onBack && <button onClick={onBack} className="mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4" />{tr('bottomNav.stats')}</button>}
             <h1 className="display text-[28px] md:text-[44px] text-[var(--text)] leading-none">{tr('habits.title')}</h1>

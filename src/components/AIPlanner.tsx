@@ -37,7 +37,7 @@ export function AIPlanner() {
   const openTasks = gtdTasks.filter(t => !t.recurring && t.status !== 'done' && t.status !== 'trash' && !t.isArchived && (t.scheduledDate || t.dueDate)).length;
 
   const sources = [
-    { key: 'includeGoals' as const, Ic: Target, c: '#4f5bd5', label: t('bottomNav.goals'), n: activeGoals },
+    { key: 'includeGoals' as const, Ic: Target, c: '#6467f2', label: t('bottomNav.goals'), n: activeGoals },
     { key: 'includeHabits' as const, Ic: Flame, c: '#e0532f', label: t('bottomNav.habits'), n: trackedHabits },
     { key: 'includeRecurring' as const, Ic: Repeat2, c: '#0d9488', label: t('overview.recurring'), n: recurring },
     { key: 'includeTasks' as const, Ic: CheckSquare, c: '#eab308', label: t('overview.tasks'), n: openTasks },

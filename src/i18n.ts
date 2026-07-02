@@ -499,6 +499,8 @@ const en: Dict = {
   'dash.completed': 'Completed',
   // ── Home (Today) ──
   'home.hi': 'Hi, {name}!', 'home.dailyProgress': 'Your daily progress', 'home.doneOf': '{done} of {total} done today',
+  'home.greetMorning': 'Good morning, {name}.', 'home.greetDay': 'Good afternoon, {name}.', 'home.greetEvening': 'Good evening, {name}.', 'home.greetNight': 'Still up, {name}?',
+  'home.heroSub': "Here's how your day looks.",
   'home.todayScheduled': 'Today · scheduled',
   'home.todayTasks': 'Today · to-do',
   'home.tomorrow': 'Tomorrow',
@@ -1217,6 +1219,8 @@ const ru: Dict = {
   'dash.completed': 'Выполнено',
   // ── Home (Today) ──
   'home.hi': 'Привет, {name}!', 'home.dailyProgress': 'Прогресс за день', 'home.doneOf': 'Выполнено {done} из {total}',
+  'home.greetMorning': 'Доброе утро, {name}.', 'home.greetDay': 'Добрый день, {name}.', 'home.greetEvening': 'Добрый вечер, {name}.', 'home.greetNight': 'Не спится, {name}?',
+  'home.heroSub': 'Вот как проходит ваш день.',
   'home.todayScheduled': 'Сегодня · по времени',
   'home.todayTasks': 'Сегодня · задачи',
   'home.tomorrow': 'Завтра',
@@ -1935,6 +1939,8 @@ const ja: Dict = {
   'dash.completed': '完了',
   // ── Home (Today) ──
   'home.hi': 'こんにちは、{name}さん！', 'home.dailyProgress': '今日の進捗', 'home.doneOf': '{total}件中{done}件完了',
+  'home.greetMorning': 'おはようございます、{name}さん。', 'home.greetDay': 'こんにちは、{name}さん。', 'home.greetEvening': 'こんばんは、{name}さん。', 'home.greetNight': 'まだ起きていますか、{name}さん？',
+  'home.heroSub': '今日の予定はこちらです。',
   'home.todayScheduled': '今日 · 時間指定',
   'home.todayTasks': '今日 · やること',
   'home.tomorrow': '明日',

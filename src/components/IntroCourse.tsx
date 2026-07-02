@@ -26,7 +26,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: 'The app has four main layers: Home for today, Calendar for time, Overview for systems, and Profile for settings. The center plus button creates new items from anywhere.',
         bullets: ['Use Home every morning to see what matters now.', 'Use Calendar when something needs an exact day or time.', 'Use Overview to manage goals, habits, GTD tasks and history.'],
         icon: Sparkles,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
       {
         kicker: 'Home',
@@ -90,7 +90,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: 'Home, Calendar, Overview and Profile are the main destinations. The center plus button creates goals, habits and sessions without hunting through screens.',
         bullets: ['Overview contains Goals, Habits, Tasks and Archive.', 'Profile contains preferences, reminders and app data.', 'Use Back to return to Home from secondary sections.'],
         icon: Plus,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
     ],
   },
@@ -106,7 +106,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: 'В приложении четыре основных слоя: Home для текущего дня, Calendar для времени, Overview для систем и Profile для настроек. Центральная кнопка плюс создаёт новые элементы откуда угодно.',
         bullets: ['Home открывают утром, чтобы понять что делать сейчас.', 'Calendar нужен, когда задаче нужна дата или точное время.', 'Overview управляет целями, привычками, GTD-задачами и историей.'],
         icon: Sparkles,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
       {
         kicker: 'Home',
@@ -170,7 +170,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: 'Home, Calendar, Overview и Profile — главные направления. Центральный плюс создаёт цели, привычки и сессии без поиска по экранам.',
         bullets: ['Overview содержит Goals, Habits, Tasks и Archive.', 'Profile содержит настройки, напоминания и данные приложения.', 'Back возвращает из внутренних секций к Home.'],
         icon: Plus,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
     ],
   },
@@ -186,7 +186,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: '主な画面は Home、Calendar、Overview、Profile です。中央のプラスボタンから、どこでも新しい項目を作れます。',
         bullets: ['Homeで今日やることを見る。', 'Calendarで日付や時間を決める。', 'Overviewで目標、習慣、GTDタスク、履歴を管理する。'],
         icon: Sparkles,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
       {
         kicker: 'Home',
@@ -250,7 +250,7 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
         body: 'Home、Calendar、Overview、Profileが主な入口です。中央のプラスで目標、習慣、セッションを作れます。',
         bullets: ['OverviewにはGoals、Habits、Tasks、Archiveがあります。', 'Profileには設定、通知、データがあります。', 'Backで内部画面からHomeへ戻ります。'],
         icon: Plus,
-        color: '#4f5bd5',
+        color: '#6467f2',
       },
     ],
   },
@@ -350,7 +350,7 @@ export function IntroCourse() {
           <button
             onClick={() => isLast ? completeIntroCourse() : setIndex(i => Math.min(data.steps.length - 1, i + 1))}
             className="h-12 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[.99]"
-            style={{ background: 'linear-gradient(135deg,var(--primary),var(--primary-2))', boxShadow: '0 10px 24px rgba(79,91,213,.32)' }}
+            style={{ background: 'var(--grad)', boxShadow: 'var(--shadow-primary)' }}
           >
             {isLast ? data.finish : data.next}
             <ArrowRight className="w-4 h-4" />

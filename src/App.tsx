@@ -5,7 +5,7 @@ import { useStore, habitDueOn, goalInsight, goalProgressPct, goalStreak } from '
 import { useT, useDateLocale } from './i18n';
 import { syncReminders } from './utils/notifications';
 import { initTimerActionListener } from './utils/timerNotifications';
-import { TimerBar, TimerLauncher } from './components/FocusTimer';
+import { TimerBar, TimerCard, TimerLauncher } from './components/FocusTimer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
 import { GTDView } from './components/GTDView';
@@ -87,13 +87,14 @@ function HomeTaskRow({ tk, onOpen }: { tk: GTDTask; onOpen: () => void }) {
           </div>
         </div>
       )}
-      <button onClick={completeTask} className="shrink-0" aria-label="Mark done">
+      <button onClick={completeTask} className="shrink-0 w-10 h-10 -ml-1 grid place-items-center" aria-label="Mark done">
         <Circle className={`w-6 h-6 transition-colors ${completing ? 'text-emerald-500' : 'text-[var(--text-mute)] hover:text-emerald-500'}`} />
       </button>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
         <div className={`text-[14px] font-semibold truncate ${completing ? 'text-emerald-500 line-through' : 'text-[var(--text)]'}`}>{tk.title}</div>
-        <div className="text-[11px] text-[var(--text-dim)] mt-0.5">P{tk.priority}{tk.context?` · ${tk.context}`:''}{tk.durationMinutes?` · ${tk.durationMinutes}${t('common.minShort')}`:''}</div>
+        {(tk.context||tk.durationMinutes)&&<div className="text-[11px] text-[var(--text-dim)] mt-0.5 truncate">{[tk.context,tk.durationMinutes?`${tk.durationMinutes}${t('common.minShort')}`:''].filter(Boolean).join(' · ')}</div>}
       </div>
+      <span className={`shrink-0 text-[10px] font-extrabold mono px-2 py-1 rounded-lg ${tk.priority===1?'bg-red-500/12 text-red-400':tk.priority===2?'bg-amber-500/12 text-amber-400':'bg-[var(--surface-2)] text-[var(--text-mute)]'}`}>P{tk.priority}</span>
     </motion.div>
   );
 }
@@ -133,8 +134,7 @@ function HomeSessionRow({ s, index = 0 }: { s: Session; index?: number }) {
       animate={{ opacity: completing ? 0.18 : 1, scale: completing ? 0.98 : 1, y: completing ? -4 : 0 }}
       exit={{ opacity: 0, scale: 0.97, y: -8 }}
       onClick={() => store.openSessionModal(s.id)}
-      className={`tcard p-3.5 flex items-center gap-3 cursor-pointer border-l-[4px] active:scale-[.99] transition-transform relative overflow-hidden ${completing ? 'bg-emerald-500/10 border-emerald-500/40' : ''}`}
-      style={{ borderLeftColor: completing ? '#10b981' : color }}
+      className={`tcard p-3 pl-4 flex items-center gap-3 cursor-pointer active:scale-[.99] transition-transform relative overflow-hidden ${completing ? 'bg-emerald-500/10 border-emerald-500/40' : ''}`}
     >
       {completing && (
         <div className="absolute inset-0 pointer-events-none grid place-items-center">
@@ -143,18 +143,25 @@ function HomeSessionRow({ s, index = 0 }: { s: Session; index?: number }) {
           </div>
         </div>
       )}
+      <div className="shrink-0 w-[52px] text-center">
+        {s.allDay || !fmtStart(s)
+          ? <div className="text-[11px] font-bold text-[var(--text-dim)] leading-tight">{t('home.allDay')}</div>
+          : <>
+              <div className="text-[15px] font-bold mono text-[var(--text)] leading-none">{fmtStart(s)}</div>
+              <div className="text-[10px] text-[var(--text-mute)] mono mt-1">{fmtDur(s.durationMinutes, store.lang)}</div>
+            </>}
+      </div>
+      <span className="shrink-0 w-[3px] h-9 rounded-full" style={{ background: completing ? '#10b981' : color }} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           {s.icon ? <SessionIcon name={s.icon} className="w-3.5 h-3.5 text-[var(--text-dim)]" /> : <span className="text-sm leading-none">{emoji}</span>}
           <span className={`font-bold text-[14px] truncate ${completing ? 'text-emerald-500 line-through' : 'text-[var(--text)]'}`}>{s.title}</span>
         </div>
-        <div className="text-[12px] text-[var(--text-dim)] mt-1 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" />
-          {s.allDay ? t('home.allDay') : `${fmtStart(s) ? fmtStart(s) + ' · ' : ''}${fmtDur(s.durationMinutes, store.lang)}`}
-        </div>
+        {!s.allDay && !fmtStart(s) && <div className="text-[11px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1"><Clock className="w-3 h-3"/>{fmtDur(s.durationMinutes, store.lang)}</div>}
       </div>
-      <button onClick={completeSession} className="w-9 h-9 rounded-xl bg-[var(--surface-2)] text-[var(--text-dim)] grid place-items-center hover:bg-emerald-500 hover:text-[var(--text)] transition-colors shrink-0" aria-label="Mark done">
-        <CheckCircle2 className="w-4 h-4" />
+      <button onClick={completeSession} aria-label="Mark done"
+        className={`w-10 h-10 rounded-full grid place-items-center shrink-0 border transition-colors ${completing ? 'grad border-transparent text-white' : 'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-mute)] hover:text-emerald-500 hover:border-emerald-500/40'}`}>
+        <CheckCircle2 className="w-[18px] h-[18px]" />
       </button>
     </motion.div>
   );
@@ -305,15 +312,15 @@ export default function App(){
   const dueHabitsToday=habits.filter(h=>!h.archived&&habitDueOn(h,_now));
 
   const renderHabitRow=(h:typeof habits[number],i=0)=>{const e=h.log[_todayStr];const st=e?.status;const count=e?.count||0;const isCounter=h.targetCount>1;return (
-    <motion.div key={h.id} {...listItem(i)} className="tcard p-3.5 flex items-center gap-3 border-l-[4px]" style={{borderLeftColor:h.color}}>
-      <div className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{background:`${h.color}1f`}}>{h.emoji||'✅'}</div>
+    <motion.div key={h.id} {...listItem(i)} className="tcard p-3 pl-3.5 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-2xl grid place-items-center text-base shrink-0" style={{background:`${h.color}1f`}}>{h.emoji||'✅'}</div>
       <div className="flex-1 min-w-0">
-        <div className={`text-[14px] font-semibold truncate ${st==='done'?'text-emerald-500 line-through':st==='failed'?'text-red-400':'text-[var(--text)]'}`}>{h.title}</div>
-        {isCounter&&<div className="text-[11px] text-[var(--text-dim)] mt-0.5">{count}/{h.targetCount}{h.unit?' '+h.unit:''}</div>}
+        <div className={`text-[14px] font-semibold truncate ${st==='done'?'text-[var(--text-mute)] line-through':st==='failed'?'text-red-400':'text-[var(--text)]'}`}>{h.title}</div>
+        {isCounter&&<div className="text-[11px] text-[var(--text-dim)] mt-0.5 mono">{count}/{h.targetCount}{h.unit?' '+h.unit:''}</div>}
       </div>
       {isCounter
-        ? <button onClick={()=>store.incHabit(h.id,_todayStr)} className="h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 shrink-0" style={st==='done'?{background:'#22c55e',color:'#fff'}:{background:`${h.color}1f`,color:h.color}}><Plus className="w-3.5 h-3.5"/>{count}/{h.targetCount}</button>
-        : <button onClick={()=>store.setHabitStatus(h.id,_todayStr,st==='done'?'rest':'done')} className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 transition-colors ${st==='done'?'bg-emerald-500 text-white':'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-emerald-500'}`}><CheckCircle2 className="w-4 h-4"/></button>}
+        ? <button onClick={()=>store.incHabit(h.id,_todayStr)} className="h-9 px-3.5 rounded-full text-[12px] font-bold flex items-center gap-1 shrink-0 mono" style={st==='done'?{background:'#10b981',color:'#fff'}:{background:`${h.color}1f`,color:h.color}}>{st==='done'?<CheckCircle2 className="w-3.5 h-3.5"/>:<Plus className="w-3.5 h-3.5"/>}{count}/{h.targetCount}</button>
+        : <button onClick={()=>store.setHabitStatus(h.id,_todayStr,st==='done'?'rest':'done')} className={`w-10 h-10 rounded-full grid place-items-center shrink-0 border transition-colors ${st==='done'?'bg-emerald-500 border-transparent text-white':'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-mute)] hover:text-emerald-500 hover:border-emerald-500/40'}`}><CheckCircle2 className="w-[18px] h-[18px]"/></button>}
     </motion.div>);};
 
   const renderSessionRow=(s:Session,i=0)=><HomeSessionRow key={s.id} s={s} index={i} />;
@@ -367,7 +374,7 @@ export default function App(){
         })()}
         <div className="ml-auto flex items-center gap-2">
           {(activeView==='dashboard'||(activeView==='goals'&&!selectedGoalId))&&<button onClick={()=>store.openWizard()} className="h-9 px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center gap-1.5 hover:bg-[var(--border)] transition-colors"><Plus className="w-3.5 h-3.5"/>{t('common.newGoal')}</button>}
-          <button onClick={()=>setCaptureOpen(v=>!v)} aria-label={t('sidebar.quickCaptureGtd')} className="h-10 px-4 rounded-xl text-white text-[13px] font-bold flex items-center gap-1.5 active:scale-95 transition-transform" style={{background:'linear-gradient(135deg,var(--primary),var(--primary-2))',boxShadow:'0 6px 16px rgba(79,91,213,.4)'}}><Plus className="w-4 h-4" strokeWidth={2.6}/>{t('create.title')}</button>
+          <button onClick={()=>setCaptureOpen(v=>!v)} aria-label={t('sidebar.quickCaptureGtd')} className="grad h-10 px-4 rounded-xl text-white text-[13px] font-bold flex items-center gap-1.5 active:scale-95 transition-transform" style={{boxShadow:'var(--shadow-primary)'}}><Plus className="w-4 h-4" strokeWidth={2.6}/>{t('create.title')}</button>
         </div>
       </div>
 
@@ -393,35 +400,61 @@ export default function App(){
   const pct=totalToday?Math.round(doneToday/totalToday*100):0;
   const emptyBox=(txt:string)=><div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center text-[13px] text-[var(--text-dim)]">{txt}</div>;
   const head=(icon:React.ReactNode,txt:string)=><h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] mb-3 flex items-center gap-2">{icon}{txt}</h3>;
-  return <div className="px-4 md:px-10 py-5 md:py-8 max-w-[760px] mx-auto w-full space-y-7 pb-28">
-  {/* Greeting card */}
-  <div className="anim-fade rounded-[26px] p-5 text-white shadow-lg" style={{background:'linear-gradient(135deg,var(--primary),var(--primary-2))',boxShadow:'0 14px 30px rgba(79,91,213,.32)'}}>
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <div className="text-[19px] font-extrabold leading-tight">{t('home.hi',{name:userName||'there'})}</div>
-        <div className="text-[12.5px] text-white/80 mt-0.5 capitalize">{format(_now,'EEEE, d MMMM',{locale})}</div>
+  const hour=_now.getHours();
+  const greetKey=hour<5?'home.greetNight':hour<12?'home.greetMorning':hour<18?'home.greetDay':'home.greetEvening';
+  const homeWs=startOfWeek(_now,{weekStartsOn:(schedulePrefs.weekStartsOn??1)});
+  const homeDays=Array.from({length:7},(_,i)=>addDays(homeWs,i));
+  const dayBusy=(d:Date)=>sessionsOn(d).length>0;
+  return <div className="relative px-4 md:px-10 py-5 md:py-8 max-w-[760px] mx-auto w-full space-y-7 pb-28">
+  <div className="aurora"/>
+  {/* Hero: greeting + week strip + day progress */}
+  <div className="anim-fade relative">
+    <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex items-center gap-2">
+        <NebullaMark className="w-7 h-7"/>
+        <span className="display text-[14px] text-[var(--text)]">Nebulla</span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {streak>0&&<span className="h-8 px-2.5 rounded-full bg-white/20 backdrop-blur flex items-center gap-1 text-[12px] font-bold">🔥 {streak}</span>}
-        <button className="w-9 h-9 rounded-full bg-white/20 grid place-items-center"><Bell className="w-4 h-4"/></button>
-        <div className="w-9 h-9 rounded-full bg-white/25 grid place-items-center text-[13px] font-bold">{initials}</div>
+        {streak>0&&<span className="h-8 px-2.5 rounded-full bg-[var(--surface)] border border-[var(--border)] flex items-center gap-1 text-[12px] font-bold text-[var(--text)]">🔥 {streak}</span>}
+        <button onClick={()=>{store.setActiveView('settings');setOverviewChild(false);}} aria-label={t('bottomNav.profile')} className="w-9 h-9 rounded-full grid place-items-center text-[12px] font-bold text-white grad">{initials}</button>
       </div>
     </div>
-    <div className="mt-4 rounded-2xl bg-white/15 backdrop-blur p-3.5">
+    <h1 className="display text-[24px] md:text-[34px] text-[var(--text)] max-w-[22ch]">{t(greetKey,{name:userName||'···'})} <span className="inline-block">👋</span></h1>
+    <p className="text-[13.5px] text-[var(--text-dim)] mt-2">{t('home.heroSub')} <span className="capitalize">{format(_now,'EEEE, d MMMM',{locale})}</span></p>
+
+    {/* Week strip */}
+    <div className="mt-5 flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+      {homeDays.map(d=>{
+        const today=isSameDay(d,_now);
+        return <button key={d.toISOString()} onClick={()=>{store.setWeekOffset(0);store.setActiveView('week');setOverviewChild(false);}}
+          className={`shrink-0 w-[52px] h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 border ${today?'grad border-transparent text-white shadow-lg':'bg-[var(--surface)] border-[var(--border)] text-[var(--text-dim)]'}`}
+          style={today?{boxShadow:'var(--shadow-primary)'}:undefined}>
+          <span className="text-[10px] font-bold uppercase tracking-wider">{format(d,'EEEEEE',{locale})}</span>
+          <span className={`text-[17px] font-bold mono leading-none ${today?'text-white':'text-[var(--text)]'}`}>{format(d,'d')}</span>
+          <span className={`w-1 h-1 rounded-full ${dayBusy(d)?(today?'bg-white':'bg-[var(--accent)]'):'bg-transparent'}`}/>
+        </button>;
+      })}
+    </div>
+
+    {/* Day progress */}
+    {totalToday>0&&<div className="mt-4 tcard p-3.5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-bold">{t('home.dailyProgress')}</span>
-        <span className="text-[13px] font-extrabold mono">{pct}%</span>
+        <span className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{t('home.dailyProgress')}</span>
+        <span className="text-[13px] font-extrabold mono grad-text">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-white/25 overflow-hidden"><motion.div className="h-full rounded-full bg-white" {...fillBar(pct)}/></div>
-      <div className="text-[11px] text-white/75 mt-1.5">{t('home.doneOf',{done:doneToday,total:totalToday})}</div>
-    </div>
+      <div className="h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden"><motion.div className="h-full rounded-full grad" {...fillBar(pct)}/></div>
+      <div className="text-[11px] text-[var(--text-mute)] mt-1.5">{t('home.doneOf',{done:doneToday,total:totalToday})}</div>
+    </div>}
   </div>
+
+  {/* Running focus timer (inline card on Home; floating bar on other views) */}
+  <TimerCard/>
 
   {/* TODAY — scheduled */}
   <section className="anim-fade anim-delay-1">
-    <div className="flex items-center justify-between mb-3">
-      {head(<Clock className="w-3.5 h-3.5"/>,t('home.todayScheduled'))}
-      <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} className="text-[11px] text-[var(--primary)] hover:opacity-80 font-bold uppercase tracking-wider pb-3">{t('dash.expandSchedule')}</button>
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] flex items-center gap-2 whitespace-nowrap"><Clock className="w-3.5 h-3.5"/>{t('home.todayScheduled')}</h3>
+      <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} aria-label={t('dash.expandSchedule')} className="w-8 h-8 rounded-full grid place-items-center text-[var(--primary)] bg-[var(--primary)]/10 shrink-0"><ChevronRight className="w-4 h-4"/></button>
     </div>
     <div className="space-y-2.5">
       {timedToday.length>0 ? timedToday.map(renderSessionRow) : emptyBox(t('home.noScheduled'))}
@@ -571,7 +604,7 @@ export default function App(){
   const archivedCount=gtdTasks.filter(t=>t.isArchived).length+goals.filter(g=>g.status==='completed').length;
   const repeatLabel=(p:string)=>t('gtd.repeat'+p.charAt(0).toUpperCase()+p.slice(1));
   const tiles=[
-    {id:'goals',Ic:Target,c:'#4f5bd5',label:t('bottomNav.goals'),sub:t('overview.activeN',{n:activeGoals.length})},
+    {id:'goals',Ic:Target,c:'#6467f2',label:t('bottomNav.goals'),sub:t('overview.activeN',{n:activeGoals.length})},
     {id:'habits',Ic:Flame,c:'#e0532f',label:t('bottomNav.habits'),sub:t('overview.trackedN',{n:trackedHabits.length})},
     {id:'inbox',Ic:Inbox,c:'#0d9488',label:t('overview.tasks'),sub:t('overview.openN',{n:openTasks.length})},
     {id:'archive',Ic:Archive,c:'#6c7280',label:t('overview.archive'),sub:t('overview.itemsN',{n:archivedCount})},
@@ -662,7 +695,7 @@ export default function App(){
 
       {/* ═══════════════════ FLOATING BOTTOM NAV (mobile only; desktop uses top nav) ═══════════════════ */}
       <div className="md:hidden absolute inset-x-0 bottom-0 z-40 px-3 pointer-events-none" style={{paddingBottom:'calc(env(safe-area-inset-bottom) + 12px)'}}>
-        <nav className="relative flex items-end justify-around bg-[var(--surface)] rounded-[28px] border border-[var(--border)] mx-auto w-full max-w-[460px] overflow-visible pointer-events-auto" style={{boxShadow:'0 10px 30px rgba(40,50,90,.18)'}}>
+        <nav className="glass relative flex items-end justify-around rounded-[28px] border border-[var(--border)] mx-auto w-full max-w-[460px] overflow-visible pointer-events-auto" style={{boxShadow:'var(--shadow-md)'}}>
           {(()=>{
             const navBtn=(id:string,label:string,Ic:any)=>{
               const a=bottomNavActiveView===id;
@@ -680,8 +713,8 @@ export default function App(){
               {navBtn('week',t('bottomNav.calendar'),Calendar)}
               {/* center create FAB */}
               <button onClick={()=>setCaptureOpen(v=>!v)} aria-label={t('sidebar.quickCaptureGtd')}
-                className="relative -top-5 shrink-0 rounded-full grid place-items-center text-white active:scale-95 transition-transform"
-                style={{width:'66px',height:'66px',background:'linear-gradient(135deg,var(--primary),var(--primary-2))',boxShadow:'0 12px 26px rgba(79,91,213,.55)'}}>
+                className="grad relative -top-5 shrink-0 rounded-full grid place-items-center text-white active:scale-95 transition-transform"
+                style={{width:'64px',height:'64px',boxShadow:'var(--shadow-primary)'}}>
                 <Plus className="w-8 h-8" strokeWidth={2.6}/>
               </button>
               {navBtn('progress',t('bottomNav.stats'),BarChart3)}
@@ -711,14 +744,14 @@ export default function App(){
               placeholder={t('create.taskPlaceholder')}
               className="flex-1 h-12 rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--primary)] transition-colors"
             />
-            <button onClick={capture} aria-label={t('sidebar.addTask')} className="w-12 h-12 shrink-0 rounded-2xl grid place-items-center text-white transition-all active:scale-95" style={{background:'linear-gradient(135deg,var(--primary),var(--primary-2))',boxShadow:'0 6px 16px rgba(79,91,213,.4)'}}>
+            <button onClick={capture} aria-label={t('sidebar.addTask')} className="grad w-12 h-12 shrink-0 rounded-2xl grid place-items-center text-white transition-all active:scale-95" style={{boxShadow:'var(--shadow-primary)'}}>
               <Plus className="w-5 h-5" strokeWidth={2.6}/>
             </button>
           </div>
           {/* Create options */}
           <div className="space-y-2">
             {[
-              {Ic:Target,c:'#4f5bd5',l:t('create.goal'),s:t('create.goalSub'),act:()=>{store.openWizard();setCaptureOpen(false);}},
+              {Ic:Target,c:'#6467f2',l:t('create.goal'),s:t('create.goalSub'),act:()=>{store.openWizard();setCaptureOpen(false);}},
               {Ic:Repeat2,c:'#e0532f',l:t('create.habit'),s:t('create.habitSub'),act:()=>{setQuickHabitOpen(true);setCaptureOpen(false);}},
               {Ic:Calendar,c:'#0d9488',l:t('create.session'),s:t('create.sessionSub'),act:()=>{store.scheduleFromTask('',60);setSelectedGoalId(null);setOverviewChild(false);setCaptureOpen(false);}},
             ].map((o,i)=>(

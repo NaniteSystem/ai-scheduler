@@ -4,9 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.scheduler.app',
   appName: 'Nebulla',
   webDir: 'dist',
-  backgroundColor: '#050505',
+  backgroundColor: '#06070d',
   android: {
-    backgroundColor: '#050505',
+    backgroundColor: '#06070d',
   },
 };
 

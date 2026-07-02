@@ -149,13 +149,13 @@ export function Onboarding() {
 
           {step === 2 && (
             <Question title={t('onb.q.peak')}>
-              {PEAK.map(o => <OptionCard key={o.id} o={o} selected={peak === o.id} onClick={() => { setPeak(o.id as typeof peak); setTimeout(next, 180); }} />)}
+              {PEAK.map(o => <OptionCard key={o.id} o={o} selected={peak === o.id} onClick={() => setPeak(o.id as typeof peak)} />)}
             </Question>
           )}
 
           {step === 3 && (
             <Question title={t('onb.q.sleep')}>
-              {SLEEP.map(o => <OptionCard key={o.id} o={o} selected={sleep === o.id} onClick={() => { setSleep(o.id); setTimeout(next, 180); }} />)}
+              {SLEEP.map(o => <OptionCard key={o.id} o={o} selected={sleep === o.id} onClick={() => setSleep(o.id)} />)}
             </Question>
           )}
 
@@ -167,7 +167,7 @@ export function Onboarding() {
 
           {step === 5 && (
             <div className="flex flex-col items-center text-center pt-10">
-              <div className="w-20 h-20 rounded-[28px] grid place-items-center mb-6 anim-pop" style={{ background: 'linear-gradient(135deg,var(--primary),var(--primary-2))', boxShadow: '0 14px 36px rgba(79,91,213,.4)' }}>
+              <div className="w-20 h-20 rounded-[28px] grid place-items-center mb-6 anim-pop" style={{ background: 'var(--grad)', boxShadow: 'var(--shadow-primary)' }}>
                 <Check className="w-10 h-10 text-white" strokeWidth={3} />
               </div>
               <h1 className="display text-[30px] text-[var(--text)] leading-tight">{t('onb.finalTitle', { name: name.trim() || '' })}</h1>
@@ -184,7 +184,7 @@ export function Onboarding() {
             onClick={step === STEPS - 1 ? finish : next}
             disabled={!canNext}
             className="w-full h-12 rounded-2xl text-white text-[15px] font-bold flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[.99]"
-            style={{ background: 'linear-gradient(135deg,var(--primary),var(--primary-2))', boxShadow: '0 10px 24px rgba(79,91,213,.32)' }}>
+            style={{ background: 'var(--grad)', boxShadow: 'var(--shadow-primary)' }}>
             {step === STEPS - 1 ? t('onb.letsGo') : step === 0 ? t('onb.getStarted') : t('onb.continue')}
             <ArrowRight className="w-4 h-4" />
           </button>
