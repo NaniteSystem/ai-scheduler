@@ -3,3 +3,14 @@ dist
 .env
 .env.*
 server/.env
+
+# OS junk
+.DS_Store
+
+# Local tooling / session artifacts
+.playwright-mcp/
+.claude/
+
+# Build outputs
+*.apk
+builds/
