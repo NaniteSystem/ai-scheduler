@@ -55,7 +55,7 @@ export function Drawer({ open, onClose, title, subtitle, width = 'md', children,
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto ${noPadding ? '' : 'p-5'}`}>
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden ${noPadding ? '' : 'p-5'}`}>
           {children}
         </div>
       </div>

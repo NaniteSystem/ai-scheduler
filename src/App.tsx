@@ -803,19 +803,21 @@ export default function App(){
         </div>}
         {s.progressLog&&<div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><div className="flex items-center gap-2 mb-2"><CheckCircle2 className="w-4 h-4 text-emerald-400"/><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">{t('sm.completed')}</span></div><p className="text-[13px] text-white"><b>{s.progressLog.value}</b> {s.progressLog.metric} · {s.progressLog.feeling==='good'?'😊':'😐'}{s.progressLog.notes&&<span className="text-[var(--text-dim)] italic ml-2">"{s.progressLog.notes}"</span>}</p></div>}
       </div>
-      <div className="mt-4 pt-4 border-t border-[var(--border)] flex gap-2">
+      <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-2">
         {s.status!=='done'
-          ? <button onClick={()=>{store.updateSession(s.id,{status:'done'});store.closeSessionModal()}} className="flex-1 h-10 rounded-xl bg-emerald-500 text-black text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-400"><CheckCircle2 className="w-4 h-4"/>{t('sm.markDone')}</button>
-          : <button onClick={()=>store.updateSession(s.id,{status:'planned'})} className="flex-1 h-10 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"><RotateCcw className="w-4 h-4"/>{t('sm.markUndone')}</button>}
-        <button onClick={()=>{store.openTimerLauncher({linkType:'session',linkId:s.id,label:s.title});store.closeSessionModal();}} className="h-10 px-4 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--primary)]/20 transition-colors"><Timer className="w-4 h-4"/>{t('timer.focus')}</button>
-        <button onClick={()=>store.requestEditSession(s.id)} className="h-10 px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"><Edit2 className="w-4 h-4"/>{t('sm.edit')}</button>
-        <button onClick={()=>{
-          if(s.seriesId){
-            store.askConfirm({title:t('sm.delSeriesTitle'),message:t('sm.delSeriesMsg'),confirmLabel:t('sm.delSeriesBtn'),danger:true,onConfirm:()=>{store.deleteSeries(s.seriesId!);store.closeSessionModal();}});
-            return;
-          }
-          store.askConfirm({title:t('sm.delTitle'),message:t('sm.delMsg'),confirmLabel:t('common.delete'),danger:true,onConfirm:()=>{store.deleteSession(s.id);store.closeSessionModal();}});
-        }} className="h-10 px-4 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-red-500/20 transition-colors"><X className="w-4 h-4"/>{t('common.delete')}</button>
+          ? <button onClick={()=>{store.updateSession(s.id,{status:'done'});store.closeSessionModal()}} className="w-full h-11 rounded-xl bg-emerald-500 text-black text-[13px] font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-400"><CheckCircle2 className="w-4 h-4"/>{t('sm.markDone')}</button>
+          : <button onClick={()=>store.updateSession(s.id,{status:'planned'})} className="w-full h-11 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[13px] font-bold flex items-center justify-center gap-1.5 hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"><RotateCcw className="w-4 h-4"/>{t('sm.markUndone')}</button>}
+        <div className="flex gap-2">
+          <button onClick={()=>{store.openTimerLauncher({linkType:'session',linkId:s.id,label:s.title});store.closeSessionModal();}} className="flex-1 min-w-0 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--primary)]/20 transition-colors"><Timer className="w-4 h-4 shrink-0"/><span className="truncate">{t('timer.focus')}</span></button>
+          <button onClick={()=>store.requestEditSession(s.id)} className="flex-1 min-w-0 h-10 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:text-[var(--text)] hover:bg-[var(--border)] transition-all"><Edit2 className="w-4 h-4 shrink-0"/><span className="truncate">{t('sm.edit')}</span></button>
+          <button aria-label={t('common.delete')} onClick={()=>{
+            if(s.seriesId){
+              store.askConfirm({title:t('sm.delSeriesTitle'),message:t('sm.delSeriesMsg'),confirmLabel:t('sm.delSeriesBtn'),danger:true,onConfirm:()=>{store.deleteSeries(s.seriesId!);store.closeSessionModal();}});
+              return;
+            }
+            store.askConfirm({title:t('sm.delTitle'),message:t('sm.delMsg'),confirmLabel:t('common.delete'),danger:true,onConfirm:()=>{store.deleteSession(s.id);store.closeSessionModal();}});
+          }} className="w-10 h-10 shrink-0 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 grid place-items-center hover:bg-red-500/20 transition-colors"><X className="w-4 h-4"/></button>
+        </div>
       </div>
     </Drawer>})()}
 
