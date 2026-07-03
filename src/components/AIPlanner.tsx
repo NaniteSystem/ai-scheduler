@@ -4,6 +4,7 @@ import { useT, useDateLocale } from '../i18n';
 import type { PlanHorizon, PlanOptions, PlanIntensity, GeneratedDay, GeneratedBlock } from '../types';
 import { format, parseISO, differenceInCalendarWeeks } from 'date-fns';
 import { aiConfigured } from '../scheduler';
+import { lbLabel } from './AIScheduler';
 import {
   Wand2, Sparkles, Target, Flame, Repeat2, CheckSquare, Calendar,
   Check, X, RotateCcw, ChevronDown, CalendarRange, Info, WifiOff,
@@ -254,12 +255,13 @@ function BlockRow({ block, date, t, store }: { block: GeneratedBlock; date: stri
   const rejected = block.status === 'rejected';
   const accepted = block.status === 'accepted';
   const reason = block.reasoning?.startsWith('plan.r.') ? t(block.reasoning) : block.reasoning;
+  const title = block.sourceKind === 'life' ? lbLabel(block.sourceId, block.title, t) : block.title;
   return (
     <div className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-all ${rejected ? 'opacity-40' : ''}`} style={{ borderColor: accepted ? `${block.color}55` : 'var(--border)', background: accepted ? `${block.color}0c` : 'var(--surface-2)' }}>
       <div className="w-12 shrink-0 text-[10px] text-[var(--text-dim)] mono leading-tight">{fmtTime(block.startMinutes)}<br />{fmtDur(block.durationMinutes)}</div>
       <span className="text-base shrink-0">{block.emoji}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-[var(--text)] truncate">{block.title}</div>
+        <div className="text-[12px] font-semibold text-[var(--text)] truncate">{title}</div>
         {reason && <div className="text-[10px] text-[var(--text-dim)] truncate">{reason}</div>}
       </div>
       {block.locked ? (

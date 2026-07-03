@@ -81,4 +81,41 @@ const t1 = plan.days[0].blocks.find(b => b.sourceId === 't1')!;
 assert.ok(t1.startMinutes >= 7 * 60, 'task clamped to wake');
 assert.ok(!plan.days.some(d => d.blocks.some(b => b.sourceId === 'ghost')));
 
+// ── Fixed commitments + break windows ───────────────────────────────────────
+const input2: PlanInput = {
+  ...input,
+  sessions: [],
+  prefs: {
+    ...prefs,
+    hasWork: true, workStart: '09:00', workEnd: '17:00',
+    workBreakStart: '12:00', workBreakEnd: '13:00',
+    commitments: [
+      { id: 'c1', title: 'University', emoji: '📚', start: '18:00', end: '20:00', days: [2], enabled: true },     // Tuesdays
+      { id: 'c2', title: 'Disabled thing', emoji: '❌', start: '18:00', end: '20:00', days: [1], enabled: false },
+    ],
+  } as any,
+  tasks: [{ id: 't1', title: 'Call dentist', priority: 1, status: 'next', createdAt: '2026-07-01', durationMinutes: 30 } as any],
+};
+const plan2 = assemble(input2, {
+  goals: [],
+  tasks: [{ id: 't1', date: '2026-07-06', time: '12:00' }],   // inside the work break — must be allowed
+});
+
+// 7. Work is split around the 12-13 break on Monday (two locked work blocks)
+const monBlocks = plan2.days[0].blocks;
+const workSegs = monBlocks.filter(b => b.type === 'work' && b.title === 'Work');
+assert.equal(workSegs.length, 2, 'work should be split by the break');
+assert.deepEqual(workSegs.map(w => [w.startMinutes, w.durationMinutes]), [[540, 180], [780, 240]]);
+
+// 8. The task lands INSIDE the break window (12:00), not pushed to the evening
+const t1b = monBlocks.find(b => b.sourceId === 't1')!;
+assert.equal(t1b.startMinutes, 12 * 60, `task should start 12:00, got ${t1b.startMinutes}`);
+
+// 9. Commitment appears only on Tuesday and is locked; the disabled one never
+const tue = plan2.days[1].blocks.filter(b => b.title === 'University');
+assert.equal(tue.length, 1);
+assert.ok(tue[0].locked);
+assert.ok(!plan2.days.some(d => d.blocks.some(b => b.title === 'University') && d.date !== '2026-07-07'));
+assert.ok(!plan2.days.some(d => d.blocks.some(b => b.title === 'Disabled thing')));
+
 console.log('schedulePlan.test.ts: all assertions passed');

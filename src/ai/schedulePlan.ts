@@ -112,8 +112,13 @@ function buildPrompt(input: PlanInput): string {
   const lines: string[] = [
     `Plan range: ${range.start} → ${range.end}. Today: ${format(new Date(), 'yyyy-MM-dd')} (weekday ${getDay(new Date())}).`,
     `User language: "${lang}". Intensity: ${intensity}.`,
-    `Preferences: wake ${prefs.wakeTime}, sleep ${prefs.sleepTime}, productivity peak: ${prefs.productivityPeak}${prefs.hasWork ? `, work ${prefs.workStart}-${prefs.workEnd} on weekdays` : ', no fixed work hours'}${prefs.fasting ? `, fasting (${prefs.fastingType || '16:8'})` : ''}.`,
+    `Preferences: wake ${prefs.wakeTime}, sleep ${prefs.sleepTime}, productivity peak: ${prefs.productivityPeak}${prefs.hasWork ? `, work ${prefs.workStart}-${prefs.workEnd} on weekdays${prefs.workBreakStart && prefs.workBreakEnd ? ` (break ${prefs.workBreakStart}-${prefs.workBreakEnd} is FREE)` : ''}` : ', no fixed work hours'}${prefs.fasting ? `, fasting (${prefs.fastingType || '16:8'})` : ''}.`,
   ];
+  const commitments = (prefs.commitments || []).filter(c => c.enabled && c.days?.length);
+  if (commitments.length) {
+    lines.push(`FIXED COMMITMENTS (locked busy time, plan around them):\n${commitments.map(c =>
+      `- "${c.title}" ${c.start}-${c.end} on weekdays [${c.days.join(',')}]${c.breakStart && c.breakEnd ? ` (break ${c.breakStart}-${c.breakEnd} is free)` : ''}`).join('\n')}`);
+  }
   if (options.includeGoals && activeGoals.length) {
     lines.push(`GOALS:\n${activeGoals.map(g => `- ${goalPrompt(g, lang)}`).join('\n')}`);
   }

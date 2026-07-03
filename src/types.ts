@@ -226,6 +226,20 @@ export interface LifeBlock {
   description: string;
 }
 
+// A user-defined fixed obligation (study, gym class, second job, …) that
+// repeats on chosen weekdays and is locked busy time for every scheduler.
+export interface FixedCommitment {
+  id: string;
+  title: string;
+  emoji: string;
+  start: string;             // "HH:MM"
+  end: string;               // "HH:MM"
+  days: number[];            // weekdays 0=Sun … 6=Sat
+  enabled: boolean;
+  breakStart?: string;       // optional free window inside the commitment
+  breakEnd?: string;         //   (e.g. lunch break) — schedulable time
+}
+
 export interface SchedulePrefs {
   wakeTime: string;          // "06:30"
   sleepTime: string;         // "23:00"
@@ -234,9 +248,12 @@ export interface SchedulePrefs {
   workStart: string;
   workEnd: string;
   hasWork: boolean;
+  workBreakStart?: string;   // optional break inside work hours (free window)
+  workBreakEnd?: string;
   productivityPeak: 'morning' | 'afternoon' | 'evening';
   weekStartsOn: 0 | 1;        // 0 = Sunday, 1 = Monday
   lifeBlocks: LifeBlock[];
+  commitments: FixedCommitment[];   // user-defined fixed obligations
   provider?: string;          // active SchedulerProvider id; default 'rule-based'
 }
 

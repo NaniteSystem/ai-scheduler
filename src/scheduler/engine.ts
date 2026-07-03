@@ -104,13 +104,33 @@ export function makeDayCtx(input: PlanInput, dateStr: string): DayCtx {
   // 1. Sleep (locked, doesn't occupy the waking window)
   const sleepB = prefs.lifeBlocks.find(b => b.id === 'sleep');
   if (sleepB?.enabled)
-    blocks.push({ id: nid(), title: sleepB.label, emoji: sleepB.emoji, color: sleepB.color, startMinutes: hm(prefs.sleepTime), durationMinutes: Math.round(sleepB.hoursPerDay * 60), type: 'essential', sourceKind: 'life', status: 'proposed', locked: true, reasoning: 'plan.r.rest' });
+    blocks.push({ id: nid(), title: sleepB.label, emoji: sleepB.emoji, color: sleepB.color, startMinutes: hm(prefs.sleepTime), durationMinutes: Math.round(sleepB.hoursPerDay * 60), type: 'essential', sourceKind: 'life', sourceId: 'sleep', status: 'proposed', locked: true, reasoning: 'plan.r.rest' });
 
-  // 2. Work (locked, weekdays only)
+  // Fixed obligations are pushed as locked blocks. An optional break window
+  // inside (lunch break, …) splits the block in two and stays FREE, so meals
+  // and small tasks can be planned inside it.
+  const pushFixed = (title: string, emoji: string, color: string, reason: string, sourceId: string | undefined, startT: string, endT: string, breakS?: string, breakE?: string) => {
+    const s0 = hm(startT), e0 = hm(endT);
+    if (e0 <= s0) return;
+    const bs = breakS ? hm(breakS) : null, be = breakE ? hm(breakE) : null;
+    const segs: [number, number][] =
+      bs != null && be != null && bs > s0 && be < e0 && be > bs ? [[s0, bs], [be, e0]] : [[s0, e0]];
+    for (const [s, e] of segs) {
+      blocks.push({ id: nid(), title, emoji, color, startMinutes: s, durationMinutes: e - s, type: 'work', sourceKind: 'life', sourceId, status: 'proposed', locked: true, reasoning: reason });
+      occupy(s, e);
+    }
+  };
+
+  // 2. Work (locked, weekdays only), with optional break window
   if (prefs.hasWork && !isWeekend(date)) {
-    const ws = hm(prefs.workStart), we = hm(prefs.workEnd);
-    blocks.push({ id: nid(), title: 'Work', emoji: '💼', color: '#64748b', startMinutes: ws, durationMinutes: we - ws, type: 'work', sourceKind: 'life', status: 'proposed', locked: true, reasoning: 'plan.r.work' });
-    occupy(ws, we);
+    pushFixed('Work', '💼', '#64748b', 'plan.r.work', 'work', prefs.workStart, prefs.workEnd, prefs.workBreakStart, prefs.workBreakEnd);
+  }
+
+  // 2b. User-defined commitments (study, gym class, …) on their weekdays
+  const wd = getDay(date);
+  for (const c of prefs.commitments || []) {
+    if (!c.enabled || !c.days?.includes(wd)) continue;
+    pushFixed(c.title, c.emoji || '📌', '#8b5cf6', 'plan.r.commitment', undefined, c.start, c.end, c.breakStart, c.breakEnd);
   }
 
   // 3. Meals (essential, respecting fasting). A meal with a fixed time is pinned
@@ -122,7 +142,7 @@ export function makeDayCtx(input: PlanInput, dateStr: string): DayCtx {
     if (prefs.fasting && (mid === 'breakfast' || prefs.fastingType === 'full-day')) continue;
     const dur = Math.round(mb.hoursPerDay * 60);
     const slot = mb.fixedTime ? hm(mb.fixedTime) : (place(wake + 180, dur) ?? wake + 180);
-    blocks.push({ id: nid(), title: mb.label, emoji: mb.emoji, color: mb.color, startMinutes: slot, durationMinutes: dur, type: 'essential', sourceKind: 'life', status: 'proposed', reasoning: 'plan.r.meal' });
+    blocks.push({ id: nid(), title: mb.label, emoji: mb.emoji, color: mb.color, startMinutes: slot, durationMinutes: dur, type: 'essential', sourceKind: 'life', sourceId: mid, status: 'proposed', reasoning: 'plan.r.meal' });
     occupy(slot, slot + dur);
   }
 
@@ -137,7 +157,7 @@ export function fillLifeBlocks(input: PlanInput, ctx: DayCtx): void {
     const dur = Math.round(b.hoursPerDay * 60);
     const slot = ctx.place(def, dur);
     if (slot == null) return;
-    ctx.blocks.push({ id: ctx.nid(), title: b.label, emoji: b.emoji, color: b.color, startMinutes: slot, durationMinutes: dur, type, sourceKind: 'life', status: 'proposed', reasoning: 'plan.r.wellbeing' });
+    ctx.blocks.push({ id: ctx.nid(), title: b.label, emoji: b.emoji, color: b.color, startMinutes: slot, durationMinutes: dur, type, sourceKind: 'life', sourceId: id, status: 'proposed', reasoning: 'plan.r.wellbeing' });
     ctx.occupy(slot, slot + dur);
   };
   fill('exercise', ctx.wake, 'wellbeing');

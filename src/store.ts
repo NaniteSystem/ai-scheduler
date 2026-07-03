@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { addDays, addWeeks, addMonths, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
-import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions } from './types';
+import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment } from './types';
 import { getProvider, horizonRange } from './scheduler';
 
 /** Is a habit scheduled on the given date (by its recurrence rule)? */
@@ -223,7 +223,7 @@ function syncTaskWithSession(task: GTDTask, session: Session): GTDTask {
 }
 
 const defaultLifeBlocks: LifeBlock[] = [
-  { id:'sleep', label:'Sleep', emoji:'😴', color:'#6366f1', category:'essential', hoursPerDay:8, minHours:5, maxHours:10, recommended:8, enabled:true, flexible:false, fixedTime:'23:00', description:'Quality rest is the foundation of productivity' },
+  { id:'sleep', label:'Sleep', emoji:'😴', color:'#6366f1', category:'essential', hoursPerDay:8, minHours:4, maxHours:14, recommended:8, enabled:true, flexible:false, fixedTime:'23:00', description:'Quality rest is the foundation of productivity' },
   { id:'breakfast', label:'Breakfast', emoji:'🍳', color:'#f59e0b', category:'essential', hoursPerDay:0.5, minHours:0, maxHours:1.5, recommended:0.5, enabled:true, flexible:true, fixedTime:'07:30', description:'Morning fuel' },
   { id:'lunch', label:'Lunch', emoji:'🥗', color:'#84cc16', category:'essential', hoursPerDay:0.75, minHours:0, maxHours:1.5, recommended:0.75, enabled:true, flexible:true, fixedTime:'13:00', description:'Midday meal' },
   { id:'dinner', label:'Dinner', emoji:'🍽️', color:'#ef4444', category:'essential', hoursPerDay:1, minHours:0, maxHours:2, recommended:1, enabled:true, flexible:true, fixedTime:'19:00', description:'Evening meal' },
@@ -243,6 +243,7 @@ const defaultPrefs: SchedulePrefs = {
   productivityPeak: 'morning',
   weekStartsOn: 1,
   lifeBlocks: defaultLifeBlocks,
+  commitments: [],
 };
 
 const hm = (t: string) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
@@ -274,11 +275,23 @@ export function generateSchedule(prefs: SchedulePrefs, goals: Goal[], tasks: GTD
   };
   const occupy = (s:number,e:number) => occupied.push({start:s,end:e});
 
-  // 2. Work block (fixed)
-  if (prefs.hasWork) {
-    const ws = hm(prefs.workStart), we = hm(prefs.workEnd);
-    blocks.push({ id:nid(), title:'Work', emoji:'💼', color:'#64748b', startMinutes:ws, durationMinutes:we-ws, type:'work', status:'proposed', locked:true, reasoning:'Your fixed work hours' });
-    occupy(ws, we);
+  // 2. Work + user commitments (fixed). An optional break window splits the
+  // block and stays free for meals/tasks.
+  const pushFixed = (title:string, emoji:string, color:string, startT:string, endT:string, breakS?:string, breakE?:string, reason='Your fixed work hours') => {
+    const s0 = hm(startT), e0 = hm(endT);
+    if (e0 <= s0) return;
+    const bs = breakS ? hm(breakS) : null, be = breakE ? hm(breakE) : null;
+    const segs: [number,number][] = bs!=null && be!=null && bs>s0 && be<e0 && be>bs ? [[s0,bs],[be,e0]] : [[s0,e0]];
+    for (const [s,e] of segs) {
+      blocks.push({ id:nid(), title, emoji, color, startMinutes:s, durationMinutes:e-s, type:'work', status:'proposed', locked:true, reasoning:reason });
+      occupy(s, e);
+    }
+  };
+  if (prefs.hasWork) pushFixed('Work', '💼', '#64748b', prefs.workStart, prefs.workEnd, prefs.workBreakStart, prefs.workBreakEnd);
+  const todayWd = parseISO(dateStr).getDay();
+  for (const c of prefs.commitments || []) {
+    if (!c.enabled || !c.days?.includes(todayWd)) continue;
+    pushFixed(c.title, c.emoji || '📌', '#8b5cf6', c.start, c.end, c.breakStart, c.breakEnd, 'Your fixed commitment');
   }
 
   // 3. Meals (essential, near fixed times) — skip if fasting
@@ -474,6 +487,9 @@ interface S {
   // AI Scheduler actions
   updateLifeBlock: (id: string, patch: Partial<LifeBlock>) => void;
   updatePrefs: (patch: Partial<SchedulePrefs>) => void;
+  addCommitment: (c: Omit<FixedCommitment, 'id'>) => void;
+  updateCommitment: (id: string, patch: Partial<FixedCommitment>) => void;
+  removeCommitment: (id: string) => void;
   generateAISchedule: () => void;
   setBlockStatus: (blockId: string, status: 'accepted' | 'rejected' | 'proposed') => void;
   acceptAllBlocks: () => void;
@@ -811,10 +827,33 @@ export const useStore = create<S>()(persist((set) => ({
   isPlanning: false,
   doingTaskId: null,
 
-  updateLifeBlock: (id, patch) => set((s) => ({
-    schedulePrefs: { ...s.schedulePrefs, lifeBlocks: s.schedulePrefs.lifeBlocks.map(b => b.id===id ? { ...b, ...patch } : b) }
-  })),
+  updateLifeBlock: (id, patch) => set((s) => {
+    const blocks = s.schedulePrefs.lifeBlocks.map(b => {
+      if (b.id !== id) return b;
+      const next = { ...b, ...patch };
+      if (typeof patch.hoursPerDay === 'number') {
+        // Per-block bounds, then a hard day cap: all enabled blocks together can never exceed 24h.
+        let v = Math.min(Math.max(patch.hoursPerDay, b.minHours), b.maxHours);
+        const others = s.schedulePrefs.lifeBlocks
+          .filter(x => x.id !== id && x.enabled)
+          .reduce((a, x) => a + x.hoursPerDay, 0);
+        v = Math.min(v, Math.max(b.minHours, +(24 - others).toFixed(2)));
+        next.hoursPerDay = v;
+      }
+      return next;
+    });
+    return { schedulePrefs: { ...s.schedulePrefs, lifeBlocks: blocks } };
+  }),
   updatePrefs: (patch) => set((s) => ({ schedulePrefs: { ...s.schedulePrefs, ...patch } })),
+  addCommitment: (c) => set((s) => ({
+    schedulePrefs: { ...s.schedulePrefs, commitments: [...(s.schedulePrefs.commitments || []), { ...c, id: `fc-${Date.now()}` }] }
+  })),
+  updateCommitment: (id, patch) => set((s) => ({
+    schedulePrefs: { ...s.schedulePrefs, commitments: (s.schedulePrefs.commitments || []).map(c => c.id === id ? { ...c, ...patch } : c) }
+  })),
+  removeCommitment: (id) => set((s) => ({
+    schedulePrefs: { ...s.schedulePrefs, commitments: (s.schedulePrefs.commitments || []).filter(c => c.id !== id) }
+  })),
   generateAISchedule: () => {
     set({ isGenerating: true, generatedDay: null });
     setTimeout(() => {
@@ -934,7 +973,9 @@ export const useStore = create<S>()(persist((set) => ({
   // v3: self-heal malformed/legacy sessions (missing tasks[] or startHour) so they
   //     never crash the session drawer or render "undefined:00".
   // v4: add first-run intro course; existing onboarded users are marked complete.
-  version: 4,
+  // v5: life-balance sanity — merge in any life blocks missing from old installs
+  //     (breakfast/dinner/…), clamp hours into [min,max], add commitments[].
+  version: 5,
   migrate: (persisted: any, version) => {
     if (version < 2 && persisted) {
       return { ...persisted, goals: [], sessions: [], gtdTasks: [], generatedDay: null, userName: '', onboarded: false };
@@ -950,6 +991,21 @@ export const useStore = create<S>()(persist((set) => ({
     }
     if (version < 4 && persisted) {
       persisted.introCourseCompleted = !!persisted.onboarded;
+    }
+    if (version < 5 && persisted?.schedulePrefs) {
+      const prefs = persisted.schedulePrefs;
+      const existing: any[] = Array.isArray(prefs.lifeBlocks) ? prefs.lifeBlocks : [];
+      // Re-add default blocks lost by older installs, clamp saved hours into bounds.
+      prefs.lifeBlocks = defaultLifeBlocks.map(def => {
+        const cur = existing.find((b: any) => b.id === def.id);
+        if (!cur) return def;
+        const merged = { ...def, ...cur, minHours: def.minHours, maxHours: def.maxHours };
+        merged.hoursPerDay = Math.min(Math.max(Number(merged.hoursPerDay) || def.recommended, def.minHours), def.maxHours);
+        return merged;
+      });
+      // Keep any custom blocks that aren't part of the defaults.
+      for (const b of existing) if (!prefs.lifeBlocks.some((x: any) => x.id === b.id)) prefs.lifeBlocks.push(b);
+      if (!Array.isArray(prefs.commitments)) prefs.commitments = [];
     }
     return persisted;
   },
