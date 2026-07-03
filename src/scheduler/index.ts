@@ -20,11 +20,32 @@ export const ruleBasedProvider: SchedulerProvider = {
   generate: async (input) => generateRangePlan(input),
 };
 
-export const providers: Record<string, SchedulerProvider> = {
-  'rule-based': ruleBasedProvider,
+/** True when the AI proxy is configured for this build. */
+export const aiConfigured = (): boolean => Boolean((import.meta as any).env?.VITE_AI_PROXY_URL);
+
+// LLM strategy + local assembler. Falls back to the rule engine when the AI
+// is offline/unavailable, marking the plan so the UI can say so.
+export const aiProvider: SchedulerProvider = {
+  id: 'ai',
+  label: 'AI',
+  generate: async (input) => {
+    try {
+      const { generateAiPlan } = await import('../ai/schedulePlan');
+      return await generateAiPlan(input);
+    } catch {
+      const plan = generateRangePlan(input);
+      return { ...plan, fallback: true };
+    }
+  },
 };
 
-export const getProvider = (id?: string): SchedulerProvider => providers[id || 'rule-based'] || ruleBasedProvider;
+export const providers: Record<string, SchedulerProvider> = {
+  'rule-based': ruleBasedProvider,
+  ai: aiProvider,
+};
+
+export const getProvider = (id?: string): SchedulerProvider =>
+  providers[id || (aiConfigured() ? 'ai' : 'rule-based')] || ruleBasedProvider;
 
 /** Date range (inclusive) for a horizon starting today. */
 export function horizonRange(horizon: PlanHorizon, from: Date = new Date()): { start: string; end: string } {

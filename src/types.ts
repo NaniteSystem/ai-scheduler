@@ -263,11 +263,15 @@ export interface GeneratedDay {
 // ─── Multi-week AI Scheduler ────────────────────────────────────────────
 export type PlanHorizon = '1w' | '2w' | '3w' | '4w';   // selectable week → month
 
+export type PlanIntensity = 'light' | 'balanced' | 'intense';
+
 export interface PlanOptions {
   includeGoals: boolean;
   includeHabits: boolean;
   includeRecurring: boolean;
   includeTasks: boolean;
+  intensity?: PlanIntensity;   // how packed the schedule should be (default 'balanced')
+  instructions?: string;       // free-text wishes passed to the AI ("keep evenings free", …)
 }
 
 export interface PlanInput {
@@ -276,13 +280,17 @@ export interface PlanInput {
   goals: Goal[];
   habits: Habit[];
   tasks: GTDTask[];
+  sessions: Session[];         // existing calendar sessions — treated as busy time
   options: PlanOptions;
+  lang: 'en' | 'ru' | 'ja';
 }
 
 export interface GeneratedPlan {
   id: string;
   createdAt: string;
-  providerId: string;
+  providerId: string;          // 'ai' | 'rule-based'
+  fallback?: boolean;          // true when AI was requested but the local engine built the plan
+  advice?: string;             // AI's short summary of how it balanced the plan (user language)
   range: { start: string; end: string };
   options: PlanOptions;
   days: GeneratedDay[];

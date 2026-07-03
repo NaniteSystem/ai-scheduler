@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --experimental-strip-types src/ai/intentFilter.test.ts && node --experimental-strip-types src/utils/localized.test.ts",
+    "test": "node --experimental-strip-types src/ai/intentFilter.test.ts && node --experimental-strip-types src/utils/localized.test.ts && node --experimental-strip-types src/ai/schedulePlan.test.ts",
     "build": "vite build",
     "preview": "vite preview",
     "android:sync": "vite build && cap sync android",

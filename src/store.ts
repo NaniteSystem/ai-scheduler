@@ -860,19 +860,25 @@ export const useStore = create<S>()(persist((set) => ({
   // ─── Multi-week AI Scheduler ───
   generatePlan: (horizon, options) => {
     set({ isPlanning: true, generatedPlan: null });
-    setTimeout(async () => {
+    (async () => {
       const st = useStore.getState();
       const provider = getProvider(st.schedulePrefs.provider);
+      const started = Date.now();
       const plan = await provider.generate({
         range: horizonRange(horizon),
         prefs: st.schedulePrefs,
         goals: st.goals,
         habits: st.habits,
         tasks: st.gtdTasks,
+        sessions: st.sessions,
         options,
+        lang: st.lang,
       });
+      // keep the "building…" state visible for at least a beat so the UI doesn't flash
+      const minWait = 600 - (Date.now() - started);
+      if (minWait > 0) await new Promise(r => setTimeout(r, minWait));
       set({ generatedPlan: plan, isPlanning: false });
-    }, 1400);
+    })();
   },
   regeneratePlan: () => {
     const cur = useStore.getState().generatedPlan;

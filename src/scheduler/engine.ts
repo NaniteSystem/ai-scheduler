@@ -5,7 +5,7 @@ import type { PlanInput, GeneratedPlan, GeneratedDay, GeneratedBlock, Goal, Habi
 // Pure & deterministic so it is unit-testable and can be swapped for a real AI
 // provider behind the SchedulerProvider seam. It must NOT import the store.
 
-const hm = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+export const hm = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
 // Situational anchor → rough clock minute (used when a habit has no reminderTime).
 const ANCHOR_MIN: Record<string, number> = {
@@ -13,7 +13,7 @@ const ANCHOR_MIN: Record<string, number> = {
   sleep: 22 * 60, afterBreakfast: 8 * 60, afterLunch: 13 * 60 + 30, afterDinner: 20 * 60,
 };
 
-function habitFiresOn(h: Habit, date: Date): boolean {
+export function habitFiresOn(h: Habit, date: Date): boolean {
   const diff = differenceInCalendarDays(date, parseISO(h.createdAt));
   if (diff < 0) return false;
   switch (h.recurrence) {
@@ -26,7 +26,7 @@ function habitFiresOn(h: Habit, date: Date): boolean {
   }
 }
 
-function recurringFiresOn(t: GTDTask, date: Date): boolean {
+export function recurringFiresOn(t: GTDTask, date: Date): boolean {
   const base = t.scheduledDate || t.dueDate || t.createdAt;
   const b = parseISO(base);
   const diff = differenceInCalendarDays(date, b);
@@ -58,9 +58,25 @@ function goalSchedules(goals: Goal[]): GoalSchedule[] {
     });
 }
 
-function buildDay(input: PlanInput, dateStr: string, scheds: GoalSchedule[]): GeneratedDay {
+// ─── Day scaffold: the locked/essential frame every provider builds on ──────
+// Sleep, work, meals + existing calendar sessions marked busy. Both the rule
+// engine and the AI assembler start from this, so precision guarantees (no
+// overlaps, inside the waking window, around real sessions) hold everywhere.
+export interface DayCtx {
+  date: Date;
+  dateStr: string;
+  wake: number;
+  sleep: number;
+  blocks: GeneratedBlock[];
+  nid: () => string;
+  overlaps: (s: number, e: number) => boolean;
+  occupy: (s: number, e: number) => void;
+  place: (start: number, dur: number) => number | null;
+}
+
+export function makeDayCtx(input: PlanInput, dateStr: string): DayCtx {
   const date = parseISO(dateStr);
-  const { prefs, habits, tasks, options } = input;
+  const { prefs } = input;
   const blocks: GeneratedBlock[] = [];
   let idc = 0;
   const nid = () => `gb-${dateStr}-${idc++}`;
@@ -77,6 +93,14 @@ function buildDay(input: PlanInput, dateStr: string, scheds: GoalSchedule[]): Ge
     return null;
   };
 
+  // 0. Existing calendar sessions on this date are busy time — never plan over them.
+  for (const s of input.sessions || []) {
+    if (s.status === 'done' || s.allDay || (s.date || '').slice(0, 10) !== dateStr) continue;
+    if (!Number.isFinite(s.startHour)) continue;
+    const st = s.startHour * 60 + (s.startMinute || 0);
+    occupy(st, st + Math.max(15, s.durationMinutes || 30));
+  }
+
   // 1. Sleep (locked, doesn't occupy the waking window)
   const sleepB = prefs.lifeBlocks.find(b => b.id === 'sleep');
   if (sleepB?.enabled)
@@ -89,16 +113,42 @@ function buildDay(input: PlanInput, dateStr: string, scheds: GoalSchedule[]): Ge
     occupy(ws, we);
   }
 
-  // 3. Meals (essential, respecting fasting)
+  // 3. Meals (essential, respecting fasting). A meal with a fixed time is pinned
+  // there even inside work hours — lunch during the workday is normal life, not
+  // a conflict to be pushed to the evening.
   for (const mid of ['breakfast', 'lunch', 'dinner']) {
     const mb = prefs.lifeBlocks.find(b => b.id === mid);
     if (!mb?.enabled) continue;
     if (prefs.fasting && (mid === 'breakfast' || prefs.fastingType === 'full-day')) continue;
     const dur = Math.round(mb.hoursPerDay * 60);
-    const slot = place(mb.fixedTime ? hm(mb.fixedTime) : wake + 180, dur) ?? (mb.fixedTime ? hm(mb.fixedTime) : wake + 180);
+    const slot = mb.fixedTime ? hm(mb.fixedTime) : (place(wake + 180, dur) ?? wake + 180);
     blocks.push({ id: nid(), title: mb.label, emoji: mb.emoji, color: mb.color, startMinutes: slot, durationMinutes: dur, type: 'essential', sourceKind: 'life', status: 'proposed', reasoning: 'plan.r.meal' });
     occupy(slot, slot + dur);
   }
+
+  return { date, dateStr, wake, sleep, blocks, nid, overlaps, occupy, place };
+}
+
+/** Wellbeing / social / relax life blocks fill leftover space (shared by providers). */
+export function fillLifeBlocks(input: PlanInput, ctx: DayCtx): void {
+  const fill = (id: string, def: number, type: GeneratedBlock['type']) => {
+    const b = input.prefs.lifeBlocks.find(x => x.id === id);
+    if (!b?.enabled || b.hoursPerDay <= 0) return;
+    const dur = Math.round(b.hoursPerDay * 60);
+    const slot = ctx.place(def, dur);
+    if (slot == null) return;
+    ctx.blocks.push({ id: ctx.nid(), title: b.label, emoji: b.emoji, color: b.color, startMinutes: slot, durationMinutes: dur, type, sourceKind: 'life', status: 'proposed', reasoning: 'plan.r.wellbeing' });
+    ctx.occupy(slot, slot + dur);
+  };
+  fill('exercise', ctx.wake, 'wellbeing');
+  fill('friends', hm('18:00'), 'social');
+  fill('relax', hm('20:00'), 'wellbeing');
+}
+
+function buildDay(input: PlanInput, dateStr: string, scheds: GoalSchedule[]): GeneratedDay {
+  const ctx = makeDayCtx(input, dateStr);
+  const { date, wake, blocks, nid, occupy, place } = ctx;
+  const { prefs, habits, tasks, options } = input;
 
   // 4. Habits (anchored)
   if (options.includeHabits) for (const h of habits) {
@@ -146,18 +196,7 @@ function buildDay(input: PlanInput, dateStr: string, scheds: GoalSchedule[]): Ge
   }
 
   // 8. Wellbeing / social / relax fill the remainder
-  const fill = (id: string, def: number, type: GeneratedBlock['type']) => {
-    const b = prefs.lifeBlocks.find(x => x.id === id);
-    if (!b?.enabled || b.hoursPerDay <= 0) return;
-    const dur = Math.round(b.hoursPerDay * 60);
-    const slot = place(def, dur);
-    if (slot == null) return;
-    blocks.push({ id: nid(), title: b.label, emoji: b.emoji, color: b.color, startMinutes: slot, durationMinutes: dur, type, sourceKind: 'life', status: 'proposed', reasoning: 'plan.r.wellbeing' });
-    occupy(slot, slot + dur);
-  };
-  fill('exercise', wake, 'wellbeing');
-  fill('friends', hm('18:00'), 'social');
-  fill('relax', hm('20:00'), 'wellbeing');
+  fillLifeBlocks(input, ctx);
 
   blocks.sort((a, b) => a.startMinutes - b.startMinutes);
   return { date: dateStr, blocks };

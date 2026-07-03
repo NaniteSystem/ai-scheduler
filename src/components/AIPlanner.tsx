@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useT, useDateLocale } from '../i18n';
-import type { PlanHorizon, PlanOptions, GeneratedDay, GeneratedBlock } from '../types';
+import type { PlanHorizon, PlanOptions, PlanIntensity, GeneratedDay, GeneratedBlock } from '../types';
 import { format, parseISO, differenceInCalendarWeeks } from 'date-fns';
+import { aiConfigured } from '../scheduler';
 import {
   Wand2, Sparkles, Target, Flame, Repeat2, CheckSquare, Calendar,
-  Check, X, RotateCcw, ChevronDown, CalendarRange, Info,
+  Check, X, RotateCcw, ChevronDown, CalendarRange, Info, WifiOff,
 } from 'lucide-react';
 
 const fmtTime = (mins: number) => {
@@ -29,7 +30,10 @@ export function AIPlanner() {
   const [tab, setTab] = useState<'setup' | 'preview'>('setup');
   const [horizon, setHorizon] = useState<PlanHorizon>('2w');
   const [options, setOptions] = useState<PlanOptions>({ includeGoals: true, includeHabits: true, includeRecurring: true, includeTasks: true });
+  const [intensity, setIntensity] = useState<PlanIntensity>('balanced');
+  const [wishes, setWishes] = useState('');
   const [drill, setDrill] = useState<string | null>(null);
+  const hasAi = aiConfigured();
 
   const activeGoals = goals.filter(g => (g.status ?? 'active') !== 'completed').length;
   const trackedHabits = habits.filter(h => !h.archived).length;
@@ -43,7 +47,10 @@ export function AIPlanner() {
     { key: 'includeTasks' as const, Ic: CheckSquare, c: '#eab308', label: t('overview.tasks'), n: openTasks },
   ];
 
-  const handleGenerate = () => { generatePlan(horizon, options); setTab('preview'); setDrill(null); };
+  const handleGenerate = () => {
+    generatePlan(horizon, { ...options, intensity, instructions: wishes.trim() || undefined });
+    setTab('preview'); setDrill(null);
+  };
 
   const allBlocks = generatedPlan ? generatedPlan.days.flatMap(d => d.blocks).filter(b => !b.locked) : [];
   const acceptedCount = allBlocks.filter(b => b.status === 'accepted').length;
@@ -107,6 +114,28 @@ export function AIPlanner() {
               </div>
             </div>
 
+            {/* Intensity */}
+            <div className="anim-fade anim-delay-1">
+              <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-3">{t('planner.intensity')}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {(['light', 'balanced', 'intense'] as const).map(i => (
+                  <button key={i} onClick={() => setIntensity(i)} className={`h-12 rounded-xl text-[13px] font-bold border transition-all ${intensity === i ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                    {t('planner.int.' + i)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Wishes for the AI */}
+            {hasAi && (
+              <div className="anim-fade anim-delay-2">
+                <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-3">{t('planner.wishes')}</div>
+                <textarea value={wishes} onChange={e => setWishes(e.target.value)} rows={2} maxLength={500}
+                  placeholder={t('planner.wishesPh')}
+                  className="w-full rounded-2xl bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text-mute)] focus:outline-none focus:border-[var(--primary)] resize-none transition-colors" />
+              </div>
+            )}
+
             {/* Prefs hint + provider */}
             <div className="anim-fade anim-delay-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 flex items-start gap-3">
               <Info className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />
@@ -114,7 +143,7 @@ export function AIPlanner() {
                 <p className="text-[12px] text-[var(--text)] leading-relaxed">{t('planner.prefsHint')}</p>
                 <button onClick={() => store.setActiveView('architect')} className="text-[12px] font-bold text-[var(--primary)] mt-1">{t('planner.openPrefs')} →</button>
               </div>
-              <span className="text-[10px] font-bold text-[var(--text-dim)] bg-[var(--surface-2)] px-2 py-1 rounded-md shrink-0 flex items-center gap-1"><Sparkles className="w-3 h-3" />{t('planner.providerRuleBased')}</span>
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 flex items-center gap-1 ${hasAi ? 'text-[var(--primary)] bg-[var(--primary)]/10' : 'text-[var(--text-dim)] bg-[var(--surface-2)]'}`}><Sparkles className="w-3 h-3" />{hasAi ? t('planner.providerAi') : t('planner.providerRuleBased')}</span>
             </div>
 
             {/* Generate */}
@@ -134,6 +163,20 @@ export function AIPlanner() {
               </div>
             ) : generatedPlan ? (
               <div className="anim-fade">
+                {/* AI fallback notice */}
+                {generatedPlan.fallback && (
+                  <div className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/[0.07] p-3.5 flex items-start gap-2.5">
+                    <WifiOff className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-[var(--text)] leading-relaxed">{t('planner.fallbackNotice')}</p>
+                  </div>
+                )}
+                {/* AI advice */}
+                {generatedPlan.advice && (
+                  <div className="mb-4 rounded-2xl border border-[var(--primary)]/25 bg-[var(--primary)]/[0.07] p-3.5 flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-[var(--text)] leading-relaxed">{generatedPlan.advice}</p>
+                  </div>
+                )}
                 {/* Action bar */}
                 <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
                   <div>
