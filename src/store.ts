@@ -470,6 +470,9 @@ interface S {
   updateTask: (id: string, patch: Partial<GTDTask>) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   deleteTask: (id: string) => void;
+  pendingUndo: { items: { id: string; status: GTDStatus; isArchived?: boolean }[]; ts: number } | null;
+  undoDelete: () => void;
+  clearUndo: () => void;
   reorderTasks: (fromId: string, toId: string) => void;
   toggleTodayFocus: (id: string) => void;
   openEditTask: (id: string) => void;
@@ -736,9 +739,27 @@ export const useStore = create<S>()(persist((set) => ({
       ? { ...t, subtasks: (t.subtasks||[]).map(st => st.id===subtaskId ? { ...st, done: !st.done } : st) }
       : t)
   })),
-  deleteTask: (id) => set((s) => ({ 
-    gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : x)
-  })),
+  deleteTask: (id) => set((s) => {
+    const t = s.gtdTasks.find((x) => x.id === id);
+    if (!t || t.status === 'trash') return {};
+    return {
+      gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : x),
+      pendingUndo: { items: [...(s.pendingUndo?.items ?? []), { id, status: t.status, isArchived: t.isArchived }], ts: Date.now() },
+    };
+  }),
+  pendingUndo: null,
+  undoDelete: () => set((s) => {
+    if (!s.pendingUndo) return {};
+    const prev = new Map(s.pendingUndo.items.map((i) => [i.id, i]));
+    return {
+      gtdTasks: s.gtdTasks.map((x) => {
+        const p = prev.get(x.id);
+        return p ? { ...x, status: p.status, isArchived: p.isArchived, updatedAt: new Date().toISOString() } : x;
+      }),
+      pendingUndo: null,
+    };
+  }),
+  clearUndo: () => set({ pendingUndo: null }),
   reorderTasks: (fromId, toId) => set((s) => {
     const fromIdx = s.gtdTasks.findIndex(x => x.id === fromId);
     const toIdx = s.gtdTasks.findIndex(x => x.id === toId);

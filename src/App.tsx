@@ -174,6 +174,8 @@ export default function App(){
   const store=useStore();
   const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,introCourseCompleted,schedulePrefs,density,theme}=store;
   useEffect(()=>{ syncReminders(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits]);
+  const undoTs=store.pendingUndo?.ts;
+  useEffect(()=>{ if(!undoTs) return; const id=setTimeout(()=>useStore.getState().clearUndo(),5000); return ()=>clearTimeout(id); },[undoTs]);
   useEffect(()=>{ store.syncScheduledSessions(); },[sessions.length,gtdTasks.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{ initTimerActionListener(); },[]);
   useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
@@ -681,6 +683,21 @@ export default function App(){
 })()}
 
       </motion.div>
+      </AnimatePresence>
+
+      {/* ═══════════════════ UNDO SNACKBAR ═══════════════════ */}
+      <AnimatePresence>
+        {store.pendingUndo&&(
+          <motion.div key={store.pendingUndo.ts} initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} exit={{opacity:0,y:16}}
+            className="absolute inset-x-0 z-50 px-4 pointer-events-none flex justify-center"
+            style={{bottom:'calc(env(safe-area-inset-bottom) + 96px)'}}>
+            <div className="glass pointer-events-auto flex items-center gap-3 rounded-2xl border border-[var(--border)] pl-4 pr-2 py-2 max-w-[420px] w-full" style={{boxShadow:'var(--shadow-md)'}}>
+              <span className="flex-1 text-[13px] text-[var(--text)] truncate">{t('undo.deletedN',{n:store.pendingUndo.items.length})}</span>
+              <button onClick={()=>store.undoDelete()} className="h-9 px-3 rounded-xl text-[13px] font-bold text-[var(--primary)] hover:bg-[var(--primary)]/10 shrink-0">{t('undo.action')}</button>
+              <button onClick={()=>store.clearUndo()} aria-label={t('common.close')} className="h-9 w-9 grid place-items-center rounded-xl text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X className="w-4 h-4"/></button>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ═══════════════════ FLOATING BOTTOM NAV (mobile only; desktop uses top nav) ═══════════════════ */}
