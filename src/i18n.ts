@@ -561,6 +561,10 @@ const en: Dict = {
   'overview.activeN': '{n} active',
   'overview.trackedN': '{n} tracked',
   'overview.openN': '{n} open',
+  'overview.unsortedN': '{n} unsorted',
+  'overview.habitsWeek': 'Habits · last 7 days',
+  'overview.habitsToday': 'done today',
+  'overview.habitsStreak': 'day streak',
   'overview.itemsN': '{n} items',
 
   // ── Create sheet (center +) ──
@@ -1303,6 +1307,10 @@ const ru: Dict = {
   'overview.activeN': 'активно: {n}',
   'overview.trackedN': 'отслеживается: {n}',
   'overview.openN': 'открыто: {n}',
+  'overview.unsortedN': 'не разобрано: {n}',
+  'overview.habitsWeek': 'Привычки · 7 дней',
+  'overview.habitsToday': 'сегодня выполнено',
+  'overview.habitsStreak': 'дней подряд',
   'overview.itemsN': 'элементов: {n}',
 
   // ── Create sheet (center +) ──
@@ -2045,6 +2053,10 @@ const ja: Dict = {
   'overview.activeN': 'アクティブ {n}件',
   'overview.trackedN': '記録中 {n}件',
   'overview.openN': '未完了 {n}件',
+  'overview.unsortedN': '未分類 {n}件',
+  'overview.habitsWeek': '習慣 · 過去7日間',
+  'overview.habitsToday': '今日の達成',
+  'overview.habitsStreak': '日連続',
   'overview.itemsN': '{n}件',
 
   // ── Create sheet (center +) ──

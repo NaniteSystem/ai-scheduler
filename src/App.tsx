@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { useStore, habitDueOn, goalInsight, goalProgressPct, goalStreak } from './store';
+import { useStore, habitDueOn, habitStreak, dailyCompletion, goalInsight, goalProgressPct, goalStreak } from './store';
 import { useT, useDateLocale } from './i18n';
 import { syncReminders } from './utils/notifications';
 import { initTimerActionListener } from './utils/timerNotifications';
+import { popHardwareBack, useBackClose } from './hooks/useHardwareBack';
 import { TimerBar, TimerCard, TimerLauncher } from './components/FocusTimer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
@@ -186,94 +187,56 @@ export default function App(){
   const[logFeeling,setLogFeeling]=useState<'bad'|'ok'|'good'|'great'>('good');
   const[logNotes,setLogNotes]=useState('');
   const[overviewChild,setOverviewChild]=useState(false);
-  const touchScrollRef=useRef<{x:number;y:number;lastY:number;lastT:number;el:HTMLElement;active:boolean;velocity:number;raf:number|null}|null>(null);
-
-  const findScrollableParent=(start:EventTarget|null)=>{
-    let el=start instanceof HTMLElement?start:null;
-    while(el){
-      const style=window.getComputedStyle(el);
-      const canScrollY=(style.overflowY==='auto'||style.overflowY==='scroll')&&el.scrollHeight>el.clientHeight+1;
-      if(canScrollY) return el;
-      el=el.parentElement;
-    }
-    return null;
-  };
-
-  const onAppTouchStart=(e:React.TouchEvent<HTMLDivElement>)=>{
-    const touch=e.touches[0];
-    if(!touch) return;
-    const el=findScrollableParent(e.target);
-    if(!el) { touchScrollRef.current=null; return; }
-    if(touchScrollRef.current?.raf) cancelAnimationFrame(touchScrollRef.current.raf);
-    touchScrollRef.current={x:touch.clientX,y:touch.clientY,lastY:touch.clientY,lastT:performance.now(),el,active:false,velocity:0,raf:null};
-  };
-
-  const onAppTouchMove=(e:React.TouchEvent<HTMLDivElement>)=>{
-    const info=touchScrollRef.current;
-    const touch=e.touches[0];
-    if(!info||!touch) return;
-    const now=performance.now();
-    const dx=touch.clientX-info.x;
-    const dy=touch.clientY-info.y;
-    if(!info.active){
-      if(Math.abs(dy)<6) return;
-      if(Math.abs(dy)<=Math.abs(dx)) { touchScrollRef.current=null; return; }
-      info.active=true;
-    }
-    const dt=Math.max(8,now-info.lastT);
-    const deltaY=touch.clientY-info.lastY;
-    info.velocity=(-deltaY)/dt;
-    info.el.scrollTop-=deltaY;
-    info.lastY=touch.clientY;
-    info.lastT=now;
-    if(e.cancelable) e.preventDefault();
-  };
-
-  const onAppTouchEnd=()=>{
-    const info=touchScrollRef.current;
-    if(!info) return;
-    if(!info.active||Math.abs(info.velocity)<0.05){touchScrollRef.current=null;return;}
-    let velocity=Math.max(-1.8,Math.min(1.8,info.velocity));
-    let last=performance.now();
-    const step=(now:number)=>{
-      const current=touchScrollRef.current;
-      if(!current) return;
-      const dt=Math.min(32,now-last);
-      last=now;
-      const before=current.el.scrollTop;
-      current.el.scrollTop+=velocity*dt;
-      const atEdge=current.el.scrollTop===before&&(current.el.scrollTop<=0||current.el.scrollTop>=current.el.scrollHeight-current.el.clientHeight-1);
-      velocity*=Math.pow(0.92,dt/16);
-      if(Math.abs(velocity)<0.02||atEdge){touchScrollRef.current=null;return;}
-      current.raf=requestAnimationFrame(step);
-    };
-    info.raf=requestAnimationFrame(step);
-  };
+  // ── Hardware back: layer stack (modals close top-first) ───────────────
+  useBackClose(!!store.confirmDialog,store.closeConfirm);
+  useBackClose(captureOpen,()=>setCaptureOpen(false));
+  useBackClose(quickHabitOpen,()=>setQuickHabitOpen(false));
+  useBackClose(!!store.timerLauncher,store.closeTimerLauncher);
+  useBackClose(!!store.sessionModalId,store.closeSessionModal);
+  useBackClose(store.logOpen,store.closeLog);
+  useBackClose(!!store.gtdEditTaskId,store.closeEditTask);
+  useBackClose(store.weeklyReviewOpen,store.closeWeeklyReview);
+  useBackClose(!!store.doingTaskId,()=>store.setDoingTask(null));
+  // ── Hardware back: view history (back returns to the previous screen) ─
+  type NavSnap={view:typeof activeView;goalId:string|null;child:boolean};
+  const navHistory=useRef<NavSnap[]>([]);
+  const navState=useRef<NavSnap>({view:activeView,goalId:selectedGoalId,child:overviewChild});
+  const restoringNav=useRef(false);
+  useEffect(()=>{
+    const prev=navState.current;
+    const cur:NavSnap={view:activeView,goalId:selectedGoalId,child:overviewChild};
+    navState.current=cur;
+    if(restoringNav.current){restoringNav.current=false;return;}
+    if(cur.view===prev.view&&cur.goalId===prev.goalId)return;
+    navHistory.current.push(prev);
+    if(navHistory.current.length>50)navHistory.current.shift();
+  },[activeView,selectedGoalId,overviewChild]);
   useEffect(()=>{
     if(!Capacitor.isNativePlatform()) return;
     let handle: { remove: () => Promise<void> } | undefined;
     let disposed=false;
     CapacitorApp.addListener('backButton',()=>{
-      const st=useStore.getState();
-      if(st.confirmDialog){st.closeConfirm();return;}
-      if(captureOpen){setCaptureOpen(false);return;}
-      if(st.wizardOpen){st.closeWizard();return;}
-      if(st.timerLauncher){st.closeTimerLauncher();return;}
-      if(st.sessionModalId){st.closeSessionModal();return;}
-      if(st.logOpen){st.closeLog();return;}
-      if(st.gtdEditTaskId){st.closeEditTask();return;}
-      if(st.weeklyReviewOpen){st.closeWeeklyReview();return;}
-      if(st.doingTaskId){st.setDoingTask(null);return;}
-      if(selectedGoalId||st.activeView!=='dashboard'){
+      if(popHardwareBack())return;
+      const prev=navHistory.current.pop();
+      if(prev){
+        restoringNav.current=true;
+        setSelectedGoalId(prev.goalId);
+        setOverviewChild(prev.child);
+        useStore.getState().setActiveView(prev.view);
+        return;
+      }
+      const cur=navState.current;
+      if(cur.goalId||cur.view!=='dashboard'){
+        restoringNav.current=true;
         setSelectedGoalId(null);
         setOverviewChild(false);
-        st.setActiveView('dashboard');
+        useStore.getState().setActiveView('dashboard');
         return;
       }
       CapacitorApp.exitApp();
     }).then((h)=>{if(disposed)h.remove();else handle=h;});
     return ()=>{disposed=true;handle?.remove();};
-  },[captureOpen,selectedGoalId]);
+  },[]);
   const ws=startOfWeek(addDays(new Date(),weekOffset*7),{weekStartsOn:(schedulePrefs.weekStartsOn??1)});
   const days=Array.from({length:7},(_,i)=>addDays(ws,i));
   const doneW=sessions.filter(s=>s.status==='done').length;
@@ -339,10 +302,6 @@ export default function App(){
 
   return <div
     className={`${theme==='dark'?'theme-dark ':''}h-[100dvh] w-full max-w-full flex bg-[var(--bg)] text-[var(--text)] overflow-hidden${density==='compact'?' density-compact':''}`}
-    onTouchStart={onAppTouchStart}
-    onTouchMove={onAppTouchMove}
-    onTouchEnd={onAppTouchEnd}
-    onTouchCancel={onAppTouchEnd}
   >
 
     {/* ═══════════════════ MAIN ═══════════════════ */}
@@ -600,13 +559,14 @@ export default function App(){
   const activeGoals=goals.filter(g=>(g.status??'active')==='active');
   const trackedHabits=habits.filter(h=>!h.archived);
   const openTasks=gtdTasks.filter(t=>t.status!=='done'&&t.status!=='trash'&&!t.isArchived);
+  const unsortedTasks=gtdTasks.filter(t=>t.status==='inbox'&&!t.processedAt&&!t.isArchived);
   const recurringTasks=openTasks.filter(t=>t.recurring);
   const archivedCount=gtdTasks.filter(t=>t.isArchived).length+goals.filter(g=>g.status==='completed').length;
   const repeatLabel=(p:string)=>t('gtd.repeat'+p.charAt(0).toUpperCase()+p.slice(1));
   const tiles=[
     {id:'goals',Ic:Target,c:'#6467f2',label:t('bottomNav.goals'),sub:t('overview.activeN',{n:activeGoals.length})},
     {id:'habits',Ic:Flame,c:'#e0532f',label:t('bottomNav.habits'),sub:t('overview.trackedN',{n:trackedHabits.length})},
-    {id:'inbox',Ic:Inbox,c:'#0d9488',label:t('overview.tasks'),sub:t('overview.openN',{n:openTasks.length})},
+    {id:'inbox',Ic:Inbox,c:'#0d9488',label:t('overview.tasks'),sub:t('overview.unsortedN',{n:unsortedTasks.length})},
     {id:'archive',Ic:Archive,c:'#6c7280',label:t('overview.archive'),sub:t('overview.itemsN',{n:archivedCount})},
   ];
   return <div className="px-4 md:px-10 py-6 md:py-8 max-w-[1300px] space-y-7">
@@ -653,6 +613,36 @@ export default function App(){
     </div>
     <div className="tcard p-5"><div className="text-[12px] font-bold text-[var(--text)] mb-1">{t('overview.timeByTask')}</div><EnergyChart/></div>
   </div>
+
+  {/* ── Habits week summary ── */}
+  {trackedHabits.length>0&&(()=>{
+    const days=Array.from({length:7},(_,i)=>addDays(new Date(),i-6));
+    const today=dailyCompletion(trackedHabits,new Date());
+    const bestStreak=Math.max(0,...trackedHabits.map(h=>habitStreak(h)));
+    return <button onClick={()=>{store.setActiveView('habits');setSelectedGoalId(null);setOverviewChild(true);}} className="tcard lift p-6 anim-fade anim-delay-2 w-full text-left block">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{t('overview.habitsWeek')}</div>
+        <ChevronRight className="w-4 h-4 text-[var(--text-dim)]"/>
+      </div>
+      <div className="flex items-end justify-between gap-2 h-[72px] mb-4">
+        {days.map((d,i)=>{
+          const dc=dailyCompletion(trackedHabits,d);
+          const pct=dc.pct??0;
+          const isToday=i===6;
+          return <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full">
+            <div className="flex-1 w-full max-w-[26px] rounded-lg bg-[var(--surface-2)] overflow-hidden flex flex-col justify-end">
+              <div className="w-full rounded-lg transition-all" style={{height:`${Math.round(pct*100)}%`,background:dc.total===0?'transparent':'#e0532f',opacity:isToday?1:.55}}/>
+            </div>
+            <div className={`text-[10px] font-semibold ${isToday?'text-[var(--text)]':'text-[var(--text-dim)]'}`}>{format(d,'EEEEE',{locale})}</div>
+          </div>;
+        })}
+      </div>
+      <div className="flex items-center gap-5">
+        <div className="text-[12px] text-[var(--text-dim)]"><span className="text-[15px] font-bold mono text-[var(--text)]">{today.done}/{today.total}</span> {t('overview.habitsToday')}</div>
+        {bestStreak>0&&<div className="flex items-center gap-1 text-[12px] text-[var(--text-dim)]"><Flame className="w-4 h-4 text-[#e0532f]"/><span className="text-[15px] font-bold mono text-[var(--text)]">{bestStreak}</span> {t('overview.habitsStreak')}</div>}
+      </div>
+    </button>;
+  })()}
 
   {/* ── Per-goal breakdown ── */}
   {activeGoals.length>0&&<div className="tcard p-6 anim-fade anim-delay-2">
