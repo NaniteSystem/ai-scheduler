@@ -3,7 +3,7 @@ import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticSuccess, hapticTick } from '../utils/haptics';
 import { nextDueDate, useStore } from '../store';
-import { useT } from '../i18n';
+import { useT, useDateLocale } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
 import { Drawer } from './ui/Drawer';
 import { SelectMenu } from './ui/SelectMenu';
@@ -593,6 +593,15 @@ function EditTaskForm({ task }: { task: GTDTask }) {
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.dueDate')}</label>
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none" />
+              <div className="flex gap-1 mt-1.5 flex-wrap">
+                {([[tr('common.today'), 0], [tr('common.tomorrow'), 1], [tr('gtd.nextWeek'), 7]] as [string, number][]).map(([label, off]) => {
+                  const d = new Date(); d.setDate(d.getDate() + off);
+                  const key = format(d, 'yyyy-MM-dd');
+                  const a = dueDate === key;
+                  return <button key={off} type="button" onClick={() => setDueDate(a ? '' : key)}
+                    className={`h-6 px-2 rounded-md text-[10px] font-bold transition-colors ${a ? 'bg-[var(--primary)]/15 text-[var(--primary)]' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{label}</button>;
+                })}
+              </div>
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.durationMin')}</label>
@@ -763,6 +772,7 @@ type TriageDestination = 'today' | 'other' | 'next-action' | 'inbox' | 'schedule
 
 export function GTDView({ onBack }: { onBack?: () => void }) {
   const tr = useT();
+  const dfLocale = useDateLocale();
   const {
     gtdTasks, gtdFilter, setGTDFilter, activeContext, setActiveContext,
     searchQuery, setSearchQuery, reorderTasks, openWeeklyReview,
@@ -828,6 +838,12 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
     .filter(t => gtdFilter === 'today' || priorityFilter === 'all' || t.priority === priorityFilter)
     .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.tags || []).some(tag => tag.includes(searchQuery.toLowerCase())))
     .sort((a, b) => {
+      if (gtdFilter === 'scheduled') {
+        // Upcoming view groups by date — always chronological (Things-style)
+        const ad = a.scheduledDate || a.dueDate || '9999', bd = b.scheduledDate || b.dueDate || '9999';
+        if (ad !== bd) return ad.localeCompare(bd);
+        return a.priority - b.priority;
+      }
       if (sortBy === 'priority') return a.priority - b.priority;
       if (sortBy === 'due') {
         if (!a.dueDate) return 1; if (!b.dueDate) return -1;
@@ -835,6 +851,17 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
       }
       return b.createdAt.localeCompare(a.createdAt);
     });
+
+  // Date-group headers for the Scheduled (upcoming) list
+  const taskDateKey = (t: GTDTask) => t.scheduledDate || t.dueDate || '';
+  const dateGroupLabel = (key: string): string => {
+    if (!key) return tr('gtd.noDate');
+    const d = parseISO(key);
+    if (isToday(d)) return tr('common.today');
+    if (isTomorrow(d)) return tr('common.tomorrow');
+    if (key < todayStr()) return tr('gtd.overdueLabel');
+    return format(d, 'EEEE, MMM d', { locale: dfLocale });
+  };
 
   const projectGroups = Array.from(filtered.reduce((acc, task) => {
     const name = task.project?.trim() || tr('gtd.noProject');
@@ -1309,7 +1336,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
 
         {viewMode === 'lists' && <div className={gtdFilter === 'reference' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-3'}>
           <AnimatePresence mode="popLayout" initial={false}>
-          {filtered.map(task => (
+          {filtered.map((task, idx) => (
             <motion.div
               key={task.id}
               layout
@@ -1318,6 +1345,12 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
+            {gtdFilter === 'scheduled' && (idx === 0 || taskDateKey(task) !== taskDateKey(filtered[idx - 1])) && (
+              <div className="flex items-center gap-2 pt-2 pb-3 first:pt-0">
+                <span className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{dateGroupLabel(taskDateKey(task))}</span>
+                <span className="flex-1 h-px bg-[var(--border)]" />
+              </div>
+            )}
             {/* inner div keeps native HTML5 drag (motion would swallow onDragStart/End) */}
             <div
               draggable={!selecting}
