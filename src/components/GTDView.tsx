@@ -529,6 +529,7 @@ function EditTaskForm({ task }: { task: GTDTask }) {
   const [project, setProject] = useState(task.project || '');
   const [scheduledDate, setScheduledDate] = useState(task.scheduledDate || '');
   const [recurring, setRecurring] = useState<RecurringPattern | ''>(task.recurring || '');
+  const [recurFromCompletion, setRecurFromCompletion] = useState(!!task.recurFromCompletion);
   const [remindAt, setRemindAt] = useState(task.remindAt ? task.remindAt.slice(0, 16) : '');
 
   const save = () => {
@@ -545,6 +546,7 @@ function EditTaskForm({ task }: { task: GTDTask }) {
       scheduledDate: scheduledDate || undefined,
       subtasks,
       recurring: recurring || undefined,
+      recurFromCompletion: recurring && recurFromCompletion ? true : undefined,
       remindAt: remindAt || undefined,
     });
     if (status !== task.status) processTask(task.id, status);
@@ -658,6 +660,12 @@ function EditTaskForm({ task }: { task: GTDTask }) {
                   { value: 'weekly', label: tr('gtd.repeatWeekly') },
                   { value: 'monthly', label: tr('gtd.repeatMonthly') },
                 ]} />
+              {recurring && (
+                <button type="button" onClick={() => setRecurFromCompletion(v => !v)}
+                  className={`mt-1.5 h-6 px-2 rounded-md text-[10px] font-bold transition-colors ${recurFromCompletion ? 'bg-[var(--primary)]/15 text-[var(--primary)]' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                  {recurFromCompletion ? '✓ ' : ''}{tr('gtd.repeatFromDone')}
+                </button>
+              )}
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -770,9 +778,18 @@ const SORTED_TABS: { id: string; label: string; icon: any; color: string }[] = [
 
 type TriageDestination = 'today' | 'other' | 'next-action' | 'inbox' | 'scheduled';
 
+const SWIPE_HINT_KEY = 'nebulla-swipe-hint-dismissed';
+
 export function GTDView({ onBack }: { onBack?: () => void }) {
   const tr = useT();
   const dfLocale = useDateLocale();
+  const [swipeHintVisible, setSwipeHintVisible] = useState(() => {
+    try { return !localStorage.getItem(SWIPE_HINT_KEY); } catch { return false; }
+  });
+  const dismissSwipeHint = () => {
+    setSwipeHintVisible(false);
+    try { localStorage.setItem(SWIPE_HINT_KEY, '1'); } catch { /* private mode */ }
+  };
   const {
     gtdTasks, gtdFilter, setGTDFilter, activeContext, setActiveContext,
     searchQuery, setSearchQuery, reorderTasks, openWeeklyReview,
@@ -1304,6 +1321,15 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             <button disabled={selectedCount === 0} onClick={() => runBulk('next-action')} className="h-8 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.moveNext')}</button>
             <button disabled={selectedCount === 0} onClick={() => runBulk('today')} className="h-8 px-3 rounded-lg bg-[var(--surface-2)] text-[var(--text)] text-[11px] font-bold disabled:opacity-40">{tr('gtd.focusToday')}</button>
             <button disabled={selectedCount === 0} onClick={() => runBulk('trash')} className="h-8 px-3 rounded-lg bg-red-500/10 text-red-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.trash')}</button>
+          </div>
+        )}
+
+        {/* One-time swipe hint (touch devices) */}
+        {viewMode === 'lists' && filtered.length > 0 && swipeHintVisible && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 md:hidden">
+            <span className="text-lg shrink-0">👉</span>
+            <span className="flex-1 text-[12px] text-[var(--text-dim)]">{tr('gtd.swipeHint')}</span>
+            <button onClick={dismissSwipeHint} aria-label={tr('common.close')} className="w-8 h-8 grid place-items-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X className="w-4 h-4" /></button>
           </div>
         )}
 

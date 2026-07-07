@@ -713,7 +713,7 @@ export const useStore = create<S>()(persist((set) => ({
     const linkedSessionId = orig?.sessionId;
     // Completing a recurring task spawns the next occurrence (Microsoft To Do behaviour).
     if (status === 'done' && orig && orig.recurring && orig.status !== 'done') {
-      const due = nextDueDate(orig.dueDate, orig.recurring);
+      const due = nextDueDate(orig.recurFromCompletion ? undefined : orig.dueDate, orig.recurring);
       const next: GTDTask = {
         ...orig,
         id: `t${Date.now()}`,

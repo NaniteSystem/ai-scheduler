@@ -149,6 +149,7 @@ export interface GTDTask {
   tags?: string[];
   subtasks?: { id: string; title: string; done: boolean }[];
   recurring?: RecurringPattern;
+  recurFromCompletion?: boolean;   // Todoist "every!": next occurrence counts from completion, not due date
   estimatedPomodoros?: number;
   completedPomodoros?: number;
   isTodayFocus?: boolean;
