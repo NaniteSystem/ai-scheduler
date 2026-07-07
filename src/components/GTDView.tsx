@@ -1326,13 +1326,31 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
           );
         })()}
 
-        {viewMode === 'lists' && gtdFilter === 'today' && filtered.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-12 text-center">
-            <Sun className="w-12 h-12 text-amber-500/20 mx-auto mb-4" />
-            <h3 className="text-[16px] font-medium text-[var(--text)] mb-1">{tr('gtd.noFocusToday')}</h3>
-            <p className="text-[13px] text-[var(--text-dim)]">{tr('gtd.noFocusDesc')}</p>
-          </div>
-        )}
+        {viewMode === 'lists' && gtdFilter === 'today' && filtered.length === 0 && (() => {
+          const doneToday = gtdTasks.filter(t => t.status === 'done' && (t.completedAt || '').slice(0, 10) === todayStr()).length;
+          if (doneToday > 0) return (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-12 text-center overflow-hidden relative">
+              <motion.div initial={{ scale: 0.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 14 }} className="text-5xl mb-4">🎉</motion.div>
+              {[...Array(6)].map((_, i) => (
+                <motion.span key={i} className="absolute text-lg" style={{ left: `${14 + i * 14}%`, top: '18%' }}
+                  initial={{ y: 0, opacity: 0 }} animate={{ y: [-6, -26], opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.4, delay: 0.15 + i * 0.12, repeat: Infinity, repeatDelay: 2.2 }}>
+                  {['✨', '🌟', '✨', '💫', '✨', '🌟'][i]}
+                </motion.span>
+              ))}
+              <h3 className="text-[16px] font-bold text-[var(--text)] mb-1">{tr('gtd.allDoneTitle')}</h3>
+              <p className="text-[13px] text-[var(--text-dim)]">{tr('gtd.allDoneDesc', { n: doneToday })}</p>
+            </motion.div>
+          );
+          return (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-12 text-center">
+              <Sun className="w-12 h-12 text-amber-500/20 mx-auto mb-4" />
+              <h3 className="text-[16px] font-medium text-[var(--text)] mb-1">{tr('gtd.noFocusToday')}</h3>
+              <p className="text-[13px] text-[var(--text-dim)]">{tr('gtd.noFocusDesc')}</p>
+            </div>
+          );
+        })()}
 
         {viewMode === 'lists' && <div className={gtdFilter === 'reference' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-3'}>
           <AnimatePresence mode="popLayout" initial={false}>

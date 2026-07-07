@@ -207,7 +207,13 @@ function TemplatesDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: (
 // ─── Analytics (H2) ────────────────────────────────────────────────────────
 
 function HeatStrip({ h }: { h: Habit }) {
+  const { setHabitStatus, clearHabitDay } = useStore();
   const cells = habitHeatmap(h, 84);
+  // Tap a due day to retro-log it: empty → done → cleared (missed days happen — let people fix the record)
+  const cycle = (date: string, status?: string) => {
+    if (status === 'done') clearHabitDay(h.id, date);
+    else setHabitStatus(h.id, date, 'done');
+  };
   return (
     <div className="grid grid-cols-12 grid-rows-7 gap-1 w-full">
       {cells.map(c => {
@@ -215,7 +221,11 @@ function HeatStrip({ h }: { h: Habit }) {
         if (c.status === 'failed') style = { background: '#ef444455' };
         else if (c.ratio > 0) style = { background: h.color, opacity: 0.25 + c.ratio * 0.75 };
         else if (c.due) style = { background: 'var(--border)' };
-        return <div key={c.date} title={`${c.date}${c.status ? ' · ' + c.status : ''}`} className="aspect-square min-w-0 rounded-[5px]" style={style} />;
+        return c.due
+          ? <button key={c.date} type="button" onClick={() => cycle(c.date, c.status)} aria-label={c.date}
+              title={`${c.date}${c.status ? ' · ' + c.status : ''}`}
+              className="aspect-square min-w-0 rounded-[5px] transition-transform active:scale-125 hover:ring-1 hover:ring-[var(--text-dim)]" style={style} />
+          : <div key={c.date} title={c.date} className="aspect-square min-w-0 rounded-[5px]" style={style} />;
       })}
     </div>
   );
