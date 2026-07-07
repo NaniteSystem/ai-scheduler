@@ -330,8 +330,9 @@ export default function App(){
             const a=activeView===id;
             return (
               <button key={id} onClick={()=>{store.setActiveView(id as any);setSelectedGoalId(null);setOverviewChild(false);}}
-                className={`h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors ${a?'bg-[var(--primary)]/12 text-[var(--primary)]':'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}>
-                <Ic className="w-[18px] h-[18px]" strokeWidth={a?2.5:2}/>{label}
+                className={`relative h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors ${a?'text-[var(--primary)]':'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}>
+                {a&&<motion.span layoutId="top-nav-pill" transition={{type:'spring',stiffness:480,damping:38}} className="absolute inset-0 rounded-xl bg-[var(--primary)]/12"/>}
+                <Ic className="relative w-[18px] h-[18px]" strokeWidth={a?2.5:2}/><span className="relative">{label}</span>
               </button>
             );
           };
@@ -720,7 +721,7 @@ export default function App(){
                   className={`relative flex-1 min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors ${a?'text-[var(--primary)]':'text-[var(--text-mute)] active:text-[var(--text)]'}`}>
                   <Ic className="w-[22px] h-[22px]" strokeWidth={a?2.5:2}/>
                   <span className="text-[10px] font-semibold leading-none">{label}</span>
-                  {a&&<span className="absolute bottom-1.5 w-5 h-[3px] rounded-full bg-[var(--primary)]"/>}
+                  {a&&<motion.span layoutId="bottom-nav-dot" transition={{type:'spring',stiffness:500,damping:35}} className="absolute bottom-1.5 w-5 h-[3px] rounded-full bg-[var(--primary)]"/>}
                 </button>
               );
             };

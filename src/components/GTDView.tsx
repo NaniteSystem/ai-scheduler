@@ -1022,11 +1022,13 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             const cnt = bucketCount(b.id);
             return (
               <button key={b.id} data-bucket-id={b.id} onClick={() => setGTDFilter(b.id)}
-                className={`h-9 px-3 rounded-xl text-[12px] font-medium flex items-center gap-2 shrink-0 border transition-all ${a ? 'bg-[var(--surface-2)] text-[var(--text)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}>
-                <Ic className="w-3.5 h-3.5" style={{ color: a ? b.color : undefined }} />
-                {tr(b.label)}
+                className={`relative h-9 px-3 rounded-xl text-[12px] font-medium flex items-center gap-2 shrink-0 transition-colors ${a ? 'text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                {a && <motion.span layoutId="gtd-tab-pill" transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                  className="absolute inset-0 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]" />}
+                <Ic className="relative w-3.5 h-3.5" style={{ color: a ? b.color : undefined }} />
+                <span className="relative">{tr(b.label)}</span>
                 {cnt > 0 && (
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md" style={{ color: a ? b.color : 'var(--text-mute)', background: a ? `${b.color}20` : 'var(--surface-2)' }}>{cnt}</span>
+                  <span className="relative text-[11px] font-bold px-1.5 py-0.5 rounded-md" style={{ color: a ? b.color : 'var(--text-mute)', background: a ? `${b.color}20` : 'var(--surface-2)' }}>{cnt}</span>
                 )}
               </button>
             );
