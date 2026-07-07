@@ -9,7 +9,7 @@ import { popHardwareBack, useBackClose } from './hooks/useHardwareBack';
 import { TimerBar, TimerCard, TimerLauncher } from './components/FocusTimer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
-import { GTDView } from './components/GTDView';
+import { GTDView, parseNL } from './components/GTDView';
 import { HabitsView, HabitModal } from './components/HabitsView';
 import { ArchiveView } from './components/ArchiveView';
 import { ScheduleView } from './components/ScheduleView';
@@ -252,7 +252,16 @@ export default function App(){
   const readPages=catSessions('reading').reduce((a,s)=>+(a+(s.progressLog?.value||0)),0);
   const sportKm=catSessions('sport').reduce((a,s)=>+(a+(s.progressLog?.value||0)),0);
 
-  const capture=()=>{const t=qt.trim();if(!t)return;store.captureTask(t,qd);setQt('')};
+  const capture=()=>{
+    const raw=qt.trim();if(!raw)return;
+    const parsed=parseNL(raw);
+    store.captureTask(parsed.title,parsed.durationMinutes||qd);
+    if(parsed.priority||parsed.context||parsed.tags?.length||parsed.dueDate){
+      const newId=useStore.getState().gtdTasks[0]?.id;
+      if(newId)store.updateTask(newId,{priority:parsed.priority||3,context:parsed.context,tags:parsed.tags||[],dueDate:parsed.dueDate});
+    }
+    setQt('');
+  };
   const goalColor=(gid:string)=>goals.find(g=>g.id===gid)?.color||'#22c55e';
   const goalEmoji=(gid:string)=>goals.find(g=>g.id===gid)?.emoji||'✓';
   const overviewSectionViews = new Set(['goals', 'habits', 'inbox', 'archive', 'planner']);
@@ -269,7 +278,7 @@ export default function App(){
   const visibleSession=(s:Session)=>s.status!=='done';
   const timedToday=sessionsTodayAll.filter(s=>!s.allDay&&visibleSession(s)).sort(byStart);
   const allDayToday=sessionsTodayAll.filter(s=>s.allDay&&visibleSession(s));
-  const tasksToday=gtdTasks.filter(tk=>taskActive(tk)&&(tk.isTodayFocus||(tk.dueDate&&isSameDay(parseISO(tk.dueDate),_now))));
+  const tasksToday=gtdTasks.filter(tk=>taskActive(tk)&&(tk.isTodayFocus||(tk.dueDate&&tk.dueDate<=format(_now,'yyyy-MM-dd'))));
   const timedTomorrow=sessionsTomorrowAll.filter(s=>!s.allDay&&visibleSession(s)).sort(byStart);
   const allDayTomorrow=sessionsTomorrowAll.filter(s=>s.allDay&&visibleSession(s));
   const tasksTomorrow=gtdTasks.filter(tk=>taskActive(tk)&&tk.dueDate&&isSameDay(parseISO(tk.dueDate),_tomorrow));

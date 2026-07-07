@@ -178,17 +178,22 @@ export function goalInsight(goal: Goal, sessions: Session[], today: Date = new D
 }
 
 /** Next due date (yyyy-MM-dd) for a recurring task, from its current due date (or today). */
-export function nextDueDate(base: string | undefined, pattern: RecurringPattern): string {
-  const start = base ? parseISO(base) : new Date();
-  let d: Date;
-  switch (pattern) {
-    case 'daily':    d = addDays(start, 1); break;
-    case 'weekly':   d = addWeeks(start, 1); break;
-    case 'monthly':  d = addMonths(start, 1); break;
-    case 'weekdays': { d = addDays(start, 1); while (isWeekend(d)) d = addDays(d, 1); break; }
-    case 'weekends': { d = addDays(start, 1); while (!isWeekend(d)) d = addDays(d, 1); break; }
-    default:         d = addWeeks(start, 1);
-  }
+export function nextDueDate(base: string | undefined, pattern: RecurringPattern, today: Date = new Date()): string {
+  const step = (from: Date): Date => {
+    switch (pattern) {
+      case 'daily':    return addDays(from, 1);
+      case 'weekly':   return addWeeks(from, 1);
+      case 'monthly':  return addMonths(from, 1);
+      case 'weekdays': { let d = addDays(from, 1); while (isWeekend(d)) d = addDays(d, 1); return d; }
+      case 'weekends': { let d = addDays(from, 1); while (!isWeekend(d)) d = addDays(d, 1); return d; }
+      default:         return addWeeks(from, 1);
+    }
+  };
+  // The next occurrence is always in the future: completing an overdue "daily"
+  // lands on tomorrow, an overdue "weekly" on the next matching weekday, etc.
+  const todayKey = format(today, 'yyyy-MM-dd');
+  let d = step(base ? parseISO(base) : today);
+  while (format(d, 'yyyy-MM-dd') <= todayKey) d = step(d);
   return format(d, 'yyyy-MM-dd');
 }
 

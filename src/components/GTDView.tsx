@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { nextDueDate, useStore } from '../store';
 import { useT } from '../i18n';
@@ -14,7 +15,7 @@ import {
   SlidersHorizontal, MoreHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Sun, Sparkles, BookOpen, Layers, Layers3, Target, Repeat, Bell
 } from 'lucide-react';
-import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 
 const PRIORITY_CONFIG = {
   1: { label: 'P1', color: '#ef4444', bg: '#ef444420', dot: 'bg-red-500' },
@@ -53,13 +54,34 @@ const STATUS_CONFIG: Record<GTDStatus | string, { label: string; icon: any; colo
   trash:         { label: 'gtd.status.trash',         icon: Trash2,     color: '#ef4444', desc: 'gtd.status.trashDesc' },
 };
 
+// ─── Due-date helpers (date-only strings; avoids isPast() marking today as overdue) ──
+const todayStr = () => format(new Date(), 'yyyy-MM-dd');
+export const isOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate < todayStr();
+const dueTodayOrOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate <= todayStr();
+
 // ─── Natural Language Parser (lightweight) ─────────────────────────────────
-function parseNL(input: string): { title: string; priority?: Priority; context?: TaskContext; durationMinutes?: number; tags?: string[] } {
+export function parseNL(input: string): { title: string; priority?: Priority; context?: TaskContext; durationMinutes?: number; tags?: string[]; dueDate?: string } {
   let title = input;
   let priority: Priority | undefined;
   let context: TaskContext | undefined;
   let durationMinutes: number | undefined;
   let tags: string[] = [];
+  let dueDate: string | undefined;
+
+  // Dates: today / tomorrow keywords (EN/RU/JA), like Todoist/TickTick quick add
+  const dateWords: [RegExp, number][] = [
+    [/(?:^|\s)(today|сегодня|今日)(?=\s|$)/i, 0],
+    [/(?:^|\s)(tomorrow|завтра|明日)(?=\s|$)/i, 1],
+  ];
+  for (const [re, offset] of dateWords) {
+    const m = title.match(re);
+    if (m) {
+      const d = new Date(); d.setDate(d.getDate() + offset);
+      dueDate = format(d, 'yyyy-MM-dd');
+      title = title.replace(m[0], ' ').trim();
+      break;
+    }
+  }
 
   // Priority: p1, p2, p3, p4 or !!! !! !
   const pMatch = title.match(/\b(p[1-4]|!!!|!!|!)\b/i);
@@ -88,7 +110,7 @@ function parseNL(input: string): { title: string; priority?: Priority; context?:
     title = title.replace(/#\w+/g, '').trim();
   }
 
-  return { title: title.trim() || input, priority, context, durationMinutes, tags };
+  return { title: title.trim() || input, priority, context, durationMinutes, tags, dueDate };
 }
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
@@ -97,12 +119,13 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
   const { processTask, deleteTask, toggleTodayFocus, openEditTask, openTimerLauncher, setDoingTask, scheduleFromTask } = useStore();
   const [expanded, setExpanded] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  useBackClose(moreOpen, () => setMoreOpen(false));
   const [completing, setCompleting] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const completeTimer = useRef<number | null>(null);
   const p = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG[4];
   const ctx = task.context ? CONTEXT_CONFIG[task.context] : null;
-  const isDue = task.dueDate && isPast(parseISO(task.dueDate)) && task.status !== 'done';
+  const isDue = isOverdue(task) && task.status !== 'done';
   const isTodayDue = task.dueDate && isToday(parseISO(task.dueDate));
   const isTomorrowDue = task.dueDate && isTomorrow(parseISO(task.dueDate));
   const nextRepeat = task.recurring ? nextDueDate(task.dueDate || task.scheduledDate || task.createdAt.slice(0, 10), task.recurring) : null;
@@ -406,6 +429,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
     if (parsed.context) hints.push(parsed.context);
     if (parsed.durationMinutes) hints.push(`${parsed.durationMinutes}m`);
     if (parsed.tags?.length) hints.push(parsed.tags.map(t => `#${t}`).join(' '));
+    if (parsed.dueDate) hints.push(parsed.dueDate === format(new Date(), 'yyyy-MM-dd') ? tr('common.today') : tr('common.tomorrow'));
     setHint(hints.join(' · '));
   };
 
@@ -414,7 +438,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
     const parsed = parseNL(input);
     const store = useStore.getState();
     store.captureTask(parsed.title, parsed.durationMinutes || 5);
-    if (parsed.priority || parsed.context || parsed.tags?.length) {
+    if (parsed.priority || parsed.context || parsed.tags?.length || parsed.dueDate) {
       // Re-read state: captureTask created a new task, prepended to the list.
       const newId = useStore.getState().gtdTasks[0]?.id;
       if (newId) {
@@ -422,6 +446,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
           priority: parsed.priority || 3,
           context: parsed.context,
           tags: parsed.tags || [],
+          dueDate: parsed.dueDate,
         });
       }
     }
@@ -734,6 +759,8 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  useBackClose(filtersOpen, () => setFiltersOpen(false));
+  useBackClose(selecting, () => { setSelecting(false); setSelectedIds([]); });
   const [viewMode, setViewMode] = useState<'inbox' | 'lists'>('inbox');
   const tabsRef = useRef<HTMLDivElement>(null);
   const viewSwipeStart = useRef<{ x: number; y: number } | null>(null);
@@ -766,9 +793,9 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   // Count helper for the bucket tabs
   const bucketCount = (id: string) => {
     const activeTasks = gtdTasks.filter(t => t.status !== 'done' && t.status !== 'trash' && !t.isArchived);
-    if (id === 'today') return activeTasks.filter(t => t.status !== 'scheduled' && (t.isTodayFocus || (t.status !== 'next-action' && t.dueDate && isToday(parseISO(t.dueDate))))).length;
+    if (id === 'today') return activeTasks.filter(t => t.status !== 'scheduled' && (t.isTodayFocus || dueTodayOrOverdue(t))).length;
     if (id === 'other') return activeTasks.filter(t => otherStatuses.includes(t.status)).length;
-    if (id === 'next-action') return activeTasks.filter(t => t.status === 'next-action' && !t.isTodayFocus && !(t.dueDate && isToday(parseISO(t.dueDate)))).length;
+    if (id === 'next-action') return activeTasks.filter(t => t.status === 'next-action' && !t.isTodayFocus && !dueTodayOrOverdue(t)).length;
     return activeTasks.filter(t => t.status === id).length;
   };
 
@@ -776,9 +803,9 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const filtered = gtdTasks
     .filter(t => (t.status !== 'trash' && t.status !== 'done') || gtdFilter === 'done' || gtdFilter === 'trash')
     .filter(t => {
-      if (gtdFilter === 'today') return t.status !== 'scheduled' && (t.isTodayFocus || (t.status !== 'next-action' && t.dueDate && isToday(parseISO(t.dueDate))));
+      if (gtdFilter === 'today') return t.status !== 'scheduled' && (t.isTodayFocus || dueTodayOrOverdue(t));
       if (gtdFilter === 'other') return otherStatuses.includes(t.status);
-      if (gtdFilter === 'next-action') return t.status === 'next-action' && !t.isTodayFocus && !(t.dueDate && isToday(parseISO(t.dueDate)));
+      if (gtdFilter === 'next-action') return t.status === 'next-action' && !t.isTodayFocus && !dueTodayOrOverdue(t);
       return t.status === gtdFilter;
     })
     .filter(t => gtdFilter === 'today' || activeContext === 'all' || t.context === activeContext)
