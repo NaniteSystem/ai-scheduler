@@ -395,8 +395,8 @@ interface S {
   setNotifPref: (patch: { habitRemindersEnabled?: boolean; defaultReminderTime?: string }) => void;
   density: 'comfortable' | 'compact';
   setDensity: (d: 'comfortable' | 'compact') => void;
-  theme: 'light' | 'dark';
-  setTheme: (t: 'light' | 'dark') => void;
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (t: 'light' | 'dark' | 'system') => void;
   userName: string;
   userProfile: { focus: string[]; struggles: string[]; sleep: string } | null;
   setUserProfile: (p: { focus: string[]; struggles: string[]; sleep: string }) => void;

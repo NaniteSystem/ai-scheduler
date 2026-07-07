@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useStore, habitDueOn, habitStreak, dailyCompletion, goalInsight, goalProgressPct, goalStreak } from './store';
 import { useT, useDateLocale } from './i18n';
+import { useEffectiveTheme } from './hooks/useEffectiveTheme';
 import { syncReminders } from './utils/notifications';
 import { initTimerActionListener } from './utils/timerNotifications';
 import { popHardwareBack, useBackClose } from './hooks/useHardwareBack';
@@ -172,7 +173,8 @@ export default function App(){
   const t=useT();
   const locale=useDateLocale();
   const store=useStore();
-  const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,introCourseCompleted,schedulePrefs,density,theme}=store;
+  const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,introCourseCompleted,schedulePrefs,density}=store;
+  const theme=useEffectiveTheme();
   useEffect(()=>{ syncReminders(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits]);
   const undoTs=store.pendingUndo?.ts;
   useEffect(()=>{ if(!undoTs) return; const id=setTimeout(()=>useStore.getState().clearUndo(),5000); return ()=>clearTimeout(id); },[undoTs]);

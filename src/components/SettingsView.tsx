@@ -124,7 +124,7 @@ export function SettingsView() {
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><LayoutGrid className="w-3.5 h-3.5" /> {t('settings.appearance')}</div>
         <div className="text-[12px] text-[var(--text)] font-medium mb-2">{t('settings.theme')}</div>
         <div className="flex gap-2">
-          {([['light', t('settings.themeLight')], ['dark', t('settings.themeDark')]] as const).map(([val, label]) => (
+          {([['system', t('settings.themeSystem')], ['light', t('settings.themeLight')], ['dark', t('settings.themeDark')]] as const).map(([val, label]) => (
             <button key={val} onClick={() => setTheme(val)}
               className={`flex-1 h-10 rounded-xl text-[12px] font-bold border transition-all flex items-center justify-center gap-2 ${theme === val ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'bg-[var(--surface)] text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--border)]'}`}>
               {theme === val && <Check className="w-4 h-4" />}{label}

@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, BarChart3, Calendar, Check, Circle, Clock, Flame, Home, Inbox, Layers, Plus, Sparkles, Target, Timer, User } from 'lucide-react';
 import { useLang } from '../i18n';
 import { useStore } from '../store';
+import { useEffectiveTheme } from '../hooks/useEffectiveTheme';
 
 type CourseStep = {
   title: string;
@@ -258,8 +260,10 @@ const copy: Record<string, { skip: string; back: string; next: string; finish: s
 
 export function IntroCourse() {
   const lang = useLang();
-  const { completeIntroCourse, theme } = useStore();
+  const { completeIntroCourse } = useStore();
+  const theme = useEffectiveTheme();
   const [index, setIndex] = useState(0);
+  useBackClose(index > 0, () => setIndex(i => i - 1));
   const data = copy[lang] || copy.en;
   const step = data.steps[index];
   const Icon = step.icon;

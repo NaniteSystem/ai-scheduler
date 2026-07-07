@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { useStore } from '../store';
+import { useEffectiveTheme } from '../hooks/useEffectiveTheme';
 import { useT } from '../i18n';
 import { ArrowRight, ArrowLeft, Check, Moon, Sun } from 'lucide-react';
 import { NebullaMark } from './BrandLogo';
@@ -16,9 +18,11 @@ const SLEEP_PREFS: Record<string, { wakeTime: string; sleepTime: string }> = {
 
 export function Onboarding() {
   const t = useT();
-  const { completeOnboarding, updatePrefs, setUserProfile, theme, setTheme, lang, setLang } = useStore();
+  const { completeOnboarding, updatePrefs, setUserProfile, setTheme, lang, setLang } = useStore();
+  const theme = useEffectiveTheme();
 
   const [step, setStep] = useState(0);
+  useBackClose(step > 0, () => setStep(s => s - 1));
   const [name, setName] = useState('');
   const [focus, setFocus] = useState<string[]>([]);
   const [peak, setPeak] = useState<'morning' | 'afternoon' | 'evening' | ''>('');
