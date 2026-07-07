@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { CATEGORY_META } from '../types';
 import type { Goal, RoadmapDepth, Category } from '../types';
 import { requestRoadmap, requestRoadmapQuestions, type RoadmapResult } from '../ai/roadmap';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { AiOfflineError } from '../ai/llm';
 import { X, ArrowLeft, ArrowRight, Wand2, Sparkles, RotateCcw, AlertTriangle, WifiOff, Check, Edit2 } from 'lucide-react';
 
@@ -31,6 +32,14 @@ export function GoalCreateWizard() {
   const [errKind, setErrKind] = useState<ErrKind>('unavailable');
 
   const close = () => store.closeWizard();
+
+  // Hardware back mirrors the on-screen back buttons: step back through the
+  // wizard, and only close it from the first screen.
+  const BACK_STEP: Partial<Record<Step, Step>> = { intent: 'mode', manual: 'mode', depth: 'intent', questions: 'intent', refuse: 'intent' };
+  useBackClose(true, () => {
+    const prev = BACK_STEP[step];
+    if (prev) setStep(prev); else close();
+  });
 
   const fail = (e: unknown) => {
     setErrKind(e instanceof AiOfflineError ? 'offline' : 'unavailable');

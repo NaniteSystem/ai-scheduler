@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { useStore, goalInsight, goalProgressPct, goalStreak } from '../store';
 import type { Goal, RoadmapNode } from '../types';
 import {
@@ -44,6 +45,9 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const [mlTitle, setMlTitle] = useState('');
   const [mlTarget, setMlTarget] = useState(1);
   const [nodeModal, setNodeModal] = useState<{ phaseTitle: string; node: RoadmapNode } | null>(null);
+  useBackClose(editOpen, () => setEditOpen(false));
+  useBackClose(completeOpen, () => setCompleteOpen(false));
+  useBackClose(nodeModal !== null, () => setNodeModal(null));
 
   const addBacklogSession = () => {
     const t = newTitle.trim();

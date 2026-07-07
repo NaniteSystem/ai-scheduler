@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBackClose } from '../../hooks/useHardwareBack';
 import { format, parseISO, startOfMonth, startOfWeek, addDays, addMonths, isSameDay, isSameMonth, setDay } from 'date-fns';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useT, useDateLocale } from '../../i18n';
@@ -11,6 +12,7 @@ export function DatePicker({ value, onChange, weekStartsOn = 1 }: { value: strin
   const t = useT();
   const locale = useDateLocale();
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const selected = value ? parseISO(value) : new Date();
   const [viewDate, setViewDate] = useState(selected);
   const today = new Date();

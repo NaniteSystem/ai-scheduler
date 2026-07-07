@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useBackClose } from '../../hooks/useHardwareBack';
 import { createPortal } from 'react-dom';
 import { Clock, Check } from 'lucide-react';
 import { useT } from '../../i18n';
@@ -15,6 +16,7 @@ const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // 0,5,…,55
 export function TimePicker({ value, onChange, label }: { value: number; onChange: (m: number) => void; label?: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const h = Math.floor(value / 60);
   const m = value % 60;
   const [hh, setHh] = useState(pad(h));

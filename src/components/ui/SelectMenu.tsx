@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackClose } from '../../hooks/useHardwareBack';
 import { Check, ChevronDown } from 'lucide-react';
 
 export interface SelectOption<T extends string> {
@@ -20,6 +21,7 @@ export function SelectMenu<T extends string>({
   size?: 'sm' | 'md';
 }) {
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value) || options[0];
 

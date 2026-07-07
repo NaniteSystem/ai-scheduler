@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { format, isToday, isPast, isSameDay, addDays, addMonths, addYears, startOfMonth, endOfMonth, startOfWeek, getYear, getMonth, differenceInCalendarWeeks, differenceInCalendarDays, parseISO, isSameMonth, addWeeks } from 'date-fns';
 import { useT, useDateLocale } from '../i18n';
 import type { Session, Goal, SessionType, RecurringPattern } from '../types';
-import { ChevronLeft, ChevronRight, Plus, RotateCcw, GripVertical, X, Repeat, Clock, Target, CalendarDays, Bell, MapPin, Link as LinkIcon, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, X, Repeat, Clock, Target, CalendarDays, Bell, MapPin, Link as LinkIcon, Check } from 'lucide-react';
 import { TimePicker } from './ui/TimePicker';
 import { DatePicker } from './ui/DatePicker';
 import { IconPicker, SessionIcon } from './ui/IconPicker';
 import { fmtDur } from '../utils/duration';
+import { WeekGrid } from './WeekGrid';
 
 const HOUR_H = 52; // px per hour (taller rows → bigger, easier-to-tap blocks; labels every 2h)
 const SLOT = 15;   // snap to 15 min
@@ -191,6 +193,8 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
   const [ghostPos, setGhostPos] = useState<{ dayIdx: number; min: number } | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  useBackClose(draft !== null, () => setDraft(null));
+  useBackClose(budgetOpen, () => setBudgetOpen(false));
   const [mode, setMode] = useState<ViewMode>('day');
   const [dayOffset, setDayOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -277,33 +281,6 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     return Math.max(0, Math.min(6, Math.floor(rel / colW)));
   }, []);
 
-  // ── Grid drag handlers (desktop week-view HTML5 fallback; pointer drag below covers touch) ──
-  const handleGridDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (!dragSid) return;
-    const dayIdx = xToDayIdx(e.clientX);
-    const totalMin = yToMin(e.clientY);
-    setGhostPos({ dayIdx, min: totalMin });
-  };
-
-  const handleGridDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!dragSid || !ghostPos) return;
-    const dateStr = format(days[ghostPos.dayIdx], 'yyyy-MM-dd');
-    const h = Math.floor(ghostPos.min / 60);
-    const m = ghostPos.min % 60;
-    store.moveSession(dragSid, dateStr, h, m);
-    setDragSid(null);
-    setGhostPos(null);
-  };
-
-  const handleGridDragEnd = () => {
-    setDragSid(null);
-    setGhostPos(null);
-  };
-
-
   // ── Long-press drag / resize (touch-first; mouse drags immediately) ──
   // On touch: hold a block ~0.45s to "pick it up", then drag to move, or drag
   // from the bottom edge to resize. Moving the finger before the hold completes
@@ -373,21 +350,6 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     store.openSessionModal(sid);
   };
 
-  // ── Double-click empty cell → open create draft ──
-  const handleCellDouble = (e: React.MouseEvent, dayIdx: number) => {
-    const totalMin = yToMin(e.clientY);
-    setDraft({
-      title: '',
-      goalId: goals[0]?.id ?? '',
-      dayIdx,
-      startMin: totalMin,
-      durationMinutes: 60,
-      sessionType: 'regular',
-      recurrence: 'none',
-      ...DRAFT_DEFAULTS,
-    });
-  };
-
   // Day-view double-click → create draft for the selected day
   const handleDayDouble = (e: React.MouseEvent) => {
     const totalMin = yToMin(e.clientY);
@@ -396,7 +358,6 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
 
   // Touch devices have no double-click → single tap on an empty slot creates.
   const isCoarse = () => typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
-  const handleCellTap = (e: React.MouseEvent, dayIdx: number) => { if (!draft && isCoarse()) handleCellDouble(e, dayIdx); };
   const handleDayTap = (e: React.MouseEvent) => { if (!draft && isCoarse()) handleDayDouble(e); };
 
   const createFromDraft = () => {
@@ -565,176 +526,18 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       {mode === 'week' && (
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-5 min-h-0 overflow-y-auto md:overflow-hidden pb-[calc(env(safe-area-inset-bottom)+96px)] md:pb-0">
         {/* Calendar Grid */}
-        <div
-          className="card overflow-auto min-w-0 h-[62vh] md:h-auto md:flex-1 shrink-0"
-          style={{ touchAction: 'pan-y' }}
-        >
-          {/* Day Headers */}
-          <div className="grid grid-cols-[44px_repeat(7,minmax(118px,1fr))] md:grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border)] sticky top-0 z-40 bg-[var(--surface)]">
-            <div className="h-14" />
-            {days.map((day, di) => {
-              const active = isToday(day);
-              const dayMin = sessions.filter(s => s.date === format(day, 'yyyy-MM-dd')).reduce((a, s) => a + s.durationMinutes, 0);
-              return (
-                <div key={di} className={`h-14 flex flex-col items-center justify-center border-l border-[var(--border)] ${active ? 'bg-[var(--primary)]/15' : ''}`}>
-                  <div className={`text-[11px] font-bold uppercase tracking-wider ${active ? 'text-[var(--primary)]' : 'text-[var(--text-dim)]'}`}>
-                    {format(day, 'EEE', { locale })}
-                  </div>
-                  <div className={`text-[20px] leading-none font-bold mt-0.5 ${active ? 'text-[var(--text)]' : 'text-[var(--text-dim)]'}`}>
-                    {format(day, 'd', { locale })}
-                  </div>
-                  {dayMin > 0 && <div className="text-[11px] text-[var(--text-dim)] mono mt-0.5">{fmtH(dayMin)}</div>}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Time Grid */}
-          <div
-            ref={gridRef}
-            className="grid grid-cols-[44px_repeat(7,minmax(118px,1fr))] md:grid-cols-[56px_repeat(7,1fr)] relative select-none"
-            style={{ height: ROWS * HOUR_H }}
-            onDragOver={handleGridDragOver}
-            onDrop={handleGridDrop}
-            onDragEnd={handleGridDragEnd}
-          >
-            {/* Hour Labels */}
-            <div className="border-r border-[var(--border)]">
-              {Array.from({ length: ROWS }, (_, i) => i + START_H).map(h => (
-                <div key={h} className="border-b border-[var(--surface)] pr-2 text-right text-[11px] text-[var(--text-dim)] mono pt-1" style={{ height: HOUR_H }}>
-                  {(h - START_H) % 2 === 0 ? `${String(h).padStart(2, '0')}:00` : ''}
-                </div>
-              ))}
-            </div>
-
-            {/* Day Columns */}
-            {days.map((day, dayIdx) => {
-              const dateStr = format(day, 'yyyy-MM-dd');
-              const daySessions = sessions.filter(s => s.date === dateStr).sort((a, b) => (a.startHour * 60 + (a.startMinute || 0)) - (b.startHour * 60 + (b.startMinute || 0)));
-              const active = isToday(day);
-              const isGhostDay = ghostPos?.dayIdx === dayIdx;
-
-              return (
-                <div
-                  key={dayIdx}
-                  className={`relative border-l border-[var(--border)] ${active ? 'bg-[var(--primary)]/[.02]' : ''}`}
-                  onDoubleClick={(e) => handleCellDouble(e, dayIdx)}
-                  onClick={(e) => handleCellTap(e, dayIdx)}
-                  title={tr('sched.dblCreate')}
-                >
-                  {/* 15-min grid lines */}
-                  {Array.from({ length: ROWS }).map((_, i) => (
-                    <div key={i} className="border-b border-[var(--surface)] relative" style={{ height: HOUR_H }}>
-                      <div className="absolute top-1/4 left-0 right-0 border-b border-dashed border-[var(--surface)]" />
-                      <div className="absolute top-1/2 left-0 right-0 border-b border-[var(--border)]" />
-                      <div className="absolute top-3/4 left-0 right-0 border-b border-dashed border-[var(--surface)]" />
-                    </div>
-                  ))}
-
-                  {/* Ghost Preview */}
-                  {isGhostDay && dragSession && ghostPos && (
-                    <div
-                      className="absolute left-1 right-1 rounded-lg border-2 border-dashed border-[var(--primary)]/60 bg-[var(--primary)]/10 pointer-events-none z-10 flex items-center justify-center"
-                      style={{
-                        top: (ghostPos.min - START_H * 60) / 60 * HOUR_H,
-                        height: Math.max(20, dragSession.durationMinutes / 60 * HOUR_H - 4),
-                      }}
-                    >
-                      <span className="text-[10px] font-bold text-[var(--primary)] mono">{minToTime(ghostPos.min)}</span>
-                    </div>
-                  )}
-
-                  {/* All-day banners pinned at top */}
-                  {daySessions.filter(s => s.allDay).map((s, ai) => {
-                    const color = s.color || goalColor(s.goalId);
-                    return (
-                      <div key={s.id} onClick={(e) => { e.stopPropagation(); store.openSessionModal(s.id); }}
-                        className={`absolute left-1.5 right-1.5 rounded-md px-2 flex items-center z-20 cursor-pointer overflow-hidden ${s.status === 'done' ? 'opacity-50' : ''}`}
-                        style={{ top: 2 + ai * 22, height: 20, background: `${color}dd`, borderLeft: `3px solid ${color}` }}>
-                        <span className="text-[11px] font-bold text-[var(--text)] truncate leading-none">{s.title}</span>
-                      </div>
-                    );
-                  })}
-
-                  {/* Session Blocks */}
-                  {(() => { const layout = layoutDay(daySessions.filter(s => !s.allDay)); return daySessions.filter(s => !s.allDay).map(s => {
-                    const color = s.color || (s.sessionType === 'checkpoint' ? '#ef4444' : goalColor(s.goalId));
-                    const topMin = s.startHour * 60 + (s.startMinute || 0) - START_H * 60;
-                    const top = (topMin / 60) * HOUR_H;
-                    const height = Math.max(20, (s.durationMinutes / 60) * HOUR_H - 2);
-                    const isDragging = dragSid === s.id;
-                    const lay = layout[s.id] || { col: 0, cols: 1 };
-
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={(e) => onBlockClick(e, s.id)}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => onBlockPointerDown(e, s)} onPointerMove={onBlockPointerMove} onPointerUp={endBlockPress} onPointerCancel={endBlockPress}
-                        className={`absolute rounded-lg overflow-hidden group transition-shadow z-10 ${
-                          isDragging ? 'opacity-30 scale-95' : 'hover:z-20 hover:shadow-xl'
-                        } ${pressSid === s.id ? 'z-30 shadow-2xl ring-2 ring-[var(--primary)]' : ''} ${s.status === 'done' ? 'opacity-50' : ''}`}
-                        style={{
-                          top,
-                          height,
-                          left: `calc(${(lay.col / lay.cols) * 100}% + 3px)`,
-                          width: `calc(${100 / lay.cols}% - 4px)`,
-                          background: `${color}${s.status === 'done' ? '44' : 'dd'}`,
-                          borderLeft: `3px solid ${color}`,
-                          cursor: pressSid === s.id ? 'grabbing' : 'grab',
-                          touchAction: pressSid === s.id ? 'none' : 'pan-y',
-                        }}
-                      >
-                        {/* Drag handle */}
-                        <div className="absolute top-0 left-0 right-0 h-3 flex items-center justify-center opacity-0 group-hover:opacity-50 cursor-grab">
-                          <GripVertical className="w-3 h-3 text-[var(--text)]" />
-                        </div>
-
-                        <div className="px-2 py-1 h-full flex flex-col">
-                          <div className={`text-[11px] font-bold ${s.status === 'done' ? 'text-[var(--text)]' : 'text-white'} truncate leading-tight flex items-center gap-1`}>
-                            {s.seriesId && <Repeat className="w-2.5 h-2.5 shrink-0 opacity-80" />}
-                            {s.icon ? <SessionIcon name={s.icon} className="w-3 h-3 shrink-0" /> : <span>{goalEmoji(s.goalId)}</span>} {s.title}
-                          </div>
-                          {height > 34 && (
-                            <div className={`mono text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/70'} mt-0.5`}>
-                              {String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')} · {fmtDur(s.durationMinutes, store.lang)}
-                            </div>
-                          )}
-                          {height > 55 && cleanSessionNote(s.description) && (
-                            <div className={`text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/60'} mt-1 line-clamp-2 leading-snug`}>
-                              {cleanSessionNote(s.description)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Resize handle (bottom edge) */}
-                        <div className="absolute bottom-0 left-0 right-0 h-5 flex items-end justify-center pb-1 pointer-events-none">
-                          <span className={`w-8 h-1 rounded-full ${s.status === 'done' ? 'bg-[var(--text-mute)]/40' : 'bg-white/45'}`} />
-                        </div>
-                      </div>
-                    );
-                  }); })()}
-                </div>
-              );
-            })}
-
-            {/* Now indicator */}
-            {weekOffset === 0 && (() => {
-              const nowMin = now.getHours() * 60 + now.getMinutes() - START_H * 60;
-              if (nowMin < 0 || nowMin > ROWS * 60) return null;
-              const top = (nowMin / 60) * HOUR_H;
-              return (
-                <div className="absolute left-0 right-0 pointer-events-none z-30" style={{ top }}>
-                  <div className="flex items-center">
-                    <span className="w-14 -ml-0.5 text-right pr-1 text-[11px] font-bold text-red-500 mono leading-none">{minToTime(now.getHours() * 60 + now.getMinutes())}</span>
-                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.6)]" />
-                    <div className="h-[1.5px] flex-1 bg-red-500" />
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
+        <WeekGrid
+          days={days}
+          sessions={sessions}
+          weekOffset={weekOffset}
+          startH={START_H}
+          rows={ROWS}
+          store={store}
+          goalColor={goalColor}
+          goalEmoji={goalEmoji}
+          now={now}
+          onCreateAt={(dayIdx, startMin) => setDraft({ title: '', goalId: goals[0]?.id ?? '', dayIdx, startMin, durationMinutes: 60, sessionType: 'regular', recurrence: 'none', ...DRAFT_DEFAULTS })}
+        />
 
         {/* Side Panel */}
         <div className="w-full md:w-[300px] shrink-0 space-y-4 md:overflow-y-auto">
@@ -1156,6 +959,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
   const occCount = expandRecurrence(baseDate, draft.recurrence, draft.weekdays).length;
   const toggleWeekday = (v: number) => upd({ weekdays: draft.weekdays.includes(v) ? draft.weekdays.filter(d => d !== v) : [...draft.weekdays, v] });
   const [showSug, setShowSug] = useState(false);
+  useBackClose(showSug, () => setShowSug(false));
 
   // Autocomplete: up to 5 suggestions. Empty query → most-frequent titles; typing → matches.
   // Sessions of the currently selected goal (incl. its unscheduled backlog) float to the top.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBackClose } from '../hooks/useHardwareBack';
 import { useStore } from '../store';
 import { useT, useDateLocale } from '../i18n';
 import type { LifeBlock, FixedCommitment } from '../types';
@@ -154,6 +155,7 @@ function CommitmentsSection() {
   const { schedulePrefs, addCommitment, updateCommitment, removeCommitment } = useStore();
   const weekStartsOn = schedulePrefs.weekStartsOn ?? 1;
   const [editing, setEditing] = useState<FixedCommitment | 'new' | null>(null);
+  useBackClose(editing !== null, () => setEditing(null));
   const commitments = schedulePrefs.commitments || [];
 
   const ws = startOfWeek(new Date(), { weekStartsOn });

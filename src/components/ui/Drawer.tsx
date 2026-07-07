@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useBackClose } from '../../hooks/useHardwareBack';
 
 interface DrawerProps {
   open: boolean;
@@ -16,6 +17,7 @@ const WIDTHS = { sm: 'md:w-96', md: 'md:w-[480px]', lg: 'md:w-[560px]', xl: 'md:
 
 export function Drawer({ open, onClose, title, subtitle, width = 'md', children, headerExtra, noPadding }: DrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
+  useBackClose(open, onClose);
 
   useEffect(() => {
     if (!open) return;

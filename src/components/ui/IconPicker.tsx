@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBackClose } from '../../hooks/useHardwareBack';
 import type { LucideIcon } from 'lucide-react';
 import { useT } from '../../i18n';
 import {
@@ -37,6 +38,7 @@ export function SessionIcon({ name, className }: { name?: string; className?: st
 export function IconPicker({ value, color = '#8b5cf6', onChange }: { value?: string; color?: string; onChange: (key: string | undefined) => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  useBackClose(open, () => setOpen(false));
   const Current = value ? ICON_MAP[value] : null;
 
   return (
