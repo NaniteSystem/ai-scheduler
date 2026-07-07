@@ -191,6 +191,7 @@ export default function App(){
   const[logFeeling,setLogFeeling]=useState<'bad'|'ok'|'good'|'great'>('good');
   const[logNotes,setLogNotes]=useState('');
   const[overviewChild,setOverviewChild]=useState(false);
+  const[homeDateStr,setHomeDateStr]=useState(()=>format(new Date(),'yyyy-MM-dd'));
   // ── Hardware back: layer stack (modals close top-first) ───────────────
   useBackClose(!!store.confirmDialog,store.closeConfirm);
   useBackClose(captureOpen,()=>setCaptureOpen(false));
@@ -285,9 +286,18 @@ export default function App(){
   const allDayTomorrow=sessionsTomorrowAll.filter(s=>s.allDay&&visibleSession(s));
   const tasksTomorrow=gtdTasks.filter(tk=>taskActive(tk)&&tk.dueDate&&isSameDay(parseISO(tk.dueDate),_tomorrow));
   const _todayStr=format(_now,'yyyy-MM-dd');
-  const dueHabitsToday=habits.filter(h=>!h.archived&&habitDueOn(h,_now));
 
-  const renderHabitRow=(h:typeof habits[number],i=0)=>{const e=h.log[_todayStr];const st=e?.status;const count=e?.count||0;const isCounter=h.targetCount>1;return (
+  // ── Home selected day (week-strip tap stays on Home and swaps the data) ──
+  const homeSelDate=parseISO(homeDateStr);
+  const homeIsToday=isSameDay(homeSelDate,_now);
+  const sessionsSelAll=homeIsToday?sessionsTodayAll:sessionsOn(homeSelDate);
+  const timedSel=homeIsToday?timedToday:sessionsSelAll.filter(s=>!s.allDay&&visibleSession(s)).sort(byStart);
+  const allDaySel=homeIsToday?allDayToday:sessionsSelAll.filter(s=>s.allDay&&visibleSession(s));
+  const tasksSel=homeIsToday?tasksToday:gtdTasks.filter(tk=>taskActive(tk)&&tk.dueDate===homeDateStr);
+  const dueHabitsSel=habits.filter(h=>!h.archived&&habitDueOn(h,homeSelDate));
+  const selDayLabel=format(homeSelDate,'EEEE, d MMM',{locale});
+
+  const renderHabitRow=(h:typeof habits[number],i=0)=>{const e=h.log[homeDateStr];const st=e?.status;const count=e?.count||0;const isCounter=h.targetCount>1;return (
     <motion.div key={h.id} {...listItem(i)} className="tcard p-3 pl-3.5 flex items-center gap-3">
       <div className="w-10 h-10 rounded-2xl grid place-items-center text-base shrink-0" style={{background:`${h.color}1f`}}>{h.emoji||'✅'}</div>
       <div className="flex-1 min-w-0">
@@ -295,8 +305,8 @@ export default function App(){
         {isCounter&&<div className="text-[11px] text-[var(--text-dim)] mt-0.5 mono">{count}/{h.targetCount}{h.unit?' '+h.unit:''}</div>}
       </div>
       {isCounter
-        ? <button onClick={()=>store.incHabit(h.id,_todayStr)} className="h-9 px-3.5 rounded-full text-[12px] font-bold flex items-center gap-1 shrink-0 mono" style={st==='done'?{background:'#10b981',color:'#fff'}:{background:`${h.color}1f`,color:h.color}}>{st==='done'?<CheckCircle2 className="w-3.5 h-3.5"/>:<Plus className="w-3.5 h-3.5"/>}{count}/{h.targetCount}</button>
-        : <button onClick={()=>store.setHabitStatus(h.id,_todayStr,st==='done'?'rest':'done')} className={`w-10 h-10 rounded-full grid place-items-center shrink-0 border transition-colors ${st==='done'?'bg-emerald-500 border-transparent text-white':'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-mute)] hover:text-emerald-500 hover:border-emerald-500/40'}`}><CheckCircle2 className="w-[18px] h-[18px]"/></button>}
+        ? <button onClick={()=>store.incHabit(h.id,homeDateStr)} className="h-9 px-3.5 rounded-full text-[12px] font-bold flex items-center gap-1 shrink-0 mono" style={st==='done'?{background:'#10b981',color:'#fff'}:{background:`${h.color}1f`,color:h.color}}>{st==='done'?<CheckCircle2 className="w-3.5 h-3.5"/>:<Plus className="w-3.5 h-3.5"/>}{count}/{h.targetCount}</button>
+        : <button onClick={()=>store.setHabitStatus(h.id,homeDateStr,st==='done'?'rest':'done')} className={`w-10 h-10 rounded-full grid place-items-center shrink-0 border transition-colors ${st==='done'?'bg-emerald-500 border-transparent text-white':'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-mute)] hover:text-emerald-500 hover:border-emerald-500/40'}`}><CheckCircle2 className="w-[18px] h-[18px]"/></button>}
     </motion.div>);};
 
   const renderSessionRow=(s:Session,i=0)=><HomeSessionRow key={s.id} s={s} index={i} />;
@@ -368,6 +378,7 @@ export default function App(){
 {activeView==='dashboard'&&(()=>{
   const initials=(userName||'').trim().split(/\s+/).filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'·';
   const streak=Math.max(0,...goals.map(g=>goalStreak(g,sessions)));
+  const dueHabitsToday=habits.filter(h=>!h.archived&&habitDueOn(h,_now));
   const doneToday=sessionsTodayAll.filter(s=>s.status==='done').length+dueHabitsToday.filter(h=>h.log[_todayStr]?.status==='done').length;
   const totalToday=sessionsTodayAll.length+tasksToday.length+dueHabitsToday.length;
   const pct=totalToday?Math.round(doneToday/totalToday*100):0;
@@ -399,12 +410,13 @@ export default function App(){
     <div className="mt-5 flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
       {homeDays.map(d=>{
         const today=isSameDay(d,_now);
-        return <button key={d.toISOString()} onClick={()=>{store.setWeekOffset(0);store.setActiveView('week');setOverviewChild(false);}}
-          className={`shrink-0 w-[52px] h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 border ${today?'grad border-transparent text-white shadow-lg':'bg-[var(--surface)] border-[var(--border)] text-[var(--text-dim)]'}`}
-          style={today?{boxShadow:'var(--shadow-primary)'}:undefined}>
+        const sel=isSameDay(d,homeSelDate);
+        return <button key={d.toISOString()} onClick={()=>setHomeDateStr(format(d,'yyyy-MM-dd'))}
+          className={`shrink-0 w-[52px] h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 border transition-colors ${sel?'grad border-transparent text-white shadow-lg':today?'bg-[var(--surface)] border-[var(--primary)]/50 text-[var(--text-dim)]':'bg-[var(--surface)] border-[var(--border)] text-[var(--text-dim)]'}`}
+          style={sel?{boxShadow:'var(--shadow-primary)'}:undefined}>
           <span className="text-[10px] font-bold uppercase tracking-wider">{format(d,'EEEEEE',{locale})}</span>
-          <span className={`text-[17px] font-bold mono leading-none ${today?'text-white':'text-[var(--text)]'}`}>{format(d,'d')}</span>
-          <span className={`w-1 h-1 rounded-full ${dayBusy(d)?(today?'bg-white':'bg-[var(--accent)]'):'bg-transparent'}`}/>
+          <span className={`text-[17px] font-bold mono leading-none ${sel?'text-white':'text-[var(--text)]'}`}>{format(d,'d')}</span>
+          <span className={`w-1 h-1 rounded-full ${dayBusy(d)?(sel?'bg-white':'bg-[var(--accent)]'):'bg-transparent'}`}/>
         </button>;
       })}
     </div>
@@ -423,35 +435,35 @@ export default function App(){
   {/* Running focus timer (inline card on Home; floating bar on other views) */}
   <TimerCard/>
 
-  {/* TODAY — scheduled */}
-  <section className="anim-fade anim-delay-1">
+  {/* SELECTED DAY — scheduled */}
+  <section className="anim-fade anim-delay-1" key={`sched-${homeDateStr}`}>
     <div className="flex items-center justify-between gap-3 mb-3">
-      <h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] flex items-center gap-2 whitespace-nowrap"><Clock className="w-3.5 h-3.5"/>{t('home.todayScheduled')}</h3>
+      <h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] flex items-center gap-2 whitespace-nowrap"><Clock className="w-3.5 h-3.5"/>{homeIsToday?t('home.todayScheduled'):t('home.dayScheduled',{d:selDayLabel})}</h3>
       <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} aria-label={t('dash.expandSchedule')} className="w-8 h-8 rounded-full grid place-items-center text-[var(--primary)] bg-[var(--primary)]/10 shrink-0"><ChevronRight className="w-4 h-4"/></button>
     </div>
     <div className="space-y-2.5">
-      {timedToday.length>0 ? timedToday.map(renderSessionRow) : emptyBox(t('home.noScheduled'))}
+      {timedSel.length>0 ? timedSel.map(renderSessionRow) : emptyBox(t('home.noScheduled'))}
     </div>
   </section>
 
-  {/* TODAY — to-do */}
-  <section className="anim-fade anim-delay-2">
-    {head(<CheckCircle2 className="w-3.5 h-3.5"/>,t('home.todayTasks'))}
+  {/* SELECTED DAY — to-do */}
+  <section className="anim-fade anim-delay-2" key={`todo-${homeDateStr}`}>
+    {head(<CheckCircle2 className="w-3.5 h-3.5"/>,homeIsToday?t('home.todayTasks'):t('home.dayTasks',{d:selDayLabel}))}
     <div className="space-y-2.5">
-      {allDayToday.map(renderSessionRow)}
-      {tasksToday.map(renderTaskRow)}
-      {allDayToday.length+tasksToday.length===0 && emptyBox(t('home.noTasks'))}
+      {allDaySel.map(renderSessionRow)}
+      {tasksSel.map(renderTaskRow)}
+      {allDaySel.length+tasksSel.length===0 && emptyBox(t('home.noTasks'))}
     </div>
   </section>
 
-  {/* TODAY — habits */}
-  {dueHabitsToday.length>0 && <section className="anim-fade anim-delay-2">
-    {head(<Repeat2 className="w-3.5 h-3.5"/>,t('home.todayHabits'))}
-    <div className="space-y-2.5">{dueHabitsToday.map(renderHabitRow)}</div>
+  {/* SELECTED DAY — habits */}
+  {dueHabitsSel.length>0 && <section className="anim-fade anim-delay-2" key={`hab-${homeDateStr}`}>
+    {head(<Repeat2 className="w-3.5 h-3.5"/>,homeIsToday?t('home.todayHabits'):t('home.dayHabits',{d:selDayLabel}))}
+    <div className="space-y-2.5">{dueHabitsSel.map(renderHabitRow)}</div>
   </section>}
 
-  {/* TOMORROW */}
-  <section className="anim-fade anim-delay-3">
+  {/* TOMORROW (only in today mode) */}
+  {homeIsToday && <section className="anim-fade anim-delay-3">
     {head(<Calendar className="w-3.5 h-3.5"/>,t('home.tomorrow'))}
     <div className="space-y-2.5">
       {timedTomorrow.map(renderSessionRow)}
@@ -459,7 +471,7 @@ export default function App(){
       {tasksTomorrow.map(renderTaskRow)}
       {timedTomorrow.length+allDayTomorrow.length+tasksTomorrow.length===0 && emptyBox(t('home.noTomorrow'))}
     </div>
-  </section>
+  </section>}
 </div>;})()}
 
 {/* ═══════════════════ GOALS ═══════════════════ */}

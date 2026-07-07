@@ -14,3 +14,7 @@ server/.env
 # Build outputs
 *.apk
 builds/
+
+# release signing (keep local, do not publish)
+android/release.keystore
+android/keystore.properties
