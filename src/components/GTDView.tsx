@@ -395,6 +395,16 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
             </button>
             {moreOpen && (
               <div className="absolute right-0 bottom-9 z-[420] w-48 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl">
+                {/* Quick priority (Todoist-style) */}
+                <div className="flex gap-1 px-1.5 py-1.5">
+                  {([1, 2, 3, 4] as Priority[]).map(pr => (
+                    <button key={pr} onClick={() => runMoreAction(() => useStore.getState().updateTask(task.id, { priority: pr }))}
+                      className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors ${task.priority === pr ? 'ring-1 ring-inset' : 'hover:opacity-80'}`}
+                      style={{ color: PRIORITY_CONFIG[pr].color, background: PRIORITY_CONFIG[pr].bg, ...(task.priority === pr ? { boxShadow: `inset 0 0 0 1.5px ${PRIORITY_CONFIG[pr].color}` } : {}) }}>
+                      {PRIORITY_CONFIG[pr].label}
+                    </button>
+                  ))}
+                </div>
                 <button onClick={() => runMoreAction(() => openEditTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Edit2 className="w-3.5 h-3.5" />{tr('gtd.editTask')}</button>
                 {task.status !== 'inbox' && <button onClick={() => runMoreAction(() => processTask(task.id, 'inbox'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Inbox className="w-3.5 h-3.5" />{tr('gtd.moveInbox')}</button>}
                 {task.status !== 'next-action' && <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Zap className="w-3.5 h-3.5" />{tr('gtd.moveNext')}</button>}
