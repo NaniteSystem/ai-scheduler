@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
+import { hapticSuccess, hapticTick } from '../utils/haptics';
 import { nextDueDate, useStore } from '../store';
 import { useT } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
@@ -167,11 +168,12 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
   const completeTask = () => {
     if (task.status === 'done' || completing) return;
     setCompleting(true);
+    hapticSuccess();
     if (completeTimer.current) window.clearTimeout(completeTimer.current);
     completeTimer.current = window.setTimeout(() => {
       processTask(task.id, 'done');
       completeTimer.current = null;
-    }, 220);
+    }, 380);
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -190,7 +192,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
   const onTouchEnd = () => {
     if (axis.current === 'h') {
       if (dx > SWIPE_TRIGGER) completeTask();
-      else if (dx < -SWIPE_TRIGGER) deleteTask(task.id);
+      else if (dx < -SWIPE_TRIGGER) { hapticTick(); deleteTask(task.id); }
     }
     start.current = null; axis.current = null; setDx(0);
   };
@@ -220,10 +222,23 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
       }`}
     >
       {completing && (
-        <div className="absolute inset-0 pointer-events-none grid place-items-center">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-500 animate-pulse">
-            <Check className="w-6 h-6" />
-          </div>
+        <div className="absolute inset-0 pointer-events-none grid place-items-center overflow-hidden rounded-xl">
+          <motion.div
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 480, damping: 16 }}
+            className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-500"
+          >
+            <motion.span initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.08, type: 'spring', stiffness: 500, damping: 15 }}>
+              <Check className="w-6 h-6" />
+            </motion.span>
+          </motion.div>
+          <motion.div
+            initial={{ scale: 0.2, opacity: 0.5 }}
+            animate={{ scale: 2.4, opacity: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="absolute w-14 h-14 rounded-full border-2 border-emerald-500/40"
+          />
         </div>
       )}
       <div className={`flex items-start gap-3 ${compact ? 'p-3' : 'p-4'}`}>

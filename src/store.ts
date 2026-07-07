@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { addDays, addWeeks, addMonths, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
 import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment } from './types';
 import { getProvider, horizonRange } from './scheduler';
+import { hapticSuccess, hapticTick } from './utils/haptics';
 
 /** Is a habit scheduled on the given date (by its recurrence rule)? */
 export function habitDueOn(h: Habit, date: Date): boolean {
@@ -524,16 +525,20 @@ export const useStore = create<S>()(persist((set) => ({
   addHabit: (h) => set((s) => ({ habits: [...s.habits, h] })),
   updateHabit: (id, patch) => set((s) => ({ habits: s.habits.map((h) => h.id === id ? { ...h, ...patch } : h) })),
   deleteHabit: (id) => set((s) => ({ habits: s.habits.filter((h) => h.id !== id) })),
-  setHabitStatus: (id, dateStr, status) => set((s) => ({
-    habits: s.habits.map((h) => h.id === id
-      ? { ...h, log: { ...h.log, [dateStr]: { status, count: status === 'done' ? h.targetCount : 0 } } }
-      : h)
-  })),
+  setHabitStatus: (id, dateStr, status) => set((s) => {
+    if (status === 'done') hapticSuccess(); else hapticTick();
+    return {
+      habits: s.habits.map((h) => h.id === id
+        ? { ...h, log: { ...h.log, [dateStr]: { status, count: status === 'done' ? h.targetCount : 0 } } }
+        : h)
+    };
+  }),
   incHabit: (id, dateStr) => set((s) => ({
     habits: s.habits.map((h) => {
       if (h.id !== id) return h;
       const cur = h.log[dateStr]?.count || 0;
       const count = Math.min(h.targetCount, cur + 1);
+      if (count >= h.targetCount) hapticSuccess(); else hapticTick();
       return { ...h, log: { ...h.log, [dateStr]: { status: count >= h.targetCount ? 'done' : 'failed', count } } };
     })
   })),
