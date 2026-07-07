@@ -13,7 +13,7 @@ import {
   Wifi, Phone, Home, ShoppingCart,
   Timer, Hourglass, Minus, Circle, CheckCircle2, Calendar, Play, GripVertical,
   SlidersHorizontal, MoreHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  Sun, Sparkles, BookOpen, Layers, Layers3, Target, Repeat, Bell
+  Sun, Sparkles, BookOpen, Layers, Layers3, Target, Repeat, Bell, AlertTriangle, CalendarClock
 } from 'lucide-react';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 
@@ -384,6 +384,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
                 {task.status !== 'inbox' && <button onClick={() => runMoreAction(() => processTask(task.id, 'inbox'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Inbox className="w-3.5 h-3.5" />{tr('gtd.moveInbox')}</button>}
                 {task.status !== 'next-action' && <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Zap className="w-3.5 h-3.5" />{tr('gtd.moveNext')}</button>}
                 {task.status !== 'someday-maybe' && <button onClick={() => runMoreAction(() => processTask(task.id, 'someday-maybe'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Layers className="w-3.5 h-3.5" />{tr('gtd.moveOther')}</button>}
+                <button onClick={() => runMoreAction(() => { const d = new Date(); d.setDate(d.getDate() + 1); useStore.getState().updateTask(task.id, { dueDate: format(d, 'yyyy-MM-dd') }); })} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><CalendarClock className="w-3.5 h-3.5" />{tr('gtd.postponeTomorrow')}</button>
                 <button onClick={() => runMoreAction(() => openTimerLauncher({ linkType: 'task', linkId: task.id, label: task.title }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Timer className="w-3.5 h-3.5" />{tr('gtd.pomodoro')}</button>
                 <button onClick={() => runMoreAction(() => deleteTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-red-400 hover:bg-red-500/10 flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" />{tr('common.delete')}</button>
               </div>
@@ -1261,6 +1262,25 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             <button disabled={selectedCount === 0} onClick={() => runBulk('trash')} className="h-8 px-3 rounded-lg bg-red-500/10 text-red-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.trash')}</button>
           </div>
         )}
+
+        {/* Overdue banner — one-tap reschedule (Todoist-style "roll with the punches") */}
+        {viewMode === 'lists' && gtdFilter === 'today' && !selecting && (() => {
+          const overdueTasks = filtered.filter(t => isOverdue(t) && t.status !== 'done');
+          if (overdueTasks.length === 0) return null;
+          const shiftAll = (offset: number) => {
+            const d = new Date(); d.setDate(d.getDate() + offset);
+            const key = format(d, 'yyyy-MM-dd');
+            overdueTasks.forEach(t => useStore.getState().updateTask(t.id, { dueDate: key }));
+          };
+          return (
+            <div className="rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3 flex flex-wrap items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="mr-auto text-[12px] font-semibold text-[var(--text)]">{tr('gtd.overdueN', { n: overdueTasks.length })}</span>
+              <button onClick={() => shiftAll(0)} className="h-8 px-3 rounded-lg bg-[var(--surface-2)] text-[var(--text)] text-[11px] font-bold hover:bg-[var(--surface)]">{tr('gtd.toToday')}</button>
+              <button onClick={() => shiftAll(1)} className="h-8 px-3 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] text-[11px] font-bold hover:bg-[var(--primary)]/20">{tr('gtd.toTomorrow')}</button>
+            </div>
+          );
+        })()}
 
         {viewMode === 'lists' && gtdFilter === 'today' && filtered.length === 0 && (
           <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-12 text-center">
