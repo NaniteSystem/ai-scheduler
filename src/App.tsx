@@ -587,6 +587,8 @@ export default function App(){
   const openTasks=gtdTasks.filter(t=>t.status!=='done'&&t.status!=='trash'&&!t.isArchived);
   const unsortedTasks=gtdTasks.filter(t=>t.status==='inbox'&&!t.processedAt&&!t.isArchived);
   const recurringTasks=openTasks.filter(t=>t.recurring);
+  const bestGoalStreak=Math.max(0,...goals.map(g=>goalStreak(g,sessions)));
+  const totalHoursLogged=+(sessions.filter(s=>s.status==='done').reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
   const archivedCount=gtdTasks.filter(t=>t.isArchived).length+goals.filter(g=>g.status==='completed').length;
   const repeatLabel=(p:string)=>t('gtd.repeat'+p.charAt(0).toUpperCase()+p.slice(1));
   const tiles=[
@@ -635,6 +637,9 @@ export default function App(){
         {l:t('progress.reading'),v:`${Math.round(readPages)}`,s:'',n:t('progress.pagesLogged'),c:'#d97706'},
         {l:t('progress.fitness'),v:`${Math.round(sportKm)}`,s:'',n:t('progress.kmCompleted'),c:'#059669'},
         {l:t('progress.overall'),v:`${adherence}`,s:'%',n:t('progress.sessionRate'),c:'#22c55e'},
+        {l:t('overview.bestStreak'),v:`${bestGoalStreak}`,s:t('common.dayShort'),n:t('overview.bestStreakSub'),c:'#f59e0b'},
+        {l:t('overview.hoursLogged'),v:fmtHours(totalHoursLogged),s:'',n:t('overview.hoursLoggedSub'),c:'#6467f2'},
+        {l:t('overview.activeGoalsStat'),v:`${activeGoals.length}`,s:'',n:t('overview.activeGoalsSub'),c:'#0d9488'},
       ].map((k,i)=><div key={i} className="tcard p-5"><div className="text-[10px] font-bold uppercase tracking-wider" style={{color:k.c}}>{k.l}</div><div className="flex items-baseline gap-1 mt-2"><span className="text-[40px] leading-none font-bold mono" style={{color:k.c}}>{k.v}</span><span className="text-[16px] text-[var(--text-dim)]">{k.s}</span></div><div className="text-[11px] text-[var(--text-dim)] mt-1">{k.n}</div></div>)}
     </div>
     <div className="tcard p-5"><div className="text-[12px] font-bold text-[var(--text)] mb-1">{t('overview.timeByTask')}</div><EnergyChart/></div>
