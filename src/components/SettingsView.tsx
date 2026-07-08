@@ -1,13 +1,23 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
-import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Trash2 } from 'lucide-react';
+import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Trash2, Bell } from 'lucide-react';
+
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} role="switch" aria-checked={on}
+      className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${on ? 'bg-[var(--primary)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'}`}>
+      <span className={`block w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+    </button>
+  );
+}
 
 export function SettingsView() {
   const t = useT();
   const store = useStore();
   const { goals, sessions, gtdTasks, userName, schedulePrefs, lang, setLang, setUserName, updatePrefs,
-    theme, setTheme, askConfirm, resetAll, resetIntroCourse } = store;
+    theme, setTheme, askConfirm, resetAll, resetIntroCourse,
+    notifPrefs, setNotifPrefs, habitRemindersEnabled, setNotifPref } = store;
   const [name, setName] = useState(userName);
   const [saved, setSaved] = useState(false);
 
@@ -117,6 +127,37 @@ export function SettingsView() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="card p-5 md:p-6 anim-fade anim-delay-2 space-y-4">
+        <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest flex items-center gap-2"><Bell className="w-3.5 h-3.5" /> {t('settings.notifications')}</div>
+        {([
+          { l: t('settings.notifSessions'), sub: t('settings.notifSessionsSub'), on: notifPrefs.sessions, fn: () => setNotifPrefs({ sessions: !notifPrefs.sessions }) },
+          { l: t('settings.notifTasks'), sub: t('settings.notifTasksSub'), on: notifPrefs.tasks, fn: () => setNotifPrefs({ tasks: !notifPrefs.tasks }) },
+          { l: t('settings.habitReminders'), sub: t('settings.habitRemindersSub'), on: habitRemindersEnabled, fn: () => setNotifPref({ habitRemindersEnabled: !habitRemindersEnabled }) },
+          { l: t('settings.quietHours'), sub: t('settings.quietHoursSub'), on: notifPrefs.quietEnabled, fn: () => setNotifPrefs({ quietEnabled: !notifPrefs.quietEnabled }) },
+        ]).map((row, i) => (
+          <div key={i} className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[13px] text-[var(--text)] font-medium">{row.l}</div>
+              <div className="text-[11px] text-[var(--text-dim)]">{row.sub}</div>
+            </div>
+            <Toggle on={row.on} onClick={row.fn} />
+          </div>
+        ))}
+        {notifPrefs.quietEnabled && (
+          <div className="flex items-center gap-3 pt-1">
+            {([['quietStart', t('settings.quietFrom')], ['quietEnd', t('settings.quietTo')]] as const).map(([field, label]) => (
+              <label key={field} className="flex-1">
+                <span className="block text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-1.5">{label}</span>
+                <input type="time" value={notifPrefs[field]}
+                  onChange={e => e.target.value && setNotifPrefs({ [field]: e.target.value })}
+                  className="w-full h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 text-[14px] text-[var(--text)] focus:outline-none focus:border-[var(--primary)]/50 transition-colors" />
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Appearance / theme */}

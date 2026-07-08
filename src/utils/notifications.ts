@@ -15,6 +15,20 @@ function notifId(sessionId: string): number {
 
 const TIMER_NOTIFICATION_IDS = new Set([99001, 99002]);
 
+// True when `at` falls inside the user's quiet-hours window (may wrap midnight).
+function inQuietHours(at: Date, prefs: { quietEnabled: boolean; quietStart: string; quietEnd: string }): boolean {
+  if (!prefs.quietEnabled) return false;
+  const parse = (s: string) => {
+    const [h, m] = s.split(':').map(Number);
+    return isNaN(h) || isNaN(m) ? null : h * 60 + m;
+  };
+  const start = parse(prefs.quietStart);
+  const end = parse(prefs.quietEnd);
+  if (start == null || end == null || start === end) return false;
+  const t = at.getHours() * 60 + at.getMinutes();
+  return start < end ? t >= start && t < end : t >= start || t < end;
+}
+
 function reminderTime(s: Session): Date | null {
   if (s.reminderMinutes == null || s.reminderMinutes < 0) return null;
   if (s.allDay) {
@@ -88,9 +102,9 @@ export async function syncReminders(sessions: Session[], tasks: GTDTask[] = [], 
       await LocalNotifications.cancel({ notifications: appReminders.map(n => ({ id: n.id })) });
     }
 
-    const lang = useStore.getState().lang;
+    const { lang, notifPrefs } = useStore.getState();
     const now = Date.now();
-    const toSchedule = sessions
+    const toSchedule = (notifPrefs.sessions ? sessions : [])
       .filter(s => s.status !== 'done')
       .map(s => ({ s, at: reminderTime(s) }))
       .filter((x): x is { s: Session; at: Date } => !!x.at && x.at.getTime() > now)
@@ -104,7 +118,7 @@ export async function syncReminders(sessions: Session[], tasks: GTDTask[] = [], 
       }));
 
     // Task reminders (explicit remindAt datetime).
-    const taskNotifs = tasks
+    const taskNotifs = (notifPrefs.tasks ? tasks : [])
       .filter((t) => t.remindAt && t.status !== 'done' && t.status !== 'trash')
       .map((t) => ({ t, at: new Date(t.remindAt as string) }))
       .filter((x) => !isNaN(x.at.getTime()) && x.at.getTime() > now)
@@ -117,7 +131,8 @@ export async function syncReminders(sessions: Session[], tasks: GTDTask[] = [], 
 
     const habitNotifs = useStore.getState().habitRemindersEnabled ? habitReminderNotifs(habits, now, lang) : [];
 
-    const all = [...toSchedule, ...taskNotifs, ...habitNotifs];
+    const all = [...toSchedule, ...taskNotifs, ...habitNotifs]
+      .filter(n => !inQuietHours(n.schedule.at, notifPrefs));
     if (all.length) {
       await LocalNotifications.schedule({ notifications: all });
     }

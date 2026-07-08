@@ -365,6 +365,14 @@ export function generateSchedule(prefs: SchedulePrefs, goals: Goal[], tasks: GTD
   return { date: dateStr, blocks };
 }
 
+export interface NotifPrefs {
+  sessions: boolean;
+  tasks: boolean;
+  quietEnabled: boolean;
+  quietStart: string; // 'HH:MM'
+  quietEnd: string;   // 'HH:MM'
+}
+
 export interface ConfirmOpts {
   title?: string;
   message: string;
@@ -393,6 +401,8 @@ interface S {
   habitRemindersEnabled: boolean;
   defaultReminderTime: string;
   setNotifPref: (patch: { habitRemindersEnabled?: boolean; defaultReminderTime?: string }) => void;
+  notifPrefs: NotifPrefs;
+  setNotifPrefs: (patch: Partial<NotifPrefs>) => void;
   density: 'comfortable' | 'compact';
   setDensity: (d: 'comfortable' | 'compact') => void;
   theme: 'light' | 'dark' | 'system';
@@ -560,6 +570,8 @@ export const useStore = create<S>()(persist((set) => ({
   habitRemindersEnabled: true,
   defaultReminderTime: '',
   setNotifPref: (patch) => set(() => patch),
+  notifPrefs: { sessions: true, tasks: true, quietEnabled: false, quietStart: '22:00', quietEnd: '08:00' },
+  setNotifPrefs: (patch) => set((s) => ({ notifPrefs: { ...s.notifPrefs, ...patch } })),
   density: 'comfortable',
   setDensity: (d) => set({ density: d }),
   theme: 'light',
@@ -623,6 +635,7 @@ export const useStore = create<S>()(persist((set) => ({
     density: data?.density === 'comfortable' || data?.density === 'compact' ? data.density : s.density,
     habitRemindersEnabled: typeof data?.habitRemindersEnabled === 'boolean' ? data.habitRemindersEnabled : s.habitRemindersEnabled,
     defaultReminderTime: typeof data?.defaultReminderTime === 'string' ? data.defaultReminderTime : s.defaultReminderTime,
+    notifPrefs: data?.notifPrefs && typeof data.notifPrefs === 'object' ? { ...s.notifPrefs, ...data.notifPrefs } : s.notifPrefs,
     generatedDay: data?.generatedDay ?? s.generatedDay,
     generatedPlan: data?.generatedPlan ?? s.generatedPlan,
     weekOffset: Number.isFinite(data?.weekOffset) ? data.weekOffset : s.weekOffset,
@@ -1050,6 +1063,7 @@ export const useStore = create<S>()(persist((set) => ({
     metricDefs: s.metricDefs,
     habitRemindersEnabled: s.habitRemindersEnabled,
     defaultReminderTime: s.defaultReminderTime,
+    notifPrefs: s.notifPrefs,
     density: s.density,
     theme: s.theme,
     userName: s.userName,
