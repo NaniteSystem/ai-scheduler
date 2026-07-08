@@ -12,6 +12,7 @@ import { TimerBar, TimerCard, TimerLauncher } from './components/FocusTimer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
 import { GTDView, parseNL } from './components/GTDView';
+import { SearchOverlay } from './components/SearchOverlay';
 import { HabitsView, HabitModal } from './components/HabitsView';
 import { ArchiveView } from './components/ArchiveView';
 import { ScheduleView } from './components/ScheduleView';
@@ -19,7 +20,7 @@ import { GoalDetailView } from './components/GoalDetailView';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
 import type { Session, GTDTask } from './types';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2 } from 'lucide-react';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon } from 'lucide-react';
 import { AIScheduler } from './components/AIScheduler';
 import { AIPlanner } from './components/AIPlanner';
 import { EnergyChart } from './components/EnergyChart';
@@ -187,6 +188,7 @@ export default function App(){
   const[qt,setQt]=useState('');
   const[qd]=useState(5);
   const[captureOpen,setCaptureOpen]=useState(false);
+  const[searchOpen,setSearchOpen]=useState(false);
   const[quickHabitOpen,setQuickHabitOpen]=useState(false);
   const[logMetric,setLogMetric]=useState('progress');
   const[logValue,setLogValue]=useState('1');
@@ -366,6 +368,7 @@ export default function App(){
           </>;
         })()}
         <div className="ml-auto flex items-center gap-2">
+          <button onClick={()=>setSearchOpen(true)} aria-label={t('search.title')} className="h-9 w-9 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"><SearchIcon className="w-4 h-4"/></button>
           {(activeView==='dashboard'||(activeView==='goals'&&!selectedGoalId))&&<button onClick={()=>store.openWizard()} className="h-9 px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center gap-1.5 hover:bg-[var(--border)] transition-colors"><Plus className="w-3.5 h-3.5"/>{t('common.newGoal')}</button>}
           <button onClick={()=>setCaptureOpen(v=>!v)} aria-label={t('sidebar.quickCaptureGtd')} className="grad h-10 px-4 rounded-xl text-white text-[13px] font-bold flex items-center gap-1.5 active:scale-95 transition-transform" style={{boxShadow:'var(--shadow-primary)'}}><Plus className="w-4 h-4" strokeWidth={2.6}/>{t('create.title')}</button>
         </div>
@@ -410,6 +413,7 @@ export default function App(){
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {streak>0&&<span className="h-8 px-2.5 rounded-full bg-[var(--surface)] border border-[var(--border)] flex items-center gap-1 text-[12px] font-bold text-[var(--text)]">🔥 {streak}</span>}
+        <button onClick={()=>setSearchOpen(true)} aria-label={t('search.title')} className="w-9 h-9 rounded-full grid place-items-center bg-[var(--surface)] border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]"><SearchIcon className="w-4 h-4"/></button>
         <button onClick={()=>{store.setActiveView('settings');setOverviewChild(false);}} aria-label={t('bottomNav.profile')} className="w-9 h-9 rounded-full grid place-items-center text-[12px] font-bold text-white grad">{initials}</button>
       </div>
     </div>
@@ -723,6 +727,9 @@ export default function App(){
 
       </motion.div>
       </AnimatePresence>
+
+      {/* ═══════════════════ GLOBAL SEARCH ═══════════════════ */}
+      <SearchOverlay open={searchOpen} onClose={()=>setSearchOpen(false)}/>
 
       {/* ═══════════════════ UNDO SNACKBAR ═══════════════════ */}
       <AnimatePresence>

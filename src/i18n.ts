@@ -656,6 +656,13 @@ const en: Dict = {
   'notif.at': 'At {time}',
   'notif.habit': 'Time for your habit',
   'widget.empty': 'All clear for today 🎉',
+  'search.title': 'Search',
+  'search.placeholder': 'Search tasks, goals, habits, sessions…',
+  'search.tasks': 'Tasks',
+  'search.goals': 'Goals',
+  'search.habits': 'Habits',
+  'search.sessions': 'Sessions',
+  'search.noResults': 'Nothing found',
 
   // ── Goal categories ──
   'cat.language': 'Language', 'cat.reading': 'Reading', 'cat.sport': 'Fitness', 'cat.course': 'Course',
@@ -1434,6 +1441,13 @@ const ru: Dict = {
   'notif.at': 'В {time}',
   'notif.habit': 'Время для привычки',
   'widget.empty': 'На сегодня всё сделано 🎉',
+  'search.title': 'Поиск',
+  'search.placeholder': 'Задачи, цели, привычки, сессии…',
+  'search.tasks': 'Задачи',
+  'search.goals': 'Цели',
+  'search.habits': 'Привычки',
+  'search.sessions': 'Сессии',
+  'search.noResults': 'Ничего не найдено',
 
   // ── Goal categories ──
   'cat.language': 'Языки', 'cat.reading': 'Чтение', 'cat.sport': 'Фитнес', 'cat.course': 'Курс',
@@ -2212,6 +2226,13 @@ const ja: Dict = {
   'notif.at': '{time}に',
   'notif.habit': '習慣の時間です',
   'widget.empty': '今日は完了です 🎉',
+  'search.title': '検索',
+  'search.placeholder': 'タスク・目標・習慣・セッションを検索…',
+  'search.tasks': 'タスク',
+  'search.goals': '目標',
+  'search.habits': '習慣',
+  'search.sessions': 'セッション',
+  'search.noResults': '見つかりませんでした',
 
   // ── Goal categories ──
   'cat.language': '言語', 'cat.reading': '読書', 'cat.sport': 'フィットネス', 'cat.course': 'コース',
