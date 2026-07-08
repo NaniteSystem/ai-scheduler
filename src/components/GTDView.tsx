@@ -538,6 +538,7 @@ function EditTaskForm({ task }: { task: GTDTask }) {
   const [recurring, setRecurring] = useState<RecurringPattern | ''>(task.recurring || '');
   const [recurFromCompletion, setRecurFromCompletion] = useState(!!task.recurFromCompletion);
   const [remindAt, setRemindAt] = useState(task.remindAt ? task.remindAt.slice(0, 16) : '');
+  const [tagsStr, setTagsStr] = useState((task.tags || []).map(t => `#${t}`).join(' '));
 
   const save = () => {
     updateTask(task.id, {
@@ -555,6 +556,7 @@ function EditTaskForm({ task }: { task: GTDTask }) {
       recurring: recurring || undefined,
       recurFromCompletion: recurring && recurFromCompletion ? true : undefined,
       remindAt: remindAt || undefined,
+      tags: tagsStr.split(/[\s,]+/).map(s => s.replace(/^#/, '').trim()).filter(Boolean),
     });
     if (status !== task.status) processTask(task.id, status);
     closeEditTask();
@@ -633,6 +635,12 @@ function EditTaskForm({ task }: { task: GTDTask }) {
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.scheduledDate')}</label>
               <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none" />
             </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.tags')}</label>
+            <input value={tagsStr} onChange={e => setTagsStr(e.target.value)} placeholder={tr('gtd.tagsPlaceholder')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none placeholder:text-[var(--text-dim)]" />
           </div>
 
           {/* Energy + Delegate */}
@@ -806,6 +814,8 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const [overId, setOverId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'priority' | 'due' | 'created'>('priority');
   const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
+  const allTags = Array.from(new Set(gtdTasks.filter(t => t.status !== 'done' && t.status !== 'trash' && !t.isArchived).flatMap(t => t.tags || []))).sort();
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -860,6 +870,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
     })
     .filter(t => gtdFilter === 'today' || activeContext === 'all' || t.context === activeContext)
     .filter(t => gtdFilter === 'today' || priorityFilter === 'all' || t.priority === priorityFilter)
+    .filter(t => gtdFilter === 'today' || tagFilter === 'all' || (t.tags || []).includes(tagFilter))
     .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.tags || []).some(tag => tag.includes(searchQuery.toLowerCase())))
     .sort((a, b) => {
       if (gtdFilter === 'scheduled') {
@@ -1135,6 +1146,16 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
                 );
               })}
             </div>
+            {allTags.length > 0 && <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+              {(['all', ...allTags] as const).map(tg => {
+                const active = tagFilter === tg;
+                return (
+                  <button key={tg} onClick={() => setTagFilter(tg)} className={`h-8 px-3 rounded-lg text-[11px] font-bold border shrink-0 ${active ? 'bg-[var(--surface-2)] text-[var(--primary)] border-[var(--border)]' : 'border-transparent text-[var(--text-dim)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]'}`}>
+                    {tg === 'all' ? tr('gtd.tagsAll') : `#${tg}`}
+                  </button>
+                );
+              })}
+            </div>}
           </div>
           )}
         </div>
