@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { hapticSuccess, hapticTick } from '../utils/haptics';
 import { extractNLDate } from '../utils/nlDate';
 import { collectWeekStats, requestWeeklyReview, type WeeklyReviewText } from '../ai/weeklyReview';
+import { requestInboxTriage, type TriageSuggestion } from '../ai/inboxTriage';
 import { nextDueDate, useStore } from '../store';
 import { useT, useDateLocale } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
@@ -728,6 +729,97 @@ function EditTaskForm({ task }: { task: GTDTask }) {
 }
 
 // ─── Weekly Review Modal ─────────────────────────────────────────────────────
+// ─── AI inbox triage modal ──────────────────────────────────────────────────
+function InboxTriageModal({ open, onClose, inboxTasks }: { open: boolean; onClose: () => void; inboxTasks: GTDTask[] }) {
+  const tr = useT();
+  const dfLocale = useDateLocale();
+  const { goals, lang, updateTask, processTask } = useStore();
+  const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [suggestions, setSuggestions] = useState<TriageSuggestion[]>([]);
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  useBackClose(open, onClose);
+
+  const load = async () => {
+    setState('loading');
+    try {
+      const res = await requestInboxTriage(inboxTasks, goals, lang);
+      setSuggestions(res);
+      setChecked(Object.fromEntries(res.map(s => [s.id, true])));
+      setState('ready');
+    } catch {
+      setState('error');
+    }
+  };
+  useEffect(() => { if (open) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!open) return null;
+
+  const statusLabel = (s: TriageSuggestion['status']) => tr('gtd.status.' + s);
+  const apply = () => {
+    for (const s of suggestions) {
+      if (!checked[s.id]) continue;
+      const goal = s.goalId ? goals.find(g => g.id === s.goalId) : undefined;
+      updateTask(s.id, {
+        priority: s.priority,
+        dueDate: s.dueDate,
+        scheduledDate: s.status === 'scheduled' ? s.dueDate : undefined,
+        project: goal?.title,
+      });
+      processTask(s.id, s.status);
+    }
+    hapticSuccess();
+    onClose();
+  };
+  const appliedCount = suggestions.filter(s => checked[s.id]).length;
+
+  return (
+    <Drawer open={true} onClose={onClose} width="lg" title={tr('it.title')} subtitle={tr('it.subtitle', { n: inboxTasks.length })}>
+      {state === 'loading' && <div className="text-[13px] text-[var(--text-dim)] text-center py-10 animate-pulse">{tr('it.loading')}</div>}
+      {state === 'error' && (
+        <div className="text-center py-8">
+          <div className="text-[13px] text-[var(--text-dim)] mb-3">{tr('wr.error')}</div>
+          <button onClick={load} className="h-9 px-4 rounded-xl border border-[var(--border)] text-[12px] font-bold text-[var(--text)]">{tr('gw.retry')}</button>
+        </div>
+      )}
+      {state === 'ready' && (
+        <>
+          <div className="space-y-2 mb-4">
+            {suggestions.map(s => {
+              const task = inboxTasks.find(t => t.id === s.id);
+              if (!task) return null;
+              const goal = s.goalId ? goals.find(g => g.id === s.goalId) : undefined;
+              const on = !!checked[s.id];
+              return (
+                <button key={s.id} onClick={() => setChecked(c => ({ ...c, [s.id]: !on }))}
+                  className={`w-full text-left rounded-xl border p-3 transition-colors ${on ? 'border-[var(--primary)]/40 bg-[var(--primary)]/[.05]' : 'border-[var(--border)] bg-[var(--surface)] opacity-55'}`}>
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-5 h-5 rounded-md border grid place-items-center shrink-0 mt-0.5 ${on ? 'bg-[var(--primary)] border-[var(--primary)]' : 'border-[var(--border)]'}`}>
+                      {on && <Check className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-[var(--text)] leading-tight">{task.title}</div>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text)]">P{s.priority}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text)]">{statusLabel(s.status)}</span>
+                        {s.dueDate && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500">{format(parseISO(s.dueDate), 'd MMM', { locale: dfLocale })}</span>}
+                        {goal && <span className="px-1.5 py-0.5 rounded" style={{ background: `${goal.color}1a`, color: goal.color }}>{goal.emoji} {goal.title}</span>}
+                      </div>
+                      {s.reason && <div className="text-[11px] text-[var(--text-dim)] mt-1.5 leading-snug">{s.reason}</div>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={apply} disabled={appliedCount === 0}
+            className="w-full h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:opacity-40">
+            {tr('it.apply', { n: appliedCount })}
+          </button>
+        </>
+      )}
+    </Drawer>
+  );
+}
+
 function WeeklyReviewModal() {
   const tr = useT();
   const { weeklyReviewOpen, closeWeeklyReview, gtdTasks, sessions, habits, goals, lang } = useStore();
@@ -870,6 +962,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const [triageDy, setTriageDy] = useState(0);
   const [triageFx, setTriageFx] = useState<{ destination: TriageDestination; x: number; y: number; color: string } | null>(null);
   const triageFxTimer = useRef<number | null>(null);
+  const [aiTriageOpen, setAiTriageOpen] = useState(false);
 
   const allContexts = ['all', ...Object.keys(CONTEXT_CONFIG)];
   const selectedCount = selectedIds.length;
@@ -1344,6 +1437,10 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
                     </motion.div>
                   )}
                 </AnimatePresence>
+                <button onClick={() => setAiTriageOpen(true)}
+                  className="absolute -bottom-14 left-1/2 -translate-x-1/2 h-9 px-4 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[var(--primary)] text-[12px] font-bold flex items-center gap-1.5 whitespace-nowrap">
+                  <Sparkles className="w-3.5 h-3.5" />{tr('it.button', { n: rawTasks.length })}
+                </button>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-10 text-center max-w-md">
@@ -1523,6 +1620,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
       {/* Modals & Widgets */}
       <EditTaskModal />
       <WeeklyReviewModal />
+      <InboxTriageModal open={aiTriageOpen} onClose={() => setAiTriageOpen(false)} inboxTasks={rawTasks} />
       <DoTaskModal />
     </div>
   );
