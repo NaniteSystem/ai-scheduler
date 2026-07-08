@@ -269,9 +269,9 @@ export default function App(){
     const raw=qt.trim();if(!raw)return;
     const parsed=parseNL(raw);
     store.captureTask(parsed.title,parsed.durationMinutes||qd);
-    if(parsed.priority||parsed.context||parsed.tags?.length||parsed.dueDate){
+    if(parsed.priority||parsed.context||parsed.tags?.length||parsed.dueDate||parsed.remindAt||parsed.recurring){
       const newId=useStore.getState().gtdTasks[0]?.id;
-      if(newId)store.updateTask(newId,{priority:parsed.priority||3,context:parsed.context,tags:parsed.tags||[],dueDate:parsed.dueDate});
+      if(newId)store.updateTask(newId,{priority:parsed.priority||3,context:parsed.context,tags:parsed.tags||[],dueDate:parsed.dueDate,remindAt:parsed.remindAt,recurring:parsed.recurring});
     }
     setQt('');
   };

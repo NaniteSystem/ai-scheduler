@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticSuccess, hapticTick } from '../utils/haptics';
+import { extractNLDate } from '../utils/nlDate';
 import { nextDueDate, useStore } from '../store';
 import { useT, useDateLocale } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
@@ -61,28 +62,16 @@ export const isOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate < todayStr();
 const dueTodayOrOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate <= todayStr();
 
 // ─── Natural Language Parser (lightweight) ─────────────────────────────────
-export function parseNL(input: string): { title: string; priority?: Priority; context?: TaskContext; durationMinutes?: number; tags?: string[]; dueDate?: string } {
-  let title = input;
+export function parseNL(input: string): { title: string; priority?: Priority; context?: TaskContext; durationMinutes?: number; tags?: string[]; dueDate?: string; remindAt?: string; recurring?: GTDTask['recurring'] } {
   let priority: Priority | undefined;
   let context: TaskContext | undefined;
   let durationMinutes: number | undefined;
   let tags: string[] = [];
-  let dueDate: string | undefined;
 
-  // Dates: today / tomorrow keywords (EN/RU/JA), like Todoist/TickTick quick add
-  const dateWords: [RegExp, number][] = [
-    [/(?:^|\s)(today|сегодня|今日)(?=\s|$)/i, 0],
-    [/(?:^|\s)(tomorrow|завтра|明日)(?=\s|$)/i, 1],
-  ];
-  for (const [re, offset] of dateWords) {
-    const m = title.match(re);
-    if (m) {
-      const d = new Date(); d.setDate(d.getDate() + offset);
-      dueDate = format(d, 'yyyy-MM-dd');
-      title = title.replace(m[0], ' ').trim();
-      break;
-    }
-  }
+  // Dates/time/recurrence in EN/RU/JA — full parser in utils/nlDate.ts
+  const nl = extractNLDate(input);
+  let title = nl.title;
+  const { dueDate, remindAt, recurring } = nl;
 
   // Priority: p1, p2, p3, p4 or !!! !! !
   const pMatch = title.match(/\b(p[1-4]|!!!|!!|!)\b/i);
@@ -111,7 +100,7 @@ export function parseNL(input: string): { title: string; priority?: Priority; co
     title = title.replace(/#\w+/g, '').trim();
   }
 
-  return { title: title.trim() || input, priority, context, durationMinutes, tags, dueDate };
+  return { title: title.trim() || input, priority, context, durationMinutes, tags, dueDate, remindAt, recurring };
 }
 
 // ─── Task Card ───────────────────────────────────────────────────────────────
@@ -455,7 +444,13 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
     if (parsed.context) hints.push(parsed.context);
     if (parsed.durationMinutes) hints.push(`${parsed.durationMinutes}m`);
     if (parsed.tags?.length) hints.push(parsed.tags.map(t => `#${t}`).join(' '));
-    if (parsed.dueDate) hints.push(parsed.dueDate === format(new Date(), 'yyyy-MM-dd') ? tr('common.today') : tr('common.tomorrow'));
+    if (parsed.dueDate) {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const tomorrow = format(new Date(Date.now() + 86400000), 'yyyy-MM-dd');
+      hints.push(parsed.dueDate === today ? tr('common.today') : parsed.dueDate === tomorrow ? tr('common.tomorrow') : parsed.dueDate);
+    }
+    if (parsed.remindAt) hints.push(`⏰ ${parsed.remindAt.slice(11, 16)}`);
+    if (parsed.recurring) hints.push(tr('gtd.repeat' + parsed.recurring.charAt(0).toUpperCase() + parsed.recurring.slice(1)));
     setHint(hints.join(' · '));
   };
 
@@ -464,7 +459,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
     const parsed = parseNL(input);
     const store = useStore.getState();
     store.captureTask(parsed.title, parsed.durationMinutes || 5);
-    if (parsed.priority || parsed.context || parsed.tags?.length || parsed.dueDate) {
+    if (parsed.priority || parsed.context || parsed.tags?.length || parsed.dueDate || parsed.remindAt || parsed.recurring) {
       // Re-read state: captureTask created a new task, prepended to the list.
       const newId = useStore.getState().gtdTasks[0]?.id;
       if (newId) {
@@ -473,6 +468,8 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
           context: parsed.context,
           tags: parsed.tags || [],
           dueDate: parsed.dueDate,
+          remindAt: parsed.remindAt,
+          recurring: parsed.recurring,
         });
       }
     }
