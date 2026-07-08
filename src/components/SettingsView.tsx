@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
+import { tasksFromCsv, toGTDTasks } from '../utils/importCsv';
 import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Trash2, Bell } from 'lucide-react';
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -20,6 +21,23 @@ export function SettingsView() {
     notifPrefs, setNotifPrefs, habitRemindersEnabled, setNotifPref } = store;
   const [name, setName] = useState(userName);
   const [saved, setSaved] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const items = tasksFromCsv(text);
+      if (!items || items.length === 0) { setImportMsg(t('settings.importErr')); return; }
+      store.importTasks(toGTDTasks(items));
+      setImportMsg(t('settings.importedN', { n: items.length }));
+    } catch {
+      setImportMsg(t('settings.importErr'));
+    }
+  };
 
   const initials = userName.trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '·';
   const weekStartsOn = schedulePrefs.weekStartsOn ?? 1;
@@ -186,10 +204,14 @@ export function SettingsView() {
         </button>
       </div>
 
-      {/* Data export/import actions were retired; keep only reset in the UI. */}
+      {/* Data: CSV import (Todoist / TickTick) + reset */}
       <div className="card p-5 md:p-6 anim-fade anim-delay-3">
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Download className="w-3.5 h-3.5" /> {t('settings.data')}</div>
+        <p className="text-[12px] text-[var(--text-dim)] leading-relaxed mb-3">{t('settings.importSub')}</p>
         <div className="grid grid-cols-1 gap-2">
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImportFile} />
+          <button onClick={() => fileRef.current?.click()} className="h-10 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[12px] font-bold text-[var(--primary)] flex items-center justify-center gap-1.5"><Download className="w-4 h-4" />{t('settings.importCsv')}</button>
+          {importMsg && <div className="text-[12px] text-center py-1 font-medium text-[var(--text)]">{importMsg}</div>}
           <button onClick={confirmReset} className="h-10 rounded-xl bg-red-500/10 border border-red-500/30 text-[12px] font-bold text-red-400 flex items-center justify-center gap-1.5"><Trash2 className="w-4 h-4" />{t('settings.reset')}</button>
         </div>
       </div>

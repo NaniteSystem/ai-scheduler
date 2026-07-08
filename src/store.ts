@@ -454,6 +454,7 @@ interface S {
   completeOnboarding: (name: string) => void;
   resetAll: () => void;
   restoreBackup: (data: any) => void;
+  importTasks: (tasks: GTDTask[]) => void;
   setActiveView: (v: S['activeView']) => void;
   setGTDFilter: (f: string) => void;
   setActiveContext: (c: string) => void;
@@ -615,6 +616,7 @@ export const useStore = create<S>()(persist((set) => ({
   setUserName: (name) => set({ userName: name.trim() }),
   completeOnboarding: (name) => set({ userName: name.trim(), onboarded: true }),
   resetAll: () => set({ goals: [], sessions: [], gtdTasks: [], habits: [], reflections: {}, metricDefs: [], generatedDay: null, weekOffset: 0 }),
+  importTasks: (tasks) => set((s) => ({ gtdTasks: [...tasks, ...s.gtdTasks] })),
   restoreBackup: (data) => set((s) => ({
     goals: Array.isArray(data?.goals) ? data.goals : s.goals,
     sessions: Array.isArray(data?.sessions) ? data.sessions : s.sessions,

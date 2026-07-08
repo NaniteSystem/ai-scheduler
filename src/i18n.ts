@@ -666,6 +666,10 @@ const en: Dict = {
   'search.habits': 'Habits',
   'search.sessions': 'Sessions',
   'search.noResults': 'Nothing found',
+  'settings.importCsv': 'Import from CSV (Todoist / TickTick)',
+  'settings.importSub': 'Bring your tasks over: export a CSV from Todoist or TickTick and import it here. Tasks land in the Inbox.',
+  'settings.importedN': 'Imported: {n} task(s)',
+  'settings.importErr': 'Could not read this file — expected a Todoist or TickTick CSV export.',
 
   // ── Goal categories ──
   'cat.language': 'Language', 'cat.reading': 'Reading', 'cat.sport': 'Fitness', 'cat.course': 'Course',
@@ -1454,6 +1458,10 @@ const ru: Dict = {
   'search.habits': 'Привычки',
   'search.sessions': 'Сессии',
   'search.noResults': 'Ничего не найдено',
+  'settings.importCsv': 'Импорт из CSV (Todoist / TickTick)',
+  'settings.importSub': 'Перенеси свои задачи: экспортируй CSV из Todoist или TickTick и импортируй здесь. Задачи попадут в Инбокс.',
+  'settings.importedN': 'Импортировано задач: {n}',
+  'settings.importErr': 'Не удалось прочитать файл — ожидается CSV-экспорт Todoist или TickTick.',
 
   // ── Goal categories ──
   'cat.language': 'Языки', 'cat.reading': 'Чтение', 'cat.sport': 'Фитнес', 'cat.course': 'Курс',
@@ -2242,6 +2250,10 @@ const ja: Dict = {
   'search.habits': '習慣',
   'search.sessions': 'セッション',
   'search.noResults': '見つかりませんでした',
+  'settings.importCsv': 'CSVからインポート（Todoist / TickTick）',
+  'settings.importSub': 'TodoistやTickTickからCSVをエクスポートしてここでインポート。タスクはインボックスに入ります。',
+  'settings.importedN': '{n}件のタスクをインポートしました',
+  'settings.importErr': 'ファイルを読み込めませんでした — TodoistまたはTickTickのCSVが必要です。',
 
   // ── Goal categories ──
   'cat.language': '言語', 'cat.reading': '読書', 'cat.sport': 'フィットネス', 'cat.course': 'コース',
