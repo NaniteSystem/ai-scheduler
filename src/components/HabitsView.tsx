@@ -33,7 +33,7 @@ const TEMPLATES: { id: string; emoji: string; habits: TplHabit[] }[] = [
 const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899'];
 const EMOJI_SUGGESTIONS = ['💧', '💪', '📖', '🧘', '🏃', '🥗', '💊', '😴', '☀️', '🦷', '🚶', '✍️', '🎯', '🌱', '🧹', '🎧', '☕', '🚭', '🙏', '🎨'];
 const ANCHORS: HabitAnchor[] = ['wake', 'afterBreakfast', 'morning', 'afterLunch', 'afternoon', 'afterDinner', 'evening', 'sleep', 'none'];
-const RECURRENCES: HabitRecurrence[] = ['daily', 'weekdays', 'weekends', 'weekly', 'everyN'];
+const RECURRENCES: HabitRecurrence[] = ['daily', 'weekdays', 'weekends', 'weekly', 'everyN', 'timesPerWeek'];
 const hmToMin = (t: string) => { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const minToHm = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 
@@ -342,6 +342,7 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
   const anchor = habit?.anchor || 'none';
   const [recurrence, setRecurrence] = useState<HabitRecurrence>(habit?.recurrence || 'daily');
   const [intervalDays, setIntervalDays] = useState(habit?.intervalDays || 2);
+  const [timesPerWeek, setTimesPerWeek] = useState(habit?.timesPerWeek || 3);
   const [targetCount, setTargetCount] = useState(habit?.targetCount || 1);
   const [unit, setUnit] = useState(habit?.unit || '');
   const [goalId, setGoalId] = useState(habit?.goalId || '');
@@ -352,6 +353,7 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
     const data = {
       title: title.trim(), emoji: emoji.trim() || '✅', color, anchor, recurrence,
       intervalDays: recurrence === 'everyN' ? Math.max(2, intervalDays) : undefined,
+      timesPerWeek: recurrence === 'timesPerWeek' ? Math.min(7, Math.max(1, timesPerWeek)) : undefined,
       targetCount: Math.max(1, targetCount), unit: unit.trim() || undefined,
       goalId: goalId || undefined, reminderTime: reminderTime || undefined,
     };
@@ -430,6 +432,19 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
             <div className="mt-2 flex items-center gap-2">
               <span className="text-[12px] text-[var(--text-dim)]">{tr('habits.intervalDays')}</span>
               <input type="number" min={2} value={intervalDays} onChange={e => setIntervalDays(parseInt(e.target.value) || 2)} className="w-20 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-3 text-[13px] text-[var(--text)] mono focus:outline-none focus:border-[var(--border)]" />
+            </div>
+          )}
+          {recurrence === 'timesPerWeek' && (
+            <div className="mt-2">
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5, 6].map(n => (
+                  <button key={n} onClick={() => setTimesPerWeek(n)}
+                    className={`w-9 h-9 rounded-lg text-[13px] font-bold border transition-all ${timesPerWeek === n ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)]'}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-1.5">{tr('habits.timesPerWeekHint', { n: timesPerWeek })}</div>
             </div>
           )}
         </div>

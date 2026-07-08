@@ -15,12 +15,47 @@ export function habitDueOn(h: Habit, date: Date): boolean {
     case 'weekends': return isWeekend(date);
     case 'weekly':   return diff % 7 === 0;
     case 'everyN':   return diff % Math.max(2, h.intervalDays || 2) === 0;
+    case 'timesPerWeek': {
+      // Flexible weekly quota: a done day is always "due"; otherwise the day is
+      // due while the week (Mon-start) hasn't reached the quota yet.
+      const key = format(date, 'yyyy-MM-dd');
+      if (h.log[key]?.status === 'done') return true;
+      const quota = Math.max(1, Math.min(7, h.timesPerWeek || 3));
+      const dow = (date.getDay() + 6) % 7; // Monday = 0
+      let done = 0;
+      for (let i = 0; i < dow; i++) {
+        const d = addDays(date, -(dow - i));
+        if (h.log[format(d, 'yyyy-MM-dd')]?.status === 'done') done++;
+      }
+      return done < quota;
+    }
     default:         return true;
   }
 }
 
 /** Current streak: consecutive due-days ending today with status 'done' ('rest' keeps it, 'failed'/missed past day breaks it). */
 export function habitStreak(h: Habit, today: Date = new Date()): number {
+  if (h.recurrence === 'timesPerWeek') {
+    // Flexible habits streak in WEEKS that met the quota; the current week
+    // doesn't break the streak while it's still in progress.
+    const quota = Math.max(1, Math.min(7, h.timesPerWeek || 3));
+    const weekStart = new Date(today); weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const doneInWeek = (ws: Date) => {
+      let n = 0;
+      for (let i = 0; i < 7; i++) n += h.log[format(addDays(ws, i), 'yyyy-MM-dd')]?.status === 'done' ? 1 : 0;
+      return n;
+    };
+    let streak = doneInWeek(weekStart) >= quota ? 1 : 0;
+    const created = parseISO(h.createdAt);
+    for (let w = 1; w < 200; w++) {
+      const ws = addDays(weekStart, -7 * w);
+      if (addDays(ws, 6) < created) break;
+      if (doneInWeek(ws) >= quota) streak++;
+      else break;
+    }
+    return streak;
+  }
   let streak = 0;
   let d = new Date(today); d.setHours(0, 0, 0, 0);
   for (let i = 0; i < 400; i++) {

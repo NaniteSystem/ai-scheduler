@@ -158,7 +158,7 @@ export type HabitStatus = 'done' | 'failed' | 'rest';   // per-day outcome; 'res
 export type HabitAnchor =
   | 'none' | 'wake' | 'morning' | 'afternoon' | 'evening' | 'sleep'
   | 'afterBreakfast' | 'afterLunch' | 'afterDinner';     // situational trigger instead of a clock time
-export type HabitRecurrence = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'everyN';
+export type HabitRecurrence = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'everyN' | 'timesPerWeek';
 
 export interface HabitLogEntry { status: HabitStatus; count: number }
 
@@ -170,6 +170,7 @@ export interface Habit {
   anchor: HabitAnchor;         // "after waking", "after lunch", … (or 'none')
   recurrence: HabitRecurrence;
   intervalDays?: number;       // for 'everyN'
+  timesPerWeek?: number;       // for 'timesPerWeek' — flexible weekly quota (e.g. 3× a week, any days)
   targetCount: number;         // quantitative target per day (default 1)
   unit?: string;               // e.g. 'glasses', 'pages'
   goalId?: string;             // link to a long-term goal (hierarchy)
