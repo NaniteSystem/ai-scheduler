@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { pageTransition, fillBar, listItem } from './utils/motion';
 import { GTDView, parseNL } from './components/GTDView';
 import { SearchOverlay } from './components/SearchOverlay';
+import { startVoice, voiceAvailable, type VoiceSession } from './utils/voice';
 import { HabitsView, HabitModal } from './components/HabitsView';
 import { ArchiveView } from './components/ArchiveView';
 import { ScheduleView } from './components/ScheduleView';
@@ -20,7 +21,7 @@ import { GoalDetailView } from './components/GoalDetailView';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
 import type { Session, GTDTask } from './types';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon } from 'lucide-react';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,BarChart3,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic } from 'lucide-react';
 import { AIScheduler } from './components/AIScheduler';
 import { AIPlanner } from './components/AIPlanner';
 import { EnergyChart } from './components/EnergyChart';
@@ -186,6 +187,19 @@ export default function App(){
   useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
   const[selectedGoalId,setSelectedGoalId]=useState<string|null>(null);
   const[qt,setQt]=useState('');
+  const[listening,setListening]=useState(false);
+  const voiceRef=useRef<VoiceSession|null>(null);
+  const toggleVoice=async()=>{
+    if(listening){voiceRef.current?.stop();return;}
+    setListening(true);
+    const session=await startVoice(store.lang,{
+      onPartial:(text)=>setQt(text),
+      onFinal:(text)=>{setListening(false);voiceRef.current=null;if(text)setQt(text);},
+      onError:()=>{setListening(false);voiceRef.current=null;},
+    });
+    if(!session){setListening(false);return;}
+    voiceRef.current=session;
+  };
   const[qd]=useState(5);
   const[captureOpen,setCaptureOpen]=useState(false);
   const[searchOpen,setSearchOpen]=useState(false);
@@ -797,10 +811,15 @@ export default function App(){
               placeholder={t('create.taskPlaceholder')}
               className="flex-1 h-12 rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--primary)] transition-colors"
             />
+            {voiceAvailable()&&<button onClick={toggleVoice} aria-label={t('voice.start')}
+              className={`w-12 h-12 shrink-0 rounded-2xl grid place-items-center transition-all active:scale-95 border ${listening?'bg-red-500 border-red-500 text-white animate-pulse':'bg-[var(--surface-2)] border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+              <Mic className="w-5 h-5"/>
+            </button>}
             <button onClick={capture} aria-label={t('sidebar.addTask')} className="grad w-12 h-12 shrink-0 rounded-2xl grid place-items-center text-white transition-all active:scale-95" style={{boxShadow:'var(--shadow-primary)'}}>
               <Plus className="w-5 h-5" strokeWidth={2.6}/>
             </button>
           </div>
+          {listening&&<div className="mb-3 text-[12px] text-[var(--text-dim)] text-center animate-pulse">{t('voice.listening')}</div>}
           {/* Create options */}
           <div className="space-y-2">
             {[
