@@ -3,12 +3,14 @@ import { useBackClose } from '../hooks/useHardwareBack';
 import { format, isToday, isPast, isSameDay, addDays, addMonths, addYears, startOfMonth, endOfMonth, startOfWeek, getYear, getMonth, differenceInCalendarWeeks, differenceInCalendarDays, parseISO, isSameMonth, addWeeks } from 'date-fns';
 import { useT, useDateLocale } from '../i18n';
 import type { Session, Goal, SessionType, RecurringPattern } from '../types';
-import { ChevronLeft, ChevronRight, Plus, RotateCcw, X, Repeat, Clock, Target, CalendarDays, Bell, MapPin, Link as LinkIcon, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, RotateCcw, X, Repeat, Clock, Target, CalendarDays, Bell, MapPin, Link as LinkIcon, Check } from 'lucide-react';
 import { TimePicker } from './ui/TimePicker';
 import { DatePicker } from './ui/DatePicker';
 import { IconPicker, SessionIcon } from './ui/IconPicker';
 import { fmtDur } from '../utils/duration';
 import { WeekGrid } from './WeekGrid';
+import { SelectMenu } from './ui/SelectMenu';
+import { extractNLDate } from '../utils/nlDate';
 
 const HOUR_H = 52; // px per hour (taller rows → bigger, easier-to-tap blocks; labels every 2h)
 const SLOT = 15;   // snap to 15 min
@@ -360,23 +362,24 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
   const isCoarse = () => typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
   const handleDayTap = (e: React.MouseEvent) => { if (!draft && isCoarse()) handleDayDouble(e); };
 
-  const createFromDraft = () => {
-    if (!draft || !draft.title.trim()) return;
-    const baseDate = draft.date ? parseISO(draft.date) : days[draft.dayIdx];
-    const h0 = draft.allDay ? 0 : Math.floor(draft.startMin / 60);
-    const m0 = draft.allDay ? 0 : draft.startMin % 60;
+  const createFromDraft = (override?: Draft) => {
+    const d0 = override ?? draft;
+    if (!d0 || !d0.title.trim()) return;
+    const baseDate = d0.date ? parseISO(d0.date) : days[d0.dayIdx];
+    const h0 = d0.allDay ? 0 : Math.floor(d0.startMin / 60);
+    const m0 = d0.allDay ? 0 : d0.startMin % 60;
 
     // Editing an existing session → update it in place.
-    if (draft.editId) {
-      store.updateSession(draft.editId, {
+    if (d0.editId) {
+      store.updateSession(d0.editId, {
         date: format(baseDate, 'yyyy-MM-dd'), startHour: h0, startMinute: m0,
-        durationMinutes: draft.allDay ? 0 : draft.durationMinutes,
-        title: draft.title.trim(), goalId: draft.goalId, sessionType: draft.sessionType,
-        description: draft.description.trim(),
-        color: draft.color || undefined, icon: draft.icon || undefined,
-        allDay: draft.allDay || undefined,
-        reminderMinutes: draft.reminderMinutes >= 0 ? draft.reminderMinutes : undefined,
-        location: draft.location.trim() || undefined, url: draft.url.trim() || undefined,
+        durationMinutes: d0.allDay ? 0 : d0.durationMinutes,
+        title: d0.title.trim(), goalId: d0.goalId, sessionType: d0.sessionType,
+        description: d0.description.trim(),
+        color: d0.color || undefined, icon: d0.icon || undefined,
+        allDay: d0.allDay || undefined,
+        reminderMinutes: d0.reminderMinutes >= 0 ? d0.reminderMinutes : undefined,
+        location: d0.location.trim() || undefined, url: d0.url.trim() || undefined,
       });
       setDraft(null);
       return;
@@ -384,17 +387,17 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
 
     // If picked from an unscheduled backlog session (single, non-recurring), MOVE it
     // onto the schedule (keep its id) so completing it later also updates the goal.
-    if (draft.sourceId && draft.spanDays === 1 && draft.recurrence === 'none') {
-      const src = sessions.find(x => x.id === draft.sourceId);
+    if (d0.sourceId && d0.spanDays === 1 && d0.recurrence === 'none') {
+      const src = sessions.find(x => x.id === d0.sourceId);
       if (src && !src.date) {
         store.updateSession(src.id, {
           date: format(baseDate, 'yyyy-MM-dd'), startHour: h0, startMinute: m0,
-          durationMinutes: draft.allDay ? 0 : draft.durationMinutes,
-          title: draft.title.trim(), goalId: draft.goalId, sessionType: draft.sessionType,
-          description: draft.description.trim(),
-          color: draft.color || undefined, icon: draft.icon || undefined,
-          allDay: draft.allDay || undefined, reminderMinutes: draft.reminderMinutes >= 0 ? draft.reminderMinutes : undefined,
-          location: draft.location.trim() || undefined, url: draft.url.trim() || undefined,
+          durationMinutes: d0.allDay ? 0 : d0.durationMinutes,
+          title: d0.title.trim(), goalId: d0.goalId, sessionType: d0.sessionType,
+          description: d0.description.trim(),
+          color: d0.color || undefined, icon: d0.icon || undefined,
+          allDay: d0.allDay || undefined, reminderMinutes: d0.reminderMinutes >= 0 ? d0.reminderMinutes : undefined,
+          location: d0.location.trim() || undefined, url: d0.url.trim() || undefined,
         });
         setDraft(null);
         return;
@@ -402,39 +405,39 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     }
 
     // Multi-day: consecutive days from baseDate. Otherwise honour recurrence.
-    const span = Math.max(1, draft.spanDays || 1);
+    const span = Math.max(1, d0.spanDays || 1);
     const dates = span > 1
       ? Array.from({ length: span }, (_, i) => addDays(baseDate, i))
-      : expandRecurrence(baseDate, draft.recurrence, draft.weekdays);
-    const linked = span > 1 || draft.recurrence !== 'none';
+      : expandRecurrence(baseDate, d0.recurrence, d0.weekdays);
+    const linked = span > 1 || d0.recurrence !== 'none';
     const seriesId = linked ? `ser${Date.now()}` : undefined;
-    const h = draft.allDay ? 0 : Math.floor(draft.startMin / 60);
-    const m = draft.allDay ? 0 : draft.startMin % 60;
-    const note = draft.description.trim();
+    const h = d0.allDay ? 0 : Math.floor(d0.startMin / 60);
+    const m = d0.allDay ? 0 : d0.startMin % 60;
+    const note = d0.description.trim();
     const newSessions: Session[] = dates.map((d, i) => ({
       id: `s${Date.now()}-${i}`,
-      goalId: draft.goalId,
+      goalId: d0.goalId,
       date: format(d, 'yyyy-MM-dd'),
       startHour: h,
       startMinute: m,
-      durationMinutes: draft.allDay ? 0 : draft.durationMinutes,
-      title: draft.title.trim(),
+      durationMinutes: d0.allDay ? 0 : d0.durationMinutes,
+      title: d0.title.trim(),
       description: note,
       tasks: [],
-      sessionType: draft.sessionType,
+      sessionType: d0.sessionType,
       status: 'planned',
-      ...(draft.color ? { color: draft.color } : {}),
-      ...(draft.icon ? { icon: draft.icon } : {}),
-      ...(draft.allDay ? { allDay: true } : {}),
-      ...(draft.reminderMinutes >= 0 ? { reminderMinutes: draft.reminderMinutes } : {}),
-      ...(draft.location.trim() ? { location: draft.location.trim() } : {}),
-      ...(draft.url.trim() ? { url: draft.url.trim() } : {}),
+      ...(d0.color ? { color: d0.color } : {}),
+      ...(d0.icon ? { icon: d0.icon } : {}),
+      ...(d0.allDay ? { allDay: true } : {}),
+      ...(d0.reminderMinutes >= 0 ? { reminderMinutes: d0.reminderMinutes } : {}),
+      ...(d0.location.trim() ? { location: d0.location.trim() } : {}),
+      ...(d0.url.trim() ? { url: d0.url.trim() } : {}),
       ...(seriesId ? { seriesId } : {}),
-      ...(seriesId && draft.recurrence !== 'none' ? { recurrence: draft.recurrence as RecurringPattern } : {}),
+      ...(seriesId && d0.recurrence !== 'none' ? { recurrence: d0.recurrence as RecurringPattern } : {}),
     }));
-    if (draft.sourceTaskId && newSessions.length === 1) {
+    if (d0.sourceTaskId && newSessions.length === 1) {
       const sess = newSessions[0];
-      store.updateTask(draft.sourceTaskId, {
+      store.updateTask(d0.sourceTaskId, {
         sessionId: sess.id,
         title: sess.title,
         status: 'scheduled',
@@ -976,7 +979,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
   sessions: Session[];
   weekStartsOn: 0 | 1;
   onClose: () => void;
-  onCreate: () => void;
+  onCreate: (override?: Draft) => void;
 }) {
   const tr = useT();
   const locale = useDateLocale();
@@ -1040,8 +1043,31 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
     });
   };
 
-  const endMin = draft.startMin + draft.durationMinutes;
-  const setEnd = (mins: number) => upd({ durationMinutes: Math.max(15, mins - draft.startMin) });
+  const [showCal, setShowCal] = useState(false);
+  // Advanced fields live behind a fold; open it automatically when editing a
+  // session that already uses any of them.
+  const [showAdvanced, setShowAdvanced] = useState(() =>
+    !!(draft.color || draft.icon || draft.sessionType !== 'regular' || draft.spanDays > 1 || draft.location || draft.url || draft.description));
+
+  // NLP (same parser as task quick-add): "завтра 18:00" in the title prefills
+  // date/time/recurrence on create. Disabled while editing an existing session.
+  const nl = extractNLDate(draft.title);
+  const nlRecurrence = nl.recurring && ['daily', 'weekdays', 'weekends', 'weekly'].includes(nl.recurring)
+    ? nl.recurring as RecurringPattern : undefined;
+  const nlActive = !draft.editId && nl.title.trim() !== draft.title.trim() && !!(nl.dueDate || nl.remindAt || nlRecurrence) && !!nl.title.trim();
+  const handleCreate = () => {
+    if (!nlActive) { onCreate(); return; }
+    const patched: Draft = { ...draft, title: nl.title };
+    if (nl.dueDate) patched.date = nl.dueDate;
+    if (nl.remindAt) {
+      const [hh, mm] = nl.remindAt.slice(11).split(':').map(Number);
+      if (Number.isFinite(hh)) patched.startMin = hh * 60 + (mm || 0);
+    }
+    if (nlRecurrence) patched.recurrence = nlRecurrence;
+    setDraft(patched);
+    onCreate(patched);
+  };
+  const dateInWeek = days.some(d => format(d, 'yyyy-MM-dd') === baseDateStr);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
@@ -1066,7 +1092,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
               onChange={e => { upd({ title: e.target.value, sourceId: undefined }); setShowSug(e.target.value.trim().length > 0); }}
               onFocus={() => setShowSug(draft.title.trim().length > 0)}
               onBlur={() => setTimeout(() => setShowSug(false), 150)}
-              onKeyDown={e => { if (e.key === 'Enter') onCreate(); if (e.key === 'Escape') setShowSug(false); }}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowSug(false); }}
               placeholder={tr('sched.namePlaceholder')}
               className="w-full h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border)]" />
             {showSug && suggestions.length > 0 && (
@@ -1083,6 +1109,16 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {nlActive && (
+              <div className="mt-1.5 text-[11px] text-[var(--primary)] flex items-center gap-1.5">
+                <span>⚡</span>
+                <span className="capitalize">
+                  {nl.dueDate ? format(parseISO(nl.dueDate), 'EEE, d MMM', { locale }) : ''}
+                  {nl.remindAt ? ` · ${nl.remindAt.slice(11, 16)}` : ''}
+                  {nlRecurrence ? ` · ${tr('sched.rep.' + nlRecurrence)}` : ''}
+                </span>
               </div>
             )}
           </div>
@@ -1105,7 +1141,96 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             </div>
           </div>
 
+          {/* Day — week strip; full calendar behind a toggle */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{draft.spanDays > 1 ? tr('sched.startDay') : tr('sched.mode.day')}</label>
+              <button onClick={() => setShowCal(v => !v)}
+                className={`h-7 px-2 rounded-lg text-[10px] font-bold flex items-center gap-1 border transition-colors ${showCal || !dateInWeek ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                <CalendarDays className="w-3 h-3" />{tr('sched.otherDate')}
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {days.map((d, i) => {
+                const ds = format(d, 'yyyy-MM-dd');
+                const active = baseDateStr === ds;
+                return (
+                  <button key={i} onClick={() => upd({ dayIdx: i, date: ds })}
+                    className={`h-12 rounded-xl border text-center transition-all ${active ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
+                    <div className="text-[11px] font-bold uppercase">{format(d, 'EEE', { locale })}</div>
+                    <div className="text-[14px] font-bold leading-none mt-0.5">{format(d, 'd', { locale })}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {!dateInWeek && <p className="text-[11px] text-[var(--primary)] mt-2 capitalize">{format(baseDate, 'EEEE, d MMMM', { locale })}</p>}
+            {showCal && <div className="mt-2"><DatePicker value={baseDateStr} weekStartsOn={weekStartsOn} onChange={d => upd({ date: d })} /></div>}
+          </div>
+
+          {/* Time: start + duration presets; all-day toggle inline */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('sched.start')}</label>
+              <button onClick={() => upd({ allDay: !draft.allDay })} className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-[var(--text-dim)]">{tr('sched.allDay')}</span>
+                <span className={`w-9 h-5 rounded-full p-0.5 transition-colors ${draft.allDay ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'}`}>
+                  <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${draft.allDay ? 'translate-x-4' : ''}`} />
+                </span>
+              </button>
+            </div>
+            {!draft.allDay && (<>
+              <TimePicker label={tr('sched.start')} value={draft.startMin} onChange={v => upd({ startMin: v })} />
+              <div className="grid grid-cols-6 gap-1.5 mt-2">
+                {DUR_PRESETS.map(m => (
+                  <button key={m} onClick={() => upd({ durationMinutes: m })}
+                    className={`h-9 rounded-lg border text-[11px] font-medium transition-all ${draft.durationMinutes === m ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
+                    {m < 60 ? `${m}${tr('common.minShort')}` : `${Math.floor(m / 60)}${tr('common.hourShort')}${m % 60 ? `${m % 60}` : ''}`}
+                  </button>
+                ))}
+              </div>
+            </>)}
+          </div>
+
+          {/* Repeat (compact select; hidden while multi-day span is active) */}
+          {draft.spanDays === 1 && (
+            <div>
+              <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Repeat className="w-3 h-3" /> {tr('sched.repeat')}</label>
+              <SelectMenu value={draft.recurrence} onChange={v => upd({ recurrence: v as RecurringPattern | 'none' })} ariaLabel={tr('sched.repeat')}
+                options={REPEAT_OPTS.map(r => ({ value: r.id, label: tr(r.label) }))} />
+              {draft.recurrence === 'custom' && (
+                <div className="grid grid-cols-7 gap-1.5 mt-2.5">
+                  {WEEKDAY_PICKER.map(d => (
+                    <button key={d.v} onClick={() => toggleWeekday(d.v)}
+                      className={`h-9 rounded-lg text-[12px] font-bold border capitalize transition-all ${draft.weekdays.includes(d.v) ? 'border-[var(--primary)] bg-[var(--primary)]/20 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
+                      {weekdayLabel(d.v)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {draft.recurrence !== 'none' && (
+                draft.recurrence === 'custom' && !draft.weekdays.length
+                  ? <p className="text-[10px] text-amber-400/80 mt-2">{tr('sched.pickWeekday')}</p>
+                  : <p className="text-[10px] text-[var(--primary)]/80 mt-2">{tr('sched.willCreate',{n:occCount})}</p>
+              )}
+            </div>
+          )}
+
+          {/* Reminder (compact select) */}
+          <div>
+            <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Bell className="w-3 h-3" /> {tr('sched.reminder')}</label>
+            <SelectMenu value={String(draft.reminderMinutes)} onChange={v => upd({ reminderMinutes: Number(v) })} ariaLabel={tr('sched.reminder')}
+              options={REMINDER_OPTS.map(r => ({ value: String(r.v), label: tr(r.label) }))} />
+          </div>
+
+          {/* Advanced fold: color, icon, type, multi-day, location/url/note */}
+          <button onClick={() => setShowAdvanced(v => !v)}
+            className="w-full flex items-center justify-between h-10 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider hover:text-[var(--text)] transition-colors">
+            {tr('sched.advanced')}
+            <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+          {showAdvanced && (<>
           {/* Color */}
+
           <div>
             <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2.5">{tr('sched.color')}</label>
             <div className="grid grid-cols-8 gap-2.5 justify-items-center">
@@ -1135,57 +1260,18 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             <IconPicker value={draft.icon} color={effColor} onChange={k => upd({ icon: k })} />
           </div>
 
-          {/* All-day */}
-          <button onClick={() => upd({ allDay: !draft.allDay })}
-            className="w-full flex items-center justify-between h-11 px-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border)] transition-all">
-            <span className="text-[13px] text-[var(--text)] font-medium">{tr('sched.allDay')}</span>
-            <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${draft.allDay ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'}`}>
-              <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${draft.allDay ? 'translate-x-4' : ''}`} />
-            </span>
-          </button>
-
-          {/* Day — quick week picker + free date */}
+          {/* Type */}
           <div>
-            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{draft.spanDays > 1 ? tr('sched.startDay') : tr('sched.mode.day')}</label>
-            <div className="grid grid-cols-7 gap-1.5">
-              {days.map((d, i) => {
-                const ds = format(d, 'yyyy-MM-dd');
-                const active = baseDateStr === ds;
-                return (
-                  <button key={i} onClick={() => upd({ dayIdx: i, date: ds })}
-                    className={`h-12 rounded-xl border text-center transition-all ${active ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                    <div className="text-[11px] font-bold uppercase">{format(d, 'EEE', { locale })}</div>
-                    <div className="text-[14px] font-bold leading-none mt-0.5">{format(d, 'd', { locale })}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-2">
-              <DatePicker value={baseDateStr} weekStartsOn={weekStartsOn} onChange={d => upd({ date: d })} />
-            </div>
-          </div>
-
-          {/* Time + End (hidden for all-day) */}
-          {!draft.allDay && (<>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 whitespace-nowrap">{tr('sched.start')}</label>
-                <TimePicker label={tr('sched.start')} value={draft.startMin} onChange={v => upd({ startMin: v })} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 whitespace-nowrap">{tr('sched.end')}</label>
-                <TimePicker label={tr('sched.end')} value={Math.min(endMin, 24 * 60 - 5)} onChange={v => setEnd(v)} />
-              </div>
-            </div>
+            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{tr('sched.typeField')}</label>
             <div className="grid grid-cols-3 gap-2">
-              {DUR_PRESETS.map(m => (
-                <button key={m} onClick={() => upd({ durationMinutes: m })}
-                  className={`h-10 rounded-xl border text-[12px] font-medium transition-all ${draft.durationMinutes === m ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  {m < 60 ? `${m}${tr('common.minShort')}` : `${Math.floor(m / 60)}${tr('common.hourShort')}${m % 60 ? ` ${m % 60}${tr('common.minShort')}` : ''}`}
+              {TYPE_OPTS.map(t => (
+                <button key={t.id} onClick={() => upd({ sessionType: t.id })}
+                  className={`h-10 rounded-xl border text-[12px] font-medium transition-all ${draft.sessionType === t.id ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
+                  {tr(t.label)}
                 </button>
               ))}
             </div>
-          </>)}
+          </div>
 
           {/* Multi-day span */}
           <div>
@@ -1200,62 +1286,6 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             </div>
             {draft.spanDays > 1 && <p className="text-[10px] text-[var(--primary)]/80 mt-2">{tr('sched.spanInfo',{n:draft.spanDays})}</p>}
           </div>
-
-          {/* Reminder */}
-          <div>
-            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Bell className="w-3 h-3" /> {tr('sched.reminder')}</label>
-            <div className="grid grid-cols-3 gap-2">
-              {REMINDER_OPTS.map(r => (
-                <button key={r.v} onClick={() => upd({ reminderMinutes: r.v })}
-                  className={`h-10 rounded-xl text-[12px] font-medium border transition-all ${draft.reminderMinutes === r.v ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  {tr(r.label)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Type */}
-          <div>
-            <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{tr('sched.typeField')}</label>
-            <div className="grid grid-cols-3 gap-2">
-              {TYPE_OPTS.map(t => (
-                <button key={t.id} onClick={() => upd({ sessionType: t.id })}
-                  className={`h-10 rounded-xl border text-[12px] font-medium transition-all ${draft.sessionType === t.id ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                  {tr(t.label)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Recurrence (disabled while multi-day is active) */}
-          {draft.spanDays === 1 && (
-            <div>
-              <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-1.5"><Repeat className="w-3 h-3" /> {tr('sched.repeat')}</label>
-              <div className="grid grid-cols-2 gap-2">
-                {REPEAT_OPTS.map(r => (
-                  <button key={r.id} onClick={() => upd({ recurrence: r.id })}
-                    className={`h-10 rounded-xl text-[12px] font-medium border transition-all ${draft.recurrence === r.id ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                    {tr(r.label)}
-                  </button>
-                ))}
-              </div>
-              {draft.recurrence === 'custom' && (
-                <div className="grid grid-cols-7 gap-1.5 mt-2.5">
-                  {WEEKDAY_PICKER.map(d => (
-                    <button key={d.v} onClick={() => toggleWeekday(d.v)}
-                      className={`h-9 rounded-lg text-[12px] font-bold border capitalize transition-all ${draft.weekdays.includes(d.v) ? 'border-[var(--primary)] bg-[var(--primary)]/20 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                      {weekdayLabel(d.v)}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {draft.recurrence !== 'none' && (
-                draft.recurrence === 'custom' && !draft.weekdays.length
-                  ? <p className="text-[10px] text-amber-400/80 mt-2">{tr('sched.pickWeekday')}</p>
-                  : <p className="text-[10px] text-[var(--primary)]/80 mt-2">{tr('sched.willCreate',{n:occCount})}</p>
-              )}
-            </div>
-          )}
 
           {/* Location / URL / Note */}
           <div className="space-y-3 pt-1">
@@ -1272,12 +1302,13 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             <textarea value={draft.description} onChange={e => upd({ description: e.target.value })} placeholder={tr('sched.note')} rows={2}
               className="w-full rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border)] resize-none" />
           </div>
+          </>)}
         </div>
 
         {/* Footer */}
         <div className="border-t border-[var(--border)] p-4 flex gap-2">
           <button onClick={onClose} className="h-11 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[13px] font-bold text-[var(--text)] hover:text-[var(--text)] transition-colors">{tr('common.cancel')}</button>
-          <button onClick={onCreate} disabled={!draft.title.trim()}
+          <button onClick={handleCreate} disabled={!draft.title.trim()}
             className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:bg-[var(--border)] disabled:text-[var(--text-mute)] flex items-center justify-center gap-2 hover:opacity-90 transition-colors">
             <Plus className="w-4 h-4" /> {draft.editId ? tr('sched.saveBtn') : tr('sched.createBtn')}{!draft.editId && (draft.spanDays > 1 ? ` (${draft.spanDays})` : draft.recurrence !== 'none' ? ` (${occCount})` : '')}
           </button>
