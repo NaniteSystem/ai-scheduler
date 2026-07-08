@@ -206,6 +206,27 @@ function TemplatesDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: (
 
 // ─── Analytics (H2) ────────────────────────────────────────────────────────
 
+// GitHub-style full-year grid (52+ weeks, column = week, Monday-aligned).
+function YearGrid({ h }: { h: Habit }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = addDays(today, -363);
+  const extra = (start.getDay() + 6) % 7; // pad back to Monday
+  const cells = habitHeatmap(h, 364 + extra);
+  return (
+    <div className="overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="grid grid-rows-7 grid-flow-col gap-[2px] w-max">
+        {cells.map(c => {
+          let style: React.CSSProperties = { background: 'var(--surface-2)' };
+          if (c.status === 'failed') style = { background: '#ef444455' };
+          else if (c.ratio > 0) style = { background: h.color, opacity: 0.25 + c.ratio * 0.75 };
+          else if (c.due) style = { background: 'var(--border)' };
+          return <div key={c.date} title={`${c.date}${c.status ? ' · ' + c.status : ''}`} className="w-[7px] h-[7px] rounded-[2px]" style={style} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HeatStrip({ h }: { h: Habit }) {
   const { setHabitStatus, clearHabitDay } = useStore();
   const cells = habitHeatmap(h, 84);
@@ -227,6 +248,32 @@ function HeatStrip({ h }: { h: Habit }) {
               className="aspect-square min-w-0 rounded-[5px] transition-transform active:scale-125 hover:ring-1 hover:ring-[var(--text-dim)]" style={style} />
           : <div key={c.date} title={c.date} className="aspect-square min-w-0 rounded-[5px]" style={style} />;
       })}
+    </div>
+  );
+}
+
+function HabitStatCard({ h }: { h: Habit }) {
+  const tr = useT();
+  const [yearMode, setYearMode] = useState(false);
+  const streak = habitStreak(h);
+  const best = habitBestStreak(h);
+  const rate = habitRate(h, 30);
+  return (
+    <div className="card p-4 w-full">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{ background: `${h.color}22` }}>{h.emoji || '✅'}</div>
+        <span className="text-[14px] font-bold text-[var(--text)] truncate flex-1">{h.title}</span>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] shrink-0">
+          <span className="flex items-center gap-1 text-amber-500 font-bold"><Flame className="w-3.5 h-3.5" />{streak}</span>
+          <span className="text-[var(--text-dim)]">{tr('habits.best')} <b className="text-[var(--text)]">{best}</b></span>
+          <span className="text-[var(--text-dim)]">30d <b className="text-[var(--text)]">{rate == null ? '–' : Math.round(rate * 100) + '%'}</b></span>
+          <button onClick={() => setYearMode(v => !v)}
+            className={`h-6 px-2 rounded-md text-[10px] font-bold border transition-colors ${yearMode ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>
+            {yearMode ? tr('habits.quarter') : tr('habits.year')}
+          </button>
+        </div>
+      </div>
+      {yearMode ? <YearGrid h={h} /> : <HeatStrip h={h} />}
     </div>
   );
 }
@@ -310,25 +357,7 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
       {/* Per-habit cards */}
       <section className="anim-fade space-y-2.5">
         <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-[.15em] flex items-center gap-1.5"><Award className="w-3.5 h-3.5" />{tr('habits.perHabit')}</h3>
-        {habits.map(h => {
-          const streak = habitStreak(h);
-          const best = habitBestStreak(h);
-          const rate = habitRate(h, 30);
-          return (
-            <div key={h.id} className="card p-4 w-full">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{ background: `${h.color}22` }}>{h.emoji || '✅'}</div>
-                <span className="text-[14px] font-bold text-[var(--text)] truncate flex-1">{h.title}</span>
-                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] shrink-0">
-                  <span className="flex items-center gap-1 text-amber-500 font-bold"><Flame className="w-3.5 h-3.5" />{streak}</span>
-                  <span className="text-[var(--text-dim)]">{tr('habits.best')} <b className="text-[var(--text)]">{best}</b></span>
-                  <span className="text-[var(--text-dim)]">30d <b className="text-[var(--text)]">{rate == null ? '–' : Math.round(rate * 100) + '%'}</b></span>
-                </div>
-              </div>
-              <HeatStrip h={h} />
-            </div>
-          );
-        })}
+        {habits.map(h => <HabitStatCard key={h.id} h={h} />)}
       </section>
     </div>
   );
