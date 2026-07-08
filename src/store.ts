@@ -423,7 +423,6 @@ interface S {
   activeView: 'dashboard' | 'goals' | 'week' | 'inbox' | 'habits' | 'progress' | 'ai' | 'architect' | 'planner' | 'archive' | 'settings';
   gtdFilter: string;
   activeContext: string;
-  activeArea: string;
   activePriority: string;
   searchQuery: string;
   focusTimer: FocusTimer | null;
@@ -458,7 +457,6 @@ interface S {
   setActiveView: (v: S['activeView']) => void;
   setGTDFilter: (f: string) => void;
   setActiveContext: (c: string) => void;
-  setActiveArea: (a: string) => void;
   setActivePriority: (p: string) => void;
   setSearchQuery: (q: string) => void;
   setWeekOffset: (n: number) => void;
@@ -592,7 +590,6 @@ export const useStore = create<S>()(persist((set) => ({
   activeView: 'dashboard',
   gtdFilter: 'inbox',
   activeContext: 'all',
-  activeArea: 'all',
   activePriority: 'all',
   searchQuery: '',
   focusTimer: null,
@@ -643,7 +640,6 @@ export const useStore = create<S>()(persist((set) => ({
   setActiveView: (v) => set({ activeView: v }),
   setGTDFilter: (f) => set({ gtdFilter: f, activeContext: 'all', activePriority: 'all' }),
   setActiveContext: (c) => set({ activeContext: c }),
-  setActiveArea: (a) => set({ activeArea: a }),
   setActivePriority: (p) => set({ activePriority: p }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setWeekOffset: (n) => set({ weekOffset: n }),

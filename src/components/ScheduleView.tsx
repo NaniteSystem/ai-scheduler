@@ -772,44 +772,76 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
 
       {/* ═══════════ YEAR VIEW (12 month cells) ═══════════ */}
       {mode === 'year' && (() => {
+        // Goals-timeline: one row per goal, its span drawn across the 12 months.
         const year = getYear(yearDate);
-        // Goal spans (start → end) for this year
-        const spans = goals.map(g => {
-          const gDates = sessions.filter(s => s.goalId === g.id && !!s.date).map(s => parseISO(s.date)).sort((a, b) => a.getTime() - b.getTime());
-          const start = gDates[0] || new Date(year, 0, 1);
-          const weeks = Math.max(1, Math.ceil(g.totalHoursEstimated / Math.max(g.hoursPerWeekTarget, 1)));
-          const end = g.deadline ? parseISO(g.deadline) : addWeeks(start, weeks);
-          return { g, start, end };
-        });
+        const yStart = new Date(year, 0, 1).getTime();
+        const yEnd = new Date(year + 1, 0, 1).getTime();
+        const pctOf = (t: number) => Math.min(100, Math.max(0, ((t - yStart) / (yEnd - yStart)) * 100));
+        const spans = goals
+          .filter(g => (g.status ?? 'active') !== 'completed')
+          .map(g => {
+            const gDates = sessions.filter(s => s.goalId === g.id && !!s.date).map(s => parseISO(s.date)).sort((a, b) => a.getTime() - b.getTime());
+            const start = gDates[0] || new Date(year, 0, 1);
+            const weeks = Math.max(1, Math.ceil(g.totalHoursEstimated / Math.max(g.hoursPerWeekTarget, 1)));
+            const end = g.deadline ? parseISO(g.deadline) : addWeeks(start, weeks);
+            return { g, start, end };
+          })
+          .filter(s => s.end.getTime() > yStart && s.start.getTime() < yEnd);
+        const monthCounts = Array.from({ length: 12 }, (_, m) =>
+          sessions.filter(s => { if (!s.date) return false; const d = parseISO(s.date); return getYear(d) === year && getMonth(d) === m; }).length);
+        const maxCount = Math.max(1, ...monthCounts);
         const todayY = getYear(today), todayM = getMonth(today);
+        const showToday = year === todayY;
         return (
           <div className="flex-1 card overflow-auto min-w-0 p-4 md:p-5 pb-[calc(env(safe-area-inset-bottom)+96px)] md:pb-5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {monthsShort.map((mLabel, m) => {
-                const mStart = new Date(year, m, 1);
-                const mEnd = endOfMonth(mStart);
-                const active = spans.filter(s => s.start <= mEnd && s.end >= mStart).map(s => s.g);
-                const mSessions = sessions.filter(s => { if(!s.date) return false; const d = parseISO(s.date); return getYear(d) === year && getMonth(d) === m; });
-                const isCur = year === todayY && m === todayM;
-                return (
-                  <button key={m} onClick={() => { setMode('month'); setMonthOffset((year - todayY) * 12 + (m - todayM)); }}
-                    className={`text-left rounded-2xl border p-4 h-[150px] flex flex-col transition-all hover:border-[var(--border)] hover:bg-[var(--surface)] ${isCur ? 'border-[var(--primary)]/40 bg-[var(--primary)]/[.06]' : 'border-[var(--border)] bg-[var(--surface)]'}`}>
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className={`text-[15px] font-bold ${isCur ? 'text-[var(--primary)]' : 'text-[var(--text)]'}`}>{mLabel}</span>
-                      {mSessions.length > 0 && <span className="text-[10px] text-[var(--text-dim)] mono">{mSessions.length}</span>}
-                    </div>
-                    <div className="flex-1 flex flex-wrap gap-1.5 content-start overflow-hidden">
-                      {active.length > 0 ? active.map(g => (
-                        <span key={g.id} title={g.title} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium" style={{ background: `${g.color}22`, color: g.color }}>
-                          {g.emoji}
-                        </span>
-                      )) : <span className="text-[10px] text-[var(--text-dim)]">{tr('sched.noActiveGoals')}</span>}
-                    </div>
-                    {active.length > 0 && <div className="text-[11px] text-[var(--text-dim)] mt-2">{tr('sched.goalsActiveN',{n:active.length})}</div>}
-                  </button>
-                );
-              })}
+            {/* Month header (tap a month → month view) */}
+            <div className="grid grid-cols-12 mb-1">
+              {monthsShort.map((mLabel, m) => (
+                <button key={m} onClick={() => { setMode('month'); setMonthOffset((year - todayY) * 12 + (m - todayM)); }}
+                  className={`text-[10px] font-bold py-1.5 rounded-lg transition-colors ${showToday && m === todayM ? 'text-[var(--primary)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                  {mLabel.slice(0, 1)}
+                </button>
+              ))}
             </div>
+            {/* Session density strip */}
+            <div className="grid grid-cols-12 gap-[3px] mb-4">
+              {monthCounts.map((c, m) => (
+                <div key={m} title={`${monthsShort[m]}: ${c}`} className="h-2 rounded-full"
+                  style={{ background: c === 0 ? 'var(--surface-2)' : 'var(--primary)', opacity: c === 0 ? 1 : 0.25 + 0.75 * (c / maxCount) }} />
+              ))}
+            </div>
+            {/* Goal timeline rows */}
+            {spans.length === 0 ? (
+              <div className="text-[12px] text-[var(--text-dim)] py-8 text-center">{tr('sched.noActiveGoals')}</div>
+            ) : (
+              <div className="relative">
+                {/* month grid lines + today marker */}
+                <div className="absolute inset-y-0 left-24 md:left-32 right-0 pointer-events-none">
+                  {Array.from({ length: 11 }, (_, i) => (
+                    <div key={i} className="absolute inset-y-0 w-px bg-[var(--border)] opacity-50" style={{ left: `${((i + 1) / 12) * 100}%` }} />
+                  ))}
+                  {showToday && <div className="absolute inset-y-0 w-[2px] bg-[var(--primary)] z-10" style={{ left: `${pctOf(today.getTime())}%` }} />}
+                </div>
+                <div className="space-y-2.5">
+                  {spans.map(({ g, start, end }) => {
+                    const left = pctOf(start.getTime());
+                    const width = Math.max(2.5, pctOf(end.getTime()) - left);
+                    return (
+                      <div key={g.id} className="flex items-center gap-2">
+                        <div className="w-[88px] md:w-[120px] shrink-0 flex items-center gap-1.5 min-w-0">
+                          <span className="text-[14px] shrink-0">{g.emoji}</span>
+                          <span className="text-[11px] font-medium text-[var(--text)] truncate">{g.title}</span>
+                        </div>
+                        <div className="relative flex-1 h-7 rounded-lg bg-[var(--surface-2)]/60 overflow-hidden">
+                          <div title={g.title} className="absolute inset-y-1 rounded-md"
+                            style={{ left: `${left}%`, width: `${width}%`, background: `${g.color}33`, borderLeft: `3px solid ${g.color}` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="text-[11px] text-[var(--text-dim)] mt-4">{tr('sched.yearHint',{year})}</div>
           </div>
         );

@@ -142,15 +142,12 @@ export interface GTDTask {
   energyLevel?: EnergyLevel;
   remindAt?: string;     // ISO datetime to fire a local notification reminder
   context?: TaskContext;
-  project?: string;      // project id
-  area?: string;         // area of life
+  project?: string;      // free-text project name (grouping in GTD views)
   delegateTo?: string;
-  waitingSince?: string;
   tags?: string[];
   subtasks?: { id: string; title: string; done: boolean }[];
   recurring?: RecurringPattern;
   recurFromCompletion?: boolean;   // Todoist "every!": next occurrence counts from completion, not due date
-  estimatedPomodoros?: number;
   completedPomodoros?: number;
   isTodayFocus?: boolean;
   isArchived?: boolean;
@@ -189,25 +186,6 @@ export interface ReflectionEntry {
   mood?: number;                      // 1..5
   note?: string;                      // free-text journal
   metrics?: Record<string, number>;   // values keyed by MetricDef.id
-}
-
-export interface GTDProject {
-  id: string;
-  title: string;
-  description?: string;
-  area?: string;
-  color?: string;
-  deadline?: string;
-  status: 'active' | 'paused' | 'completed';
-  taskIds: string[];
-  createdAt: string;
-}
-
-export interface GTDArea {
-  id: string;
-  title: string;
-  emoji?: string;
-  color?: string;
 }
 
 // ─── AI Scheduling Engine ───────────────────────────────────────────────
