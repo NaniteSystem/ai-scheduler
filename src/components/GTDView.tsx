@@ -3,6 +3,7 @@ import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticSuccess, hapticTick } from '../utils/haptics';
 import { extractNLDate } from '../utils/nlDate';
+import { collectWeekStats, requestWeeklyReview, type WeeklyReviewText } from '../ai/weeklyReview';
 import { nextDueDate, useStore } from '../store';
 import { useT, useDateLocale } from '../i18n';
 import type { GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern } from '../types';
@@ -729,10 +730,21 @@ function EditTaskForm({ task }: { task: GTDTask }) {
 // ─── Weekly Review Modal ─────────────────────────────────────────────────────
 function WeeklyReviewModal() {
   const tr = useT();
-  const { weeklyReviewOpen, closeWeeklyReview, gtdTasks } = useStore();
+  const { weeklyReviewOpen, closeWeeklyReview, gtdTasks, sessions, habits, goals, lang } = useStore();
   const [step, setStep] = useState(0);
   const setGTDFilter = useStore(s => s.setGTDFilter);
+  const [ai, setAi] = useState<{ state: 'idle' | 'loading' | 'error' } | { state: 'done'; review: WeeklyReviewText }>({ state: 'idle' });
   if (!weeklyReviewOpen) return null;
+
+  const runAiReview = async () => {
+    setAi({ state: 'loading' });
+    try {
+      const review = await requestWeeklyReview(collectWeekStats(sessions, gtdTasks, habits, goals), lang);
+      setAi({ state: 'done', review });
+    } catch {
+      setAi({ state: 'error' });
+    }
+  };
 
   const steps = [
     { title: tr('gtd.review1t'), desc: tr('gtd.review1d'), filter: 'inbox', done: gtdTasks.filter(t=>t.status==='inbox').length === 0 },
@@ -751,6 +763,32 @@ function WeeklyReviewModal() {
 
   return (
     <Drawer open={true} onClose={closeWeeklyReview} width="lg" title={tr('gtd.weeklyReview')} subtitle={tr('gtd.reviewStep',{n:step+1,total:steps.length})}>
+      {/* AI week summary */}
+      <div className="mb-5 rounded-2xl border border-[var(--primary)]/25 bg-[var(--primary)]/[.06] p-4">
+        {ai.state === 'idle' && (
+          <button onClick={runAiReview} className="w-full h-10 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold flex items-center justify-center gap-1.5">
+            <Sparkles className="w-4 h-4" />{tr('wr.aiButton')}
+          </button>
+        )}
+        {ai.state === 'loading' && <div className="text-[12px] text-[var(--text-dim)] text-center py-2 animate-pulse">{tr('wr.loading')}</div>}
+        {ai.state === 'error' && (
+          <div className="text-center py-1">
+            <div className="text-[12px] text-[var(--text-dim)] mb-2">{tr('wr.error')}</div>
+            <button onClick={runAiReview} className="h-8 px-3 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--text)]">{tr('gw.retry')}</button>
+          </div>
+        )}
+        {ai.state === 'done' && (
+          <div className="space-y-3">
+            <p className="text-[13px] text-[var(--text)] leading-relaxed">{ai.review.summary}</p>
+            {([['wr.wins', ai.review.wins, 'text-emerald-500'], ['wr.concerns', ai.review.concerns, 'text-amber-500'], ['wr.suggestions', ai.review.suggestions, 'text-[var(--primary)]']] as const).map(([key, items, color]) => items.length > 0 && (
+              <div key={key}>
+                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${color}`}>{tr(key)}</div>
+                <ul className="space-y-1">{items.map((x, i) => <li key={i} className="text-[12px] text-[var(--text)] leading-snug flex gap-1.5"><span className="text-[var(--text-dim)]">·</span>{x}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="space-y-1 mb-5">{steps.map((_s, i) => <div key={i} className={`h-1 rounded-full ${i <= step ? 'bg-emerald-500' : 'bg-[var(--border)]'}`} style={{width: `${100/steps.length}%`}}/>)}</div>
       <div className="space-y-3">
         {steps.map((s, i) => (
