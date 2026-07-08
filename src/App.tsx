@@ -5,6 +5,7 @@ import { useStore, habitDueOn, habitStreak, dailyCompletion, goalInsight, goalPr
 import { useT, useDateLocale } from './i18n';
 import { useEffectiveTheme } from './hooks/useEffectiveTheme';
 import { syncReminders } from './utils/notifications';
+import { syncWidget } from './utils/widget';
 import { initTimerActionListener } from './utils/timerNotifications';
 import { popHardwareBack, useBackClose } from './hooks/useHardwareBack';
 import { TimerBar, TimerCard, TimerLauncher } from './components/FocusTimer';
@@ -176,6 +177,7 @@ export default function App(){
   const{goals,sessions,gtdTasks,habits,activeView,weekOffset,userName,onboarded,introCourseCompleted,schedulePrefs,density}=store;
   const theme=useEffectiveTheme();
   useEffect(()=>{ syncReminders(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits,store.notifPrefs,store.habitRemindersEnabled]);
+  useEffect(()=>{ syncWidget(sessions,gtdTasks,habits); },[sessions,gtdTasks,habits,store.lang]);
   const undoTs=store.pendingUndo?.ts;
   useEffect(()=>{ if(!undoTs) return; const id=setTimeout(()=>useStore.getState().clearUndo(),5000); return ()=>clearTimeout(id); },[undoTs]);
   useEffect(()=>{ store.syncScheduledSessions(); },[sessions.length,gtdTasks.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -195,6 +197,14 @@ export default function App(){
   // ── Hardware back: layer stack (modals close top-first) ───────────────
   useBackClose(!!store.confirmDialog,store.closeConfirm);
   useBackClose(captureOpen,()=>setCaptureOpen(false));
+  // Deep link from the home-screen widget: nebulla://capture opens the quick-add sheet.
+  useEffect(()=>{
+    let h:{remove:()=>void}|undefined; let disposed=false;
+    const isCapture=(u?:string)=>!!u&&u.startsWith('nebulla://capture');
+    CapacitorApp.addListener('appUrlOpen',(e)=>{ if(isCapture(e.url)) setCaptureOpen(true); }).then(x=>{ if(disposed)x.remove(); else h=x; });
+    CapacitorApp.getLaunchUrl().then(r=>{ if(isCapture(r?.url)) setCaptureOpen(true); }).catch(()=>{});
+    return ()=>{ disposed=true; h?.remove(); };
+  },[]);
   useBackClose(quickHabitOpen,()=>setQuickHabitOpen(false));
   useBackClose(!!store.timerLauncher,store.closeTimerLauncher);
   useBackClose(!!store.sessionModalId,store.closeSessionModal);

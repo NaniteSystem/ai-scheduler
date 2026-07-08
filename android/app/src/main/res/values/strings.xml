@@ -4,4 +4,6 @@
     <string name="title_activity_main">Nebulla</string>
     <string name="package_name">com.scheduler.app</string>
     <string name="custom_url_scheme">com.scheduler.app</string>
+    <string name="widget_today_label">Nebulla — Today</string>
+    <string name="widget_today_desc">Today\'s sessions, tasks and habits with quick add</string>
 </resources>

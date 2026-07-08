@@ -655,6 +655,7 @@ const en: Dict = {
   'notif.today': 'Today',
   'notif.at': 'At {time}',
   'notif.habit': 'Time for your habit',
+  'widget.empty': 'All clear for today 🎉',
 
   // ── Goal categories ──
   'cat.language': 'Language', 'cat.reading': 'Reading', 'cat.sport': 'Fitness', 'cat.course': 'Course',
@@ -1432,6 +1433,7 @@ const ru: Dict = {
   'notif.today': 'Сегодня',
   'notif.at': 'В {time}',
   'notif.habit': 'Время для привычки',
+  'widget.empty': 'На сегодня всё сделано 🎉',
 
   // ── Goal categories ──
   'cat.language': 'Языки', 'cat.reading': 'Чтение', 'cat.sport': 'Фитнес', 'cat.course': 'Курс',
@@ -2209,6 +2211,7 @@ const ja: Dict = {
   'notif.today': '今日',
   'notif.at': '{time}に',
   'notif.habit': '習慣の時間です',
+  'widget.empty': '今日は完了です 🎉',
 
   // ── Goal categories ──
   'cat.language': '言語', 'cat.reading': '読書', 'cat.sport': 'フィットネス', 'cat.course': 'コース',
