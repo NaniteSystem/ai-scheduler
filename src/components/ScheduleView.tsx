@@ -213,7 +213,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     const seed = store.scheduleSeed;
     if (!seed) return;
     setMode('week');
-    setDraft({ title: seed.title, goalId: goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', sourceTaskId: seed.taskId, ...DRAFT_DEFAULTS });
+    setDraft({ title: seed.title, goalId: seed.goalId ?? goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', sourceTaskId: seed.taskId, ...DRAFT_DEFAULTS });
     store.consumeScheduleSeed();
   }, [store.scheduleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -444,8 +444,8 @@ interface S {
   confirmDialog: ConfirmOpts | null;
   askConfirm: (o: ConfirmOpts) => void;
   closeConfirm: () => void;
-  scheduleSeed: { title: string; durationMinutes: number; taskId?: string } | null;
-  scheduleFromTask: (title: string, durationMinutes: number, taskId?: string) => void;
+  scheduleSeed: { title: string; durationMinutes: number; taskId?: string; goalId?: string } | null;
+  scheduleFromTask: (title: string, durationMinutes: number, taskId?: string, goalId?: string) => void;
   consumeScheduleSeed: () => void;
   editSessionId: string | null;
   requestEditSession: (id: string) => void;
@@ -608,7 +608,7 @@ export const useStore = create<S>()(persist((set) => ({
   askConfirm: (o) => set({ confirmDialog: o }),
   closeConfirm: () => set({ confirmDialog: null }),
   scheduleSeed: null,
-  scheduleFromTask: (title, durationMinutes, taskId) => set({ scheduleSeed: { title, durationMinutes, taskId }, activeView: 'week' }),
+  scheduleFromTask: (title, durationMinutes, taskId, goalId) => set({ scheduleSeed: { title, durationMinutes, taskId, goalId }, activeView: 'week' }),
   consumeScheduleSeed: () => set({ scheduleSeed: null }),
   editSessionId: null,
   requestEditSession: (id) => set({ editSessionId: id, sessionModalId: null, activeView: 'week' }),

@@ -5,7 +5,7 @@ import type { Goal, RoadmapNode } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
   TrendingUp, ChevronRight, Check, AlertCircle, Play, BookOpen,
-  Activity, Award, BarChart3, Plus, Edit2, X, ExternalLink
+  Activity, Award, BarChart3, Plus, Edit2, X, ExternalLink, CalendarPlus
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
@@ -824,6 +824,12 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                       </div>
                     ))}
                   </div>
+                )}
+                {!nodeModal.node.done && (
+                  <button onClick={() => { useStore.getState().scheduleFromTask(lt(nodeModal.node.title, lang), 60, undefined, goal.id); setNodeModal(null); }}
+                    className="w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 bg-[var(--primary)] text-white">
+                    <CalendarPlus className="w-4 h-4" />{tr('gr.scheduleStep')}
+                  </button>
                 )}
                 <button onClick={() => { toggleRoadmapNode(goal.id, nodeModal.node.id); setNodeModal((m) => m ? { ...m, node: { ...m.node, done: !m.node.done } } : null); }}
                   className={`w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 ${nodeModal.node.done ? 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)]' : 'bg-emerald-500 text-white'}`}>
