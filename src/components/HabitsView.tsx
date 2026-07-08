@@ -257,6 +257,7 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
     { id: 'perfect', icon: '💯', earned: perfectDay },
     { id: 'consistent', icon: '🌟', earned: anyConsistent },
     { id: 'centurion', icon: '🏆', earned: bestEver >= 30 },
+    { id: 'legend', icon: '👑', earned: bestEver >= 100 },
   ];
 
   const ringPct = todayPct.pct == null ? 0 : Math.round(todayPct.pct * 100);
@@ -296,7 +297,7 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
       {/* Achievements */}
       <section className="anim-fade">
         <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-[.15em] mb-2.5 flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5" />{tr('habits.achievements')}</h3>
-        <div className="grid grid-cols-5 gap-2 max-w-[440px] mx-auto">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 max-w-[520px] mx-auto">
           {badges.map(b => (
             <div key={b.id} title={tr('habits.badge.' + b.id + '.desc')} className={`card p-2.5 flex flex-col items-center gap-1 text-center ${b.earned ? '' : 'opacity-30 grayscale'}`}>
               <span className="text-[22px] leading-none">{b.icon}</span>
