@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "updated": "2026-07-07",
+  "updated": "2026-07-09",
   "_readme": "Источник правды для карты проекта. Claude читает и обновляет этот файл; страница PROJECT-MAP.html импортирует/экспортирует его. Статусы: done | part | todo | block.",
   "modules": [
     {
@@ -46,15 +46,15 @@
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Релизная подпись APK",
-          "desc": "keystore + signingConfig + assembleRelease для Google Play.",
+          "desc": "release.keystore + signingConfig, builds/Nebulla-release.apk подпись verified (2026-07-08).",
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Сплэш-экран APK",
-          "desc": "assets/splash.png.",
+          "desc": "Splash-ассеты и стили в android/ (закоммичено 86182d9/060b341).",
           "refs": []
         },
         {
@@ -123,15 +123,15 @@
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Доп. вопросы (возраст, откуда узнал) + интро-карусель",
-          "desc": "Есть в референсах, по желанию.",
+          "desc": "Шаги «возраст» и «откуда узнал» (опциональные, повторный тап снимает выбор) добавлены в онбординг; ответы в userProfile (2026-07-09). Интро-карусель = IntroCourse (уже был).",
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Использовать userProfile",
-          "desc": "Подбирать стартовые цели/привычки по ответам.",
+          "desc": "focus/struggles из онбординга подаются в AI-промпты: планировщик недели и AI-обзор недели (2026-07-09).",
           "refs": []
         }
       ]
@@ -155,9 +155,9 @@
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Вернуть стат-панели / Priority Focus",
-          "desc": "Убраны при редизайне Home.",
+          "desc": "Best Streak / Hours Logged / Active Goals — плитки в Progress (6d930bc); Priority Focus покрыт карточками Goals.",
           "refs": []
         }
       ]
@@ -374,15 +374,15 @@
           "refs": []
         },
         {
-          "status": "part",
+          "status": "done",
           "title": "AI = локальный алгоритм",
-          "desc": "Эвристика, не реальная модель.",
+          "desc": "Гибрид: LLM-стратегия + локальный сборщик (engine.ts) гарантирует корректность; фолбэк rule-based.",
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Реальный Claude API (опц.)",
-          "desc": "Ключ, стоимость, онлайн. Нужно решение.",
+          "desc": "Реальный LLM через Vercel-прокси: roadmap целей, мульти-недельный планировщик, AI-обзор недели, AI-разбор инбокса.",
           "refs": []
         }
       ]
@@ -412,9 +412,9 @@
           "refs": []
         },
         {
-          "status": "todo",
+          "status": "done",
           "title": "Кастомизация уведомлений + иконка",
-          "desc": "Частота/контент.",
+          "desc": "Settings → Notifications: тумблеры сессии/задачи/привычки + тихие часы (43499e4).",
           "refs": []
         }
       ]
@@ -461,7 +461,20 @@
       "icon": "💡",
       "title": "12. Мои идеи / новое",
       "sub": "Добавляй сюда свои функции и референсы",
-      "items": []
+      "items": [
+        {
+          "status": "done",
+          "title": "Фича-марафон 2026-07-08/09",
+          "desc": "Виджет Android, глобальный поиск, NLP-даты EN/RU/JA, tag-фильтры, CSV-импорт Todoist/TickTick, roadmap-шаг→сессия, AI weekly review, AI-разбор инбокса, голосовой ввод, гибкие привычки N раз/нед, годовой heatmap, year-view→goals-timeline.",
+          "refs": []
+        },
+        {
+          "status": "done",
+          "title": "Компактное создание сессии",
+          "desc": "Форма переосмыслена: NLP в названии, «Дополнительно» свёрнуто, End-пикер удалён (dc44fcd).",
+          "refs": []
+        }
+      ]
     }
   ]
 }

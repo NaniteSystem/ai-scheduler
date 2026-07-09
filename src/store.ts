@@ -434,8 +434,7 @@ interface S {
   addMetricDef: (m: MetricDef) => void;
   deleteMetricDef: (id: string) => void;
   habitRemindersEnabled: boolean;
-  defaultReminderTime: string;
-  setNotifPref: (patch: { habitRemindersEnabled?: boolean; defaultReminderTime?: string }) => void;
+  setNotifPref: (patch: { habitRemindersEnabled?: boolean }) => void;
   notifPrefs: NotifPrefs;
   setNotifPrefs: (patch: Partial<NotifPrefs>) => void;
   density: 'comfortable' | 'compact';
@@ -443,8 +442,8 @@ interface S {
   theme: 'light' | 'dark' | 'system';
   setTheme: (t: 'light' | 'dark' | 'system') => void;
   userName: string;
-  userProfile: { focus: string[]; struggles: string[]; sleep: string } | null;
-  setUserProfile: (p: { focus: string[]; struggles: string[]; sleep: string }) => void;
+  userProfile: { focus: string[]; struggles: string[]; sleep: string; age?: string; source?: string } | null;
+  setUserProfile: (p: { focus: string[]; struggles: string[]; sleep: string; age?: string; source?: string }) => void;
   onboarded: boolean;
   introCourseCompleted: boolean;
   completeIntroCourse: () => void;
@@ -602,7 +601,6 @@ export const useStore = create<S>()(persist((set) => ({
   addMetricDef: (m) => set((s) => ({ metricDefs: [...s.metricDefs, m] })),
   deleteMetricDef: (id) => set((s) => ({ metricDefs: s.metricDefs.filter((m) => m.id !== id) })),
   habitRemindersEnabled: true,
-  defaultReminderTime: '',
   setNotifPref: (patch) => set(() => patch),
   notifPrefs: { sessions: true, tasks: true, quietEnabled: false, quietStart: '22:00', quietEnd: '08:00' },
   setNotifPrefs: (patch) => set((s) => ({ notifPrefs: { ...s.notifPrefs, ...patch } })),
@@ -668,7 +666,6 @@ export const useStore = create<S>()(persist((set) => ({
     theme: data?.theme === 'light' || data?.theme === 'dark' ? data.theme : s.theme,
     density: data?.density === 'comfortable' || data?.density === 'compact' ? data.density : s.density,
     habitRemindersEnabled: typeof data?.habitRemindersEnabled === 'boolean' ? data.habitRemindersEnabled : s.habitRemindersEnabled,
-    defaultReminderTime: typeof data?.defaultReminderTime === 'string' ? data.defaultReminderTime : s.defaultReminderTime,
     notifPrefs: data?.notifPrefs && typeof data.notifPrefs === 'object' ? { ...s.notifPrefs, ...data.notifPrefs } : s.notifPrefs,
     generatedDay: data?.generatedDay ?? s.generatedDay,
     generatedPlan: data?.generatedPlan ?? s.generatedPlan,
@@ -989,6 +986,7 @@ export const useStore = create<S>()(persist((set) => ({
         sessions: st.sessions,
         options,
         lang: st.lang,
+        profile: st.userProfile,
       });
       // keep the "building…" state visible for at least a beat so the UI doesn't flash
       const minWait = 600 - (Date.now() - started);
@@ -1095,7 +1093,6 @@ export const useStore = create<S>()(persist((set) => ({
     reflections: s.reflections,
     metricDefs: s.metricDefs,
     habitRemindersEnabled: s.habitRemindersEnabled,
-    defaultReminderTime: s.defaultReminderTime,
     notifPrefs: s.notifPrefs,
     density: s.density,
     theme: s.theme,

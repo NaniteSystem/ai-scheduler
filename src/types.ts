@@ -280,6 +280,7 @@ export interface PlanInput {
   sessions: Session[];         // existing calendar sessions — treated as busy time
   options: PlanOptions;
   lang: 'en' | 'ru' | 'ja';
+  profile?: { focus: string[]; struggles: string[]; sleep: string; age?: string; source?: string } | null; // onboarding answers → personalization
 }
 
 export interface GeneratedPlan {

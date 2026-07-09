@@ -28,6 +28,8 @@ export function Onboarding() {
   const [peak, setPeak] = useState<'morning' | 'afternoon' | 'evening' | ''>('');
   const [sleep, setSleep] = useState('');
   const [struggles, setStruggles] = useState<string[]>([]);
+  const [age, setAge] = useState('');
+  const [source, setSource] = useState('');
 
   const FOCUS: Opt[] = [
     { id: 'procrast', emoji: '⚡', label: t('onb.focus.procrast') },
@@ -55,8 +57,22 @@ export function Onboarding() {
     { id: 'procrast', emoji: '🐢', label: t('onb.str.procrast') },
     { id: 'distract', emoji: '🎯', label: t('onb.str.distract') },
   ];
+  const AGES: Opt[] = [
+    { id: 'lt18', emoji: '🌱', label: t('onb.age.lt18') },
+    { id: '18to24', emoji: '🎓', label: '18–24' },
+    { id: '25to34', emoji: '💼', label: '25–34' },
+    { id: '35to44', emoji: '🏡', label: '35–44' },
+    { id: '45plus', emoji: '🌟', label: '45+' },
+  ];
+  const SOURCES: Opt[] = [
+    { id: 'friends', emoji: '💬', label: t('onb.src.friends') },
+    { id: 'social', emoji: '📱', label: t('onb.src.social') },
+    { id: 'store', emoji: '🛍️', label: t('onb.src.store') },
+    { id: 'search', emoji: '🔎', label: t('onb.src.search') },
+    { id: 'other', emoji: '✨', label: t('onb.src.other') },
+  ];
 
-  const STEPS = 6;
+  const STEPS = 8;
   const toggle = (set: React.Dispatch<React.SetStateAction<string[]>>, id: string) =>
     set(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
@@ -68,7 +84,7 @@ export function Onboarding() {
     if (peak) prefs.productivityPeak = peak;
     if (sleep && SLEEP_PREFS[sleep]) Object.assign(prefs, SLEEP_PREFS[sleep]);
     if (Object.keys(prefs).length) updatePrefs(prefs);
-    setUserProfile({ focus, struggles, sleep });
+    setUserProfile({ focus, struggles, sleep, age: age || undefined, source: source || undefined });
     completeOnboarding(name.trim() || 'You');
   };
 
@@ -170,6 +186,18 @@ export function Onboarding() {
           )}
 
           {step === 5 && (
+            <Question title={t('onb.q.age')} hint={t('onb.optionalHint')}>
+              {AGES.map(o => <OptionCard key={o.id} o={o} selected={age === o.id} onClick={() => setAge(a => a === o.id ? '' : o.id)} />)}
+            </Question>
+          )}
+
+          {step === 6 && (
+            <Question title={t('onb.q.source')} hint={t('onb.optionalHint')}>
+              {SOURCES.map(o => <OptionCard key={o.id} o={o} selected={source === o.id} onClick={() => setSource(s => s === o.id ? '' : o.id)} />)}
+            </Question>
+          )}
+
+          {step === 7 && (
             <div className="flex flex-col items-center text-center pt-10">
               <div className="w-20 h-20 rounded-[28px] grid place-items-center mb-6 anim-pop" style={{ background: 'var(--grad)', boxShadow: 'var(--shadow-primary)' }}>
                 <Check className="w-10 h-10 text-white" strokeWidth={3} />

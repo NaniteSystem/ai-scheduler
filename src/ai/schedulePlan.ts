@@ -114,6 +114,9 @@ function buildPrompt(input: PlanInput): string {
     `User language: "${lang}". Intensity: ${intensity}.`,
     `Preferences: wake ${prefs.wakeTime}, sleep ${prefs.sleepTime}, productivity peak: ${prefs.productivityPeak}${prefs.hasWork ? `, work ${prefs.workStart}-${prefs.workEnd} on weekdays${prefs.workBreakStart && prefs.workBreakEnd ? ` (break ${prefs.workBreakStart}-${prefs.workBreakEnd} is FREE)` : ''}` : ', no fixed work hours'}${prefs.fasting ? `, fasting (${prefs.fastingType || '16:8'})` : ''}.`,
   ];
+  if (input.profile && (input.profile.focus?.length || input.profile.struggles?.length)) {
+    lines.push(`User profile (from onboarding; adapt pacing/advice to it): focus areas [${(input.profile.focus || []).join(', ')}], struggles [${(input.profile.struggles || []).join(', ')}].`);
+  }
   const commitments = (prefs.commitments || []).filter(c => c.enabled && c.days?.length);
   if (commitments.length) {
     lines.push(`FIXED COMMITMENTS (locked busy time, plan around them):\n${commitments.map(c =>

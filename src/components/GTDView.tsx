@@ -831,7 +831,7 @@ function WeeklyReviewModal() {
   const runAiReview = async () => {
     setAi({ state: 'loading' });
     try {
-      const review = await requestWeeklyReview(collectWeekStats(sessions, gtdTasks, habits, goals), lang);
+      const review = await requestWeeklyReview(collectWeekStats(sessions, gtdTasks, habits, goals), lang, useStore.getState().userProfile);
       setAi({ state: 'done', review });
     } catch {
       setAi({ state: 'error' });

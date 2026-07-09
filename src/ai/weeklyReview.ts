@@ -70,14 +70,18 @@ export interface WeeklyReviewText {
 
 const LANG_NAME: Record<string, string> = { en: 'English', ru: 'Russian', ja: 'Japanese' };
 
-export async function requestWeeklyReview(stats: WeekStats, lang: string): Promise<WeeklyReviewText> {
+export async function requestWeeklyReview(stats: WeekStats, lang: string, profile?: { focus: string[]; struggles: string[] } | null): Promise<WeeklyReviewText> {
+  const payload = profile && (profile.focus?.length || profile.struggles?.length)
+    ? { ...stats, userProfile: { focus: profile.focus, struggles: profile.struggles } }
+    : stats;
   const out = await llmJson<WeeklyReviewText>({
     system:
       'You are a pragmatic productivity coach reviewing a user\'s week in their planner app. ' +
       'Given their real stats as JSON, write a short honest review. Be specific — reference actual numbers, goals and stale tasks. ' +
+      'If a userProfile with focus areas/struggles is present, angle the advice toward them. ' +
       'No flattery, no generic advice. 2-4 items per list, one sentence each. ' +
       `Respond ONLY with JSON {"summary": string (2-3 sentences), "wins": string[], "concerns": string[], "suggestions": string[]} in ${LANG_NAME[lang] || 'English'}.`,
-    prompt: JSON.stringify(stats),
+    prompt: JSON.stringify(payload),
     temperature: 0.4,
   });
   if (!out || typeof out.summary !== 'string') throw new Error('bad review');
