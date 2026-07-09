@@ -291,7 +291,19 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
   const PRESS_CANCEL_PX = 16;
   const [pressSid, setPressSid] = useState<string | null>(null);
   const draggedRef = useRef(false);
-  const pressRef = useRef<{ sid: string; startX: number; startY: number; origDur: number; origStartMin: number; kind: 'move' | 'resize'; armed: boolean; touch: boolean; timer: number; tgtDayIdx: number; tgtMin: number } | null>(null);
+  const pressRef = useRef<{ sid: string; startX: number; startY: number; origDur: number; origStartMin: number; kind: 'move' | 'resize'; armed: boolean; touch: boolean; timer: number; tgtDayIdx: number; tgtMin: number; scrollEl: HTMLElement | null; lastX: number; lastY: number; scrolling: boolean } | null>(null);
+
+  // Blocks are touch-action:none (the browser would otherwise steal the armed drag
+  // as a pan-y scroll — touch-action is locked at gesture start and preventDefault
+  // can't override it). A swipe that starts on a block therefore scrolls via this
+  // manual fallback: nearest scrollable ancestor follows the finger.
+  const findScrollParent = (el: HTMLElement | null): HTMLElement | null => {
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight + 4 || n.scrollWidth > n.clientWidth + 4)) return n;
+    }
+    return null;
+  };
 
   const armPress = (info: NonNullable<typeof pressRef.current>, el: HTMLElement, pointerId: number) => {
     info.armed = true;
@@ -307,7 +319,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     const el = e.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
     const touch = e.pointerType === 'touch' || e.pointerType === 'pen';
-    const info = { sid: s.id, startX: e.clientX, startY: e.clientY, origDur: s.durationMinutes, origStartMin: s.startHour * 60 + (s.startMinute || 0), kind: (e.clientY >= rect.bottom - 20 ? 'resize' : 'move') as 'move' | 'resize', armed: false, touch, timer: 0, tgtDayIdx: mode === 'week' ? xToDayIdx(e.clientX) : 0, tgtMin: s.startHour * 60 + (s.startMinute || 0) };
+    const info = { sid: s.id, startX: e.clientX, startY: e.clientY, origDur: s.durationMinutes, origStartMin: s.startHour * 60 + (s.startMinute || 0), kind: (e.clientY >= rect.bottom - 20 ? 'resize' : 'move') as 'move' | 'resize', armed: false, touch, timer: 0, tgtDayIdx: mode === 'week' ? xToDayIdx(e.clientX) : 0, tgtMin: s.startHour * 60 + (s.startMinute || 0), scrollEl: touch ? findScrollParent(el) : null, lastX: e.clientX, lastY: e.clientY, scrolling: false };
     pressRef.current = info;
     const pid = e.pointerId;
     if (touch) info.timer = window.setTimeout(() => { if (pressRef.current === info) armPress(info, el, pid); }, LONG_PRESS_MS);
@@ -319,7 +331,16 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     const dx = e.clientX - info.startX, dy = e.clientY - info.startY;
     if (!info.armed) {
       const dist = Math.hypot(dx, dy);
-      if (info.touch) { if (dist > PRESS_CANCEL_PX) { clearTimeout(info.timer); pressRef.current = null; } return; }
+      if (info.touch) {
+        // Moved before the hold completed → user is scrolling, not dragging.
+        // touch-action:none killed native scroll on blocks, so scroll manually.
+        if (!info.scrolling && dist > PRESS_CANCEL_PX) { clearTimeout(info.timer); info.scrolling = true; }
+        if (info.scrolling) {
+          info.scrollEl?.scrollBy(info.lastX - e.clientX, info.lastY - e.clientY);
+          info.lastX = e.clientX; info.lastY = e.clientY;
+        }
+        return;
+      }
       if (dist > 4) armPress(info, e.currentTarget as HTMLElement, e.pointerId); else return;
     }
     e.preventDefault();
@@ -340,6 +361,17 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       const dateStr = mode === 'week' ? format(days[info.tgtDayIdx], 'yyyy-MM-dd') : format(selectedDay, 'yyyy-MM-dd');
       store.moveSession(info.sid, dateStr, Math.floor(info.tgtMin / 60), info.tgtMin % 60);
     }
+    if (info.armed || info.scrolling) { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ } draggedRef.current = true; }
+    pressRef.current = null;
+    setPressSid(null); setDragSid(null); setGhostPos(null);
+  };
+
+  // Gesture cancelled (browser stole it, incoming call, …) — revert, do NOT commit.
+  const cancelBlockPress = (e: React.PointerEvent) => {
+    const info = pressRef.current;
+    if (!info) return;
+    clearTimeout(info.timer);
+    if (info.armed && info.kind === 'resize') store.resizeSession(info.sid, info.origDur);
     if (info.armed) { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ } draggedRef.current = true; }
     pressRef.current = null;
     setPressSid(null); setDragSid(null); setGhostPos(null);
@@ -674,9 +706,9 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
                     return (
                       <div key={s.id}
                         onClick={(e) => onBlockClick(e, s.id)} onDoubleClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => onBlockPointerDown(e, s)} onPointerMove={onBlockPointerMove} onPointerUp={endBlockPress} onPointerCancel={endBlockPress}
+                        onPointerDown={(e) => onBlockPointerDown(e, s)} onPointerMove={onBlockPointerMove} onPointerUp={endBlockPress} onPointerCancel={cancelBlockPress}
                         className={`absolute rounded-lg overflow-hidden group transition-shadow z-10 hover:z-20 hover:shadow-xl ${dragSid === s.id ? 'opacity-30 z-20 cursor-grabbing' : pressSid === s.id ? 'z-30 shadow-2xl ring-2 ring-[var(--primary)] cursor-grabbing' : 'cursor-pointer'} ${s.status === 'done' ? 'opacity-50' : ''}`}
-                        style={{ top, height, left: `calc(${(lay.col / lay.cols) * 100}% + 6px)`, width: `calc(${100 / lay.cols}% - 10px)`, background: `${color}${s.status === 'done' ? '44' : 'dd'}`, borderLeft: `3px solid ${color}`, touchAction: pressSid === s.id ? 'none' : 'pan-y' }}>
+                        style={{ top, height, left: `calc(${(lay.col / lay.cols) * 100}% + 6px)`, width: `calc(${100 / lay.cols}% - 10px)`, background: `${color}${s.status === 'done' ? '44' : 'dd'}`, borderLeft: `3px solid ${color}`, touchAction: 'none' }}>
                         <div className="px-3 py-1.5 h-full flex flex-col">
                           <div className={`text-[11px] font-bold ${s.status === 'done' ? 'text-[var(--text)]' : 'text-white'} truncate leading-tight flex items-center gap-1`}>
                             {s.seriesId && <Repeat className="w-2.5 h-2.5 shrink-0 opacity-80" />}{s.icon ? <SessionIcon name={s.icon} className="w-3 h-3 shrink-0 inline" /> : <span>{goalEmoji(s.goalId)}</span>} {s.title}

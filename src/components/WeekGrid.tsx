@@ -138,7 +138,20 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
     sid: string; startX: number; startY: number;
     origDur: number; kind: 'move' | 'resize'; armed: boolean; touch: boolean;
     timer: number; tgtDayIdx: number; tgtMin: number;
+    scrollEl: HTMLElement | null; lastX: number; lastY: number; scrolling: boolean;
   } | null>(null);
+
+  // Blocks are touch-action:none (the browser would otherwise steal the armed drag
+  // as a pan scroll — touch-action is locked at gesture start and preventDefault
+  // can't override it). A swipe that starts on a block scrolls via this manual
+  // fallback: the grid scroll container follows the finger (both axes).
+  const findScrollParent = (el: HTMLElement | null): HTMLElement | null => {
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight + 4 || n.scrollWidth > n.clientWidth + 4)) return n;
+    }
+    return null;
+  };
 
   const armPress = (info: NonNullable<typeof pressRef.current>, el: HTMLElement, pointerId: number) => {
     info.armed = true;
@@ -161,6 +174,8 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
       armed: false, touch, timer: 0,
       tgtDayIdx: dayIdxFromX(e.clientX),
       tgtMin: s.startHour * 60 + (s.startMinute || 0),
+      scrollEl: touch ? findScrollParent(el) : null,
+      lastX: e.clientX, lastY: e.clientY, scrolling: false,
     };
     pressRef.current = info;
     const pid = e.pointerId;
@@ -173,7 +188,16 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
     const dx = e.clientX - info.startX, dy = e.clientY - info.startY;
     if (!info.armed) {
       const dist = Math.hypot(dx, dy);
-      if (info.touch) { if (dist > PRESS_CANCEL_PX) { clearTimeout(info.timer); pressRef.current = null; } return; }
+      if (info.touch) {
+        // Moved before the hold completed → user is scrolling, not dragging.
+        // touch-action:none killed native scroll on blocks, so scroll manually.
+        if (!info.scrolling && dist > PRESS_CANCEL_PX) { clearTimeout(info.timer); info.scrolling = true; }
+        if (info.scrolling) {
+          info.scrollEl?.scrollBy(info.lastX - e.clientX, info.lastY - e.clientY);
+          info.lastX = e.clientX; info.lastY = e.clientY;
+        }
+        return;
+      }
       if (dist > 4) armPress(info, e.currentTarget as HTMLElement, e.pointerId); else return;
     }
     e.preventDefault();
@@ -194,6 +218,20 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
       const dateStr = format(days[info.tgtDayIdx], 'yyyy-MM-dd');
       store.moveSession(info.sid, dateStr, Math.floor(info.tgtMin / 60), info.tgtMin % 60);
     }
+    if (info.armed || info.scrolling) {
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+      draggedRef.current = true;
+    }
+    pressRef.current = null;
+    setPressSid(null); setDragSid(null); setGhost(null);
+  };
+
+  // Gesture cancelled (browser stole it, incoming call, …) — revert, do NOT commit.
+  const cancelBlockPress = (e: React.PointerEvent) => {
+    const info = pressRef.current;
+    if (!info) return;
+    clearTimeout(info.timer);
+    if (info.armed && info.kind === 'resize') store.resizeSession(info.sid, info.origDur);
     if (info.armed) {
       try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
       draggedRef.current = true;
@@ -346,7 +384,7 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
                     onPointerDown={(e) => onBlockPointerDown(e, s)}
                     onPointerMove={onBlockPointerMove}
                     onPointerUp={endBlockPress}
-                    onPointerCancel={endBlockPress}
+                    onPointerCancel={cancelBlockPress}
                     className={`absolute rounded-lg overflow-hidden group transition-shadow z-10 ${
                       isDragging ? 'opacity-30 scale-95' : 'hover:z-20 hover:shadow-xl'
                     } ${pressSid === s.id ? 'z-30 shadow-2xl ring-2 ring-[var(--primary)]' : ''} ${s.status === 'done' ? 'opacity-50' : ''}`}
@@ -358,7 +396,7 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
                       background: `${color}${s.status === 'done' ? '44' : 'dd'}`,
                       borderLeft: `3px solid ${color}`,
                       cursor: pressSid === s.id ? 'grabbing' : 'grab',
-                      touchAction: pressSid === s.id ? 'none' : 'pan-x pan-y',
+                      touchAction: 'none',
                     }}
                   >
                     <div className="absolute top-0 left-0 right-0 h-3 flex items-center justify-center opacity-0 group-hover:opacity-50 cursor-grab">
