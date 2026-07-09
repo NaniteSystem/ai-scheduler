@@ -372,7 +372,7 @@ export function WeekGrid({ days, sessions, weekOffset, startH, rows, store, goal
                       </div>
                       {height > 34 && (
                         <div className={`mono text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/70'} mt-0.5`}>
-                          {String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')} · {fmtDur(s.durationMinutes, store.lang)}
+                          {String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')}{s.openEnd ? '' : ' · ' + fmtDur(s.durationMinutes, store.lang)}
                         </div>
                       )}
                       {height > 55 && cleanNote(s.description) && (

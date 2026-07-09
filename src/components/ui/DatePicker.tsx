@@ -8,10 +8,10 @@ import { useT, useDateLocale } from '../../i18n';
  * Custom calendar date picker — replaces the native <input type="date"> popup.
  * `value` / `onChange` use yyyy-MM-dd strings.
  */
-export function DatePicker({ value, onChange, weekStartsOn = 1 }: { value: string; onChange: (d: string) => void; weekStartsOn?: 0 | 1 }) {
+export function DatePicker({ value, onChange, weekStartsOn = 1, defaultOpen = false }: { value: string; onChange: (d: string) => void; weekStartsOn?: 0 | 1; defaultOpen?: boolean }) {
   const t = useT();
   const locale = useDateLocale();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   useBackClose(open, () => setOpen(false));
   const selected = value ? parseISO(value) : new Date();
   const [viewDate, setViewDate] = useState(selected);

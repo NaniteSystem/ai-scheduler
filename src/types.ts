@@ -78,6 +78,9 @@ export interface GoalRoadmap {
 
 export interface Session {
   id: string;
+  /** Start time only — no explicit end chosen. durationMinutes then holds a
+   *  nominal 60 for grid layout/engine, but UI hides the end/duration. */
+  openEnd?: boolean;
   goalId: string;
   date: string;
   startHour: number;

@@ -56,6 +56,7 @@ interface Draft {
   date?: string;           // explicit yyyy-MM-dd (used by Day view); overrides dayIdx
   startMin: number;        // minutes from 00:00
   durationMinutes: number;
+  openEnd: boolean;        // no explicit end time chosen (start-only session)
   sessionType: SessionType;
   recurrence: RecurringPattern | 'none';
   weekdays: number[];      // selected weekdays (0 Sun..6 Sat) for 'custom' recurrence
@@ -74,7 +75,7 @@ interface Draft {
 }
 
 // Defaults applied to every freshly-opened draft.
-export const DRAFT_DEFAULTS = { allDay: false, spanDays: 1, reminderMinutes: -1, location: '', url: '', description: '', weekdays: [] as number[] };
+export const DRAFT_DEFAULTS = { allDay: false, spanDays: 1, reminderMinutes: -1, location: '', url: '', description: '', weekdays: [] as number[], openEnd: true };
 
 // Curated, harmonious palette (warm → cool → neutral), each with a soft gradient pair for depth.
 const PALETTE: { c: string; from: string; to: string }[] = [
@@ -128,8 +129,6 @@ const TYPE_OPTS: { id: SessionType; label: string }[] = [
   { id: 'intensive', label: 'sched.type.intensive' },
   { id: 'checkpoint', label: 'sched.type.checkpoint' },
 ];
-
-const DUR_PRESETS = [15, 30, 45, 60, 90, 120];
 
 // Build list of dates for a recurrence over the next `weeksAhead` weeks.
 // `weekdays` (0 Sun..6 Sat) is used only by the 'custom' pattern.
@@ -215,7 +214,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
     const seed = store.scheduleSeed;
     if (!seed) return;
     setMode('week');
-    setDraft({ title: seed.title, goalId: seed.goalId ?? goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', sourceTaskId: seed.taskId, ...DRAFT_DEFAULTS });
+    setDraft({ title: seed.title, goalId: seed.goalId ?? goals[0]?.id ?? '', dayIdx: 0, date: format(new Date(), 'yyyy-MM-dd'), startMin: 9 * 60, durationMinutes: seed.durationMinutes || 60, sessionType: 'regular', recurrence: 'none', sourceTaskId: seed.taskId, ...DRAFT_DEFAULTS, openEnd: !seed.durationMinutes });
     store.consumeScheduleSeed();
   }, [store.scheduleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -231,6 +230,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       date: s.date || format(new Date(), 'yyyy-MM-dd'),
       startMin: (s.startHour || 0) * 60 + (s.startMinute || 0),
       durationMinutes: s.durationMinutes || 60,
+      openEnd: !!s.openEnd,
       sessionType: s.sessionType || 'regular', recurrence: 'none',
       color: s.color || '', icon: s.icon || '',
       allDay: !!s.allDay, spanDays: 1,
@@ -363,8 +363,10 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
   const handleDayTap = (e: React.MouseEvent) => { if (!draft && isCoarse()) handleDayDouble(e); };
 
   const createFromDraft = (override?: Draft) => {
-    const d0 = override ?? draft;
+    let d0 = override ?? draft;
     if (!d0 || !d0.title.trim()) return;
+    // Start-only session: keep a nominal 60-min duration for grid layout/engine.
+    if (d0.openEnd && !d0.allDay) d0 = { ...d0, durationMinutes: 60 };
     const baseDate = d0.date ? parseISO(d0.date) : days[d0.dayIdx];
     const h0 = d0.allDay ? 0 : Math.floor(d0.startMin / 60);
     const m0 = d0.allDay ? 0 : d0.startMin % 60;
@@ -374,6 +376,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       store.updateSession(d0.editId, {
         date: format(baseDate, 'yyyy-MM-dd'), startHour: h0, startMinute: m0,
         durationMinutes: d0.allDay ? 0 : d0.durationMinutes,
+        openEnd: (!d0.allDay && d0.openEnd) || undefined,
         title: d0.title.trim(), goalId: d0.goalId, sessionType: d0.sessionType,
         description: d0.description.trim(),
         color: d0.color || undefined, icon: d0.icon || undefined,
@@ -393,6 +396,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
         store.updateSession(src.id, {
           date: format(baseDate, 'yyyy-MM-dd'), startHour: h0, startMinute: m0,
           durationMinutes: d0.allDay ? 0 : d0.durationMinutes,
+          openEnd: (!d0.allDay && d0.openEnd) || undefined,
           title: d0.title.trim(), goalId: d0.goalId, sessionType: d0.sessionType,
           description: d0.description.trim(),
           color: d0.color || undefined, icon: d0.icon || undefined,
@@ -429,6 +433,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       ...(d0.color ? { color: d0.color } : {}),
       ...(d0.icon ? { icon: d0.icon } : {}),
       ...(d0.allDay ? { allDay: true } : {}),
+      ...(!d0.allDay && d0.openEnd ? { openEnd: true } : {}),
       ...(d0.reminderMinutes >= 0 ? { reminderMinutes: d0.reminderMinutes } : {}),
       ...(d0.location.trim() ? { location: d0.location.trim() } : {}),
       ...(d0.url.trim() ? { url: d0.url.trim() } : {}),
@@ -676,7 +681,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
                           <div className={`text-[11px] font-bold ${s.status === 'done' ? 'text-[var(--text)]' : 'text-white'} truncate leading-tight flex items-center gap-1`}>
                             {s.seriesId && <Repeat className="w-2.5 h-2.5 shrink-0 opacity-80" />}{s.icon ? <SessionIcon name={s.icon} className="w-3 h-3 shrink-0 inline" /> : <span>{goalEmoji(s.goalId)}</span>} {s.title}
                           </div>
-                          {height > 34 && <div className={`mono text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/70'} mt-0.5`}>{String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')} · {fmtDur(s.durationMinutes, store.lang)}</div>}
+                          {height > 34 && <div className={`mono text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/70'} mt-0.5`}>{String(s.startHour).padStart(2, '0')}:{String(s.startMinute || 0).padStart(2, '0')}{s.openEnd ? '' : ' · ' + fmtDur(s.durationMinutes, store.lang)}</div>}
                           {height > 55 && cleanSessionNote(s.description) && <div className={`text-[11px] ${s.status === 'done' ? 'text-[var(--text-dim)]' : 'text-white/60'} mt-1 line-clamp-2 leading-snug`}>{cleanSessionNote(s.description)}</div>}
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 h-5 flex items-end justify-center pb-1 pointer-events-none"><span className={`w-8 h-1 rounded-full ${s.status === 'done' ? 'bg-[var(--text-mute)]/40' : 'bg-white/45'}`} /></div>
@@ -1031,6 +1036,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
       title: s.title,
       goalId: s.goalId,
       durationMinutes: s.durationMinutes || draft.durationMinutes,
+      openEnd: !!s.openEnd,
       sessionType: s.sessionType,
       ...(s.color ? { color: s.color } : {}),
       ...(s.icon ? { icon: s.icon } : {}),
@@ -1164,7 +1170,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
               })}
             </div>
             {!dateInWeek && <p className="text-[11px] text-[var(--primary)] mt-2 capitalize">{format(baseDate, 'EEEE, d MMMM', { locale })}</p>}
-            {showCal && <div className="mt-2"><DatePicker value={baseDateStr} weekStartsOn={weekStartsOn} onChange={d => upd({ date: d })} /></div>}
+            {showCal && <div className="mt-2"><DatePicker value={baseDateStr} weekStartsOn={weekStartsOn} onChange={d => upd({ date: d })} defaultOpen /></div>}
           </div>
 
           {/* Time: start + duration presets; all-day toggle inline */}
@@ -1180,14 +1186,23 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             </div>
             {!draft.allDay && (<>
               <TimePicker label={tr('sched.start')} value={draft.startMin} onChange={v => upd({ startMin: v })} />
-              <div className="grid grid-cols-6 gap-1.5 mt-2">
-                {DUR_PRESETS.map(m => (
-                  <button key={m} onClick={() => upd({ durationMinutes: m })}
-                    className={`h-9 rounded-lg border text-[11px] font-medium transition-all ${draft.durationMinutes === m ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)] hover:border-[var(--border)]'}`}>
-                    {m < 60 ? `${m}${tr('common.minShort')}` : `${Math.floor(m / 60)}${tr('common.hourShort')}${m % 60 ? `${m % 60}` : ''}`}
+              {draft.openEnd ? (
+                <button onClick={() => upd({ openEnd: false, durationMinutes: draft.durationMinutes || 60 })}
+                  className="mt-2 h-9 px-3 rounded-lg border border-dashed border-[var(--border)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--primary)] flex items-center gap-1.5 transition-colors">
+                  <Plus className="w-3.5 h-3.5" />{tr('sched.addEnd')}
+                </button>
+              ) : (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1">
+                    <TimePicker label={tr('sched.end')} value={(draft.startMin + draft.durationMinutes) % 1440}
+                      onChange={v => upd({ durationMinutes: ((v - draft.startMin) + 1440) % 1440 || 60 })} />
+                  </div>
+                  <button onClick={() => upd({ openEnd: true })} title={tr('sched.noEnd')}
+                    className="w-9 h-9 rounded-lg border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] transition-colors shrink-0">
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                ))}
-              </div>
+                </div>
+              )}
             </>)}
           </div>
 

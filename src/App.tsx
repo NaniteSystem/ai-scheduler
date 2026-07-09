@@ -153,7 +153,7 @@ function HomeSessionRow({ s, index = 0 }: { s: Session; index?: number }) {
           ? <div className="text-[11px] font-bold text-[var(--text-dim)] leading-tight">{t('home.allDay')}</div>
           : <>
               <div className="text-[15px] font-bold mono text-[var(--text)] leading-none">{fmtStart(s)}</div>
-              <div className="text-[10px] text-[var(--text-mute)] mono mt-1">{fmtDur(s.durationMinutes, store.lang)}</div>
+              {!s.openEnd && <div className="text-[10px] text-[var(--text-mute)] mono mt-1">{fmtDur(s.durationMinutes, store.lang)}</div>}
             </>}
       </div>
       <span className="shrink-0 w-[3px] h-9 rounded-full" style={{ background: completing ? '#10b981' : color }} />
@@ -850,11 +850,11 @@ export default function App(){
     const sTasks=s.tasks||[];
     return <Drawer open={true} onClose={()=>store.closeSessionModal()} width="md"
         title={`${gEmoji} ${s.title}`}
-        subtitle={s.allDay?`${s.date} · ${t('sm.subAllDay')}`:`${s.date}${tlabel?' · '+tlabel:''} — ${fmtDur(s.durationMinutes,store.lang)}`}>
+        subtitle={s.allDay?`${s.date} · ${t('sm.subAllDay')}`:`${s.date}${tlabel?' · '+tlabel:''}${s.openEnd?'':' — '+fmtDur(s.durationMinutes,store.lang)}`}>
       <div className="space-y-4">
         {/* Meta */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
-          <div className="flex items-center gap-3 px-4 py-3"><Clock className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--text)]">{s.allDay?t('sm.allDayCap'):`${tlabel?tlabel+' · ':''}${fmtDur(s.durationMinutes,store.lang)}`}</span></div>
+          <div className="flex items-center gap-3 px-4 py-3"><Clock className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--text)]">{s.allDay?t('sm.allDayCap'):s.openEnd?tlabel:`${tlabel?tlabel+' · ':''}${fmtDur(s.durationMinutes,store.lang)}`}</span></div>
           {remLabel&&<div className="flex items-center gap-3 px-4 py-3"><Bell className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--text)]">{t('sm.reminder',{label:remLabel})}</span></div>}
           {s.location&&<div className="flex items-center gap-3 px-4 py-3"><MapPin className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--text)] truncate">{s.location}</span></div>}
           {s.url&&<a href={s.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors"><LinkIcon className="w-4 h-4 text-[var(--text-dim)] shrink-0"/><span className="text-[13px] text-[var(--primary)] truncate underline">{s.url}</span></a>}
