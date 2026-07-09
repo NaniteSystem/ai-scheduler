@@ -71,8 +71,8 @@ export function AIPlanner() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setTab('setup')} className={`h-9 px-4 rounded-xl text-[12px] font-medium transition-all ${tab === 'setup' ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{t('planner.setup')}</button>
-            <button onClick={() => setTab('preview')} className={`h-9 px-4 rounded-xl text-[12px] font-medium transition-all ${tab === 'preview' ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{t('planner.preview')}</button>
+            <button onClick={() => setTab('setup')} className={`hity h-9 px-4 rounded-xl text-[12px] font-medium transition-all ${tab === 'setup' ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{t('planner.setup')}</button>
+            <button onClick={() => setTab('preview')} className={`hity h-9 px-4 rounded-xl text-[12px] font-medium transition-all ${tab === 'preview' ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>{t('planner.preview')}</button>
           </div>
         </div>
       </div>
@@ -142,7 +142,7 @@ export function AIPlanner() {
               <Info className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-[12px] text-[var(--text)] leading-relaxed">{t('planner.prefsHint')}</p>
-                <button onClick={() => store.setActiveView('architect')} className="text-[12px] font-bold text-[var(--primary)] mt-1">{t('planner.openPrefs')} →</button>
+                <button onClick={() => store.setActiveView('architect')} className="hit text-[12px] font-bold text-[var(--primary)] mt-1 inline-flex items-center">{t('planner.openPrefs')} →</button>
               </div>
               <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 flex items-center gap-1 ${hasAi ? 'text-[var(--primary)] bg-[var(--primary)]/10' : 'text-[var(--text-dim)] bg-[var(--surface-2)]'}`}><Sparkles className="w-3 h-3" />{hasAi ? t('planner.providerAi') : t('planner.providerRuleBased')}</span>
             </div>

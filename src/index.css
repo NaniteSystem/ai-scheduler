@@ -117,6 +117,15 @@ button:active,[role="button"]:active{transform:scale(.97)}
 .lift:hover{transform:translateY(-2px) scale(1.02);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--primary) 35%,var(--border))}
 .lift:active{transform:translateY(-1px) scale(1.0)}
 
+/* Touch-target extension (Material: hit area ≥48dp even if the visual is smaller).
+   .hit  — invisible hit area grows to at least 48×48, centered (standalone controls only:
+           expanding both axes would overlap tight neighbours).
+   .hity — grows only vertically to 48 (for controls sitting in a row: tabs, segments, steppers). */
+.hit,.hity{position:relative}
+.hit::after,.hity::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:max(100%,48px)}
+.hit::after{width:max(100%,48px)}
+.hity::after{width:100%}
+
 /* Compact density: tighten card padding & section spacing app-wide (H4). */
 .density-compact .card{padding:0.75rem!important;border-radius:18px}
 @media(min-width:768px){.density-compact .card{padding:1rem!important}}

@@ -79,7 +79,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
         <div className="flex items-center gap-1.5 shrink-0">
           {isCounter ? (
             <>
-              {count > 0 && <button onClick={() => clearHabitDay(h.id, today)} className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--border)]"><RotateCcw className="w-3.5 h-3.5" /></button>}
+              {count > 0 && <button onClick={() => clearHabitDay(h.id, today)} className="hity w-10 h-10 rounded-lg grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--border)]"><RotateCcw className="w-3.5 h-3.5" /></button>}
               <button onClick={() => incHabit(h.id, today)} className="h-9 px-3 rounded-xl text-[13px] font-bold flex items-center gap-1.5 transition-colors"
                 style={status === 'done' ? { background: '#22c55e', color: '#000' } : { background: `${h.color}22`, color: h.color }}>
                 <Plus className="w-4 h-4" />{count}/{h.targetCount}
@@ -88,20 +88,20 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
           ) : (
             <>
               <button onClick={() => setHabitStatus(h.id, today, status === 'done' ? 'rest' : 'done')} title={tr('habits.done')}
-                className={`w-9 h-9 rounded-xl grid place-items-center transition-colors ${status === 'done' ? 'bg-emerald-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-emerald-400'}`}>
+                className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'done' ? 'bg-emerald-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-emerald-400'}`}>
                 <Check className="w-4 h-4" strokeWidth={3} />
               </button>
               <button onClick={() => setHabitStatus(h.id, today, status === 'rest' ? 'done' : 'rest')} title={tr('habits.rest')}
-                className={`w-9 h-9 rounded-xl grid place-items-center transition-colors ${status === 'rest' ? 'bg-amber-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-amber-400'}`}>
+                className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'rest' ? 'bg-amber-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-amber-400'}`}>
                 <Moon className="w-4 h-4" />
               </button>
               <button onClick={() => setHabitStatus(h.id, today, status === 'failed' ? 'done' : 'failed')} title={tr('habits.failed')}
-                className={`w-9 h-9 rounded-xl grid place-items-center transition-colors ${status === 'failed' ? 'bg-red-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-red-400'}`}>
+                className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'failed' ? 'bg-red-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-red-400'}`}>
                 <X className="w-4 h-4" strokeWidth={3} />
               </button>
             </>
           )}
-          <button onClick={() => setEditing(h)} className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-mute)] hover:text-[var(--text)] hover:bg-[var(--border)]"><Edit2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setEditing(h)} className="hity w-10 h-10 rounded-lg grid place-items-center text-[var(--text-mute)] hover:text-[var(--text)] hover:bg-[var(--border)]"><Edit2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
     );
@@ -112,7 +112,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
       <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] w-full mx-auto space-y-6 pb-24">
         <div className="flex flex-wrap items-end justify-between gap-3 anim-fade">
           <div>
-            {onBack && <button onClick={onBack} className="mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4" />{tr('bottomNav.stats')}</button>}
+            {onBack && <button onClick={onBack} className="hit mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4" />{tr('bottomNav.stats')}</button>}
             <h1 className="display text-[28px] md:text-[44px] text-[var(--text)] leading-none">{tr('habits.title')}</h1>
             <p className="text-[13px] text-[var(--text-dim)] mt-1.5">{tr('habits.subtitle')}</p>
           </div>
@@ -123,8 +123,8 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
         </div>
 
         <div className="flex gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] w-fit anim-fade">
-          <button onClick={() => setTab('today')} className={`h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'today' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><Check className="w-4 h-4" />{tr('habits.tabToday')}</button>
-          <button onClick={() => setTab('stats')} className={`h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'stats' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><BarChart3 className="w-4 h-4" />{tr('habits.tabStats')}</button>
+          <button onClick={() => setTab('today')} className={`hity h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'today' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><Check className="w-4 h-4" />{tr('habits.tabToday')}</button>
+          <button onClick={() => setTab('stats')} className={`hity h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'stats' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><BarChart3 className="w-4 h-4" />{tr('habits.tabStats')}</button>
         </div>
 
         {tab === 'stats' && (active.length > 0

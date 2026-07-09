@@ -521,13 +521,13 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 self-start">
-            <button onClick={goPrev} className="w-8 h-8 rounded-lg border border-[var(--border)] grid place-items-center hover:bg-[var(--surface-2)] text-[var(--text-dim)] transition-colors">
+            <button onClick={goPrev} className="hity w-10 h-10 rounded-lg border border-[var(--border)] grid place-items-center hover:bg-[var(--surface-2)] text-[var(--text-dim)] transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button onClick={goToday} className="h-8 px-3 rounded-lg border border-[var(--border)] text-[11px] text-[var(--text-dim)] hover:bg-[var(--surface-2)] transition-colors">
+            <button onClick={goToday} className="hity h-10 px-3 rounded-lg border border-[var(--border)] text-[11px] text-[var(--text-dim)] hover:bg-[var(--surface-2)] transition-colors">
               {tr('common.today')}
             </button>
-            <button onClick={goNext} className="w-8 h-8 rounded-lg border border-[var(--border)] grid place-items-center hover:bg-[var(--surface-2)] text-[var(--text-dim)] transition-colors">
+            <button onClick={goNext} className="hity w-10 h-10 rounded-lg border border-[var(--border)] grid place-items-center hover:bg-[var(--surface-2)] text-[var(--text-dim)] transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -538,7 +538,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
             <div className="inline-flex w-fit max-w-full items-center p-0.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
               {MODE_LABELS.map(m => (
                 <button key={m.id} onClick={() => setMode(m.id)}
-                  className={`h-7 px-3 rounded-md text-[11px] font-bold transition-all whitespace-nowrap ${mode === m.id ? 'bg-[var(--border)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                  className={`hity h-9 px-3 rounded-md text-[11px] font-bold transition-all whitespace-nowrap ${mode === m.id ? 'bg-[var(--border)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
                   {tr(m.label)}
                 </button>
               ))}
@@ -546,14 +546,14 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
             {mode === 'year' ? (
               <button
                 onClick={() => store.openWizard()}
-                className="h-8 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
+                className="hity h-10 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" /> {tr('goals.newGoal')}
               </button>
             ) : (
               <button
                 onClick={() => setDraft({ title: '', goalId: goals[0]?.id ?? '', dayIdx: 0, date: mode === 'day' ? format(selectedDay, 'yyyy-MM-dd') : undefined, startMin: 9 * 60, durationMinutes: 60, sessionType: 'regular', recurrence: 'none', ...DRAFT_DEFAULTS })}
-                className="h-8 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
+                className="hity h-10 px-3 rounded-lg bg-[var(--primary)] text-white text-[11px] font-bold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" /> {tr('sched.newSession')}
               </button>
@@ -838,7 +838,7 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
             <div className="grid grid-cols-12 mb-1">
               {monthsShort.map((mLabel, m) => (
                 <button key={m} onClick={() => { setMode('month'); setMonthOffset((year - todayY) * 12 + (m - todayM)); }}
-                  className={`text-[10px] font-bold py-1.5 rounded-lg transition-colors ${showToday && m === todayM ? 'text-[var(--primary)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+                  className={`hity text-[11px] font-bold py-3 rounded-lg transition-colors ${showToday && m === todayM ? 'text-[var(--primary)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
                   {mLabel.slice(0, 1)}
                 </button>
               ))}

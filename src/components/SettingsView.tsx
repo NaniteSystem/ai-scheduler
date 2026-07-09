@@ -7,7 +7,7 @@ import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, Layout
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} role="switch" aria-checked={on}
-      className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${on ? 'bg-[var(--primary)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'}`}>
+      className={`hit w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${on ? 'bg-[var(--primary)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'}`}>
       <span className={`block w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
   );

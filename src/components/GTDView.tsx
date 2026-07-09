@@ -1184,7 +1184,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
                 if (viewMode === 'lists' || gtdFilter !== 'inbox') openInboxLevel();
                 else onBack();
               }}
-              className="w-9 h-9 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"
+              className="hit w-10 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"
               aria-label={tr('bottomNav.stats')}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -1201,7 +1201,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             </div>
             <button
               onClick={viewMode === 'inbox' ? openSortedLists : openInboxLevel}
-              className="h-9 px-3 rounded-xl border border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)] text-[12px] font-bold flex items-center justify-center gap-1.5 shrink-0"
+              className="hity h-9 px-3 rounded-xl border border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)] text-[12px] font-bold flex items-center justify-center gap-1.5 shrink-0"
             >
               {viewMode === 'inbox' ? <><Layers3 className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.sortedLists')}</span></> : <><Inbox className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.backToInbox')}</span></>}
             </button>
@@ -1438,7 +1438,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
                   )}
                 </AnimatePresence>
                 <button onClick={() => setAiTriageOpen(true)}
-                  className="absolute -bottom-14 left-1/2 -translate-x-1/2 h-9 px-4 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[var(--primary)] text-[12px] font-bold flex items-center gap-1.5 whitespace-nowrap">
+                  className="hit absolute -bottom-14 left-1/2 -translate-x-1/2 h-9 px-4 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[var(--primary)] text-[12px] font-bold flex items-center gap-1.5 whitespace-nowrap">
                   <Sparkles className="w-3.5 h-3.5" />{tr('it.button', { n: rawTasks.length })}
                 </button>
               </div>

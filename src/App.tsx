@@ -427,8 +427,8 @@ export default function App(){
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {streak>0&&<span className="h-8 px-2.5 rounded-full bg-[var(--surface)] border border-[var(--border)] flex items-center gap-1 text-[12px] font-bold text-[var(--text)]">🔥 {streak}</span>}
-        <button onClick={()=>setSearchOpen(true)} aria-label={t('search.title')} className="w-9 h-9 rounded-full grid place-items-center bg-[var(--surface)] border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]"><SearchIcon className="w-4 h-4"/></button>
-        <button onClick={()=>{store.setActiveView('settings');setOverviewChild(false);}} aria-label={t('bottomNav.profile')} className="w-9 h-9 rounded-full grid place-items-center text-[12px] font-bold text-white grad">{initials}</button>
+        <button onClick={()=>setSearchOpen(true)} aria-label={t('search.title')} className="hit w-10 h-10 rounded-full grid place-items-center bg-[var(--surface)] border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)]"><SearchIcon className="w-4 h-4"/></button>
+        <button onClick={()=>{store.setActiveView('settings');setOverviewChild(false);}} aria-label={t('bottomNav.profile')} className="hit w-10 h-10 rounded-full grid place-items-center text-[12px] font-bold text-white grad">{initials}</button>
       </div>
     </div>
     <h1 className="display text-[24px] md:text-[34px] text-[var(--text)] max-w-[22ch]">{t(greetKey,{name:userName||'···'})} <span className="inline-block">👋</span></h1>
@@ -467,7 +467,7 @@ export default function App(){
   <section className="anim-fade anim-delay-1" key={`sched-${homeDateStr}`}>
     <div className="flex items-center justify-between gap-3 mb-3">
       <h3 className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-[.12em] flex items-center gap-2 whitespace-nowrap"><Clock className="w-3.5 h-3.5"/>{homeIsToday?t('home.todayScheduled'):t('home.dayScheduled',{d:selDayLabel})}</h3>
-      <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} aria-label={t('dash.expandSchedule')} className="w-8 h-8 rounded-full grid place-items-center text-[var(--primary)] bg-[var(--primary)]/10 shrink-0"><ChevronRight className="w-4 h-4"/></button>
+      <button onClick={()=>{store.setActiveView('week');setOverviewChild(false);}} aria-label={t('dash.expandSchedule')} className="hit w-8 h-8 rounded-full grid place-items-center text-[var(--primary)] bg-[var(--primary)]/10 shrink-0"><ChevronRight className="w-4 h-4"/></button>
     </div>
     <div className="space-y-2.5">
       {timedSel.length>0 ? timedSel.map(renderSessionRow) : emptyBox(t('home.noScheduled'))}
@@ -511,7 +511,7 @@ export default function App(){
   return <div className="px-4 md:px-10 py-6 md:py-8 max-w-[1500px] space-y-6 md:space-y-8 pb-32">
     <div className="flex items-end justify-between anim-fade">
       <div>
-        {overviewChild&&<button onClick={()=>{store.setActiveView('progress');setOverviewChild(false);setSelectedGoalId(null);}} className="mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4"/>{t('bottomNav.stats')}</button>}
+        {overviewChild&&<button onClick={()=>{store.setActiveView('progress');setOverviewChild(false);setSelectedGoalId(null);}} className="hit mb-4 h-9 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[12px] font-bold text-[var(--text-dim)] flex items-center gap-1.5 hover:text-[var(--text)]"><ChevronLeft className="w-4 h-4"/>{t('bottomNav.stats')}</button>}
         <h1 className="display text-[30px] md:text-[48px] text-[var(--text)]">{t('goals.title')}</h1>
         <p className="text-[15px] text-[var(--text-dim)] mt-1">{t('goals.count',{n:activeGoals.length})}{completedGoals.length>0?t('goals.completedSuffix',{n:completedGoals.length}):''}</p>
       </div>
@@ -710,7 +710,7 @@ export default function App(){
       const gDone=sessions.filter(s=>s.goalId===g.id&&s.status==='done');
       const gHours=+(gDone.reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
       const pct=goalProgressPct(g,sessions);
-      return <button key={g.id} onClick={()=>{store.setActiveView('goals');setSelectedGoalId(g.id);setOverviewChild(true);}} className="w-full flex items-center gap-4 group hover:opacity-90 transition-opacity">
+      return <button key={g.id} onClick={()=>{store.setActiveView('goals');setSelectedGoalId(g.id);setOverviewChild(true);}} className="w-full min-h-[44px] flex items-center gap-4 group hover:opacity-90 transition-opacity">
         <span className="text-xl w-8 text-center">{g.emoji}</span>
         <div className="w-36 text-[13px] font-medium text-[var(--text)] truncate text-left">{g.title.split(' ').slice(0,3).join(' ')}</div>
         <div className="flex-1 h-2.5 bg-[var(--surface-2)] rounded-full overflow-hidden"><motion.div className="h-full rounded-full" style={{background:g.color}} {...fillBar(pct)}/></div>
