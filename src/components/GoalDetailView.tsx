@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
-import { useStore, goalInsight, goalProgressPct, goalStreak } from '../store';
+import { useStore, goalInsight, goalProgressPct, goalStreak, milestoneReached } from '../store';
 import type { Goal, RoadmapNode } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
@@ -130,8 +130,9 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const insight = goalInsight(goal, sessions);
   const insightText = (insight.key === 'gi.start' && goal.aiInsight) ? goal.aiInsight : tr(insight.key, insight.vars);
 
-  // Milestones
-  const doneMilestones = goal.milestones.filter(m => m.done).length;
+  // Milestones — reached = manual ✓ OR logged hours crossed targetValue
+  const msReached = (m: Goal['milestones'][number]) => milestoneReached(m, hoursLogged);
+  const doneMilestones = goal.milestones.filter(msReached).length;
 
   // Recent logs
   const recentLogs = doneSessions
@@ -204,6 +205,8 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                 { icon: CheckCircle2, val: `${doneCount}/${totalCount}`, label: tr('gd.mSessions'), color: '#22c55e' },
                 { icon: TrendingUp, val: `${completionRate}%`, label: tr('gd.mCompletionRate'), color: '#8b5cf6' },
                 ...(daysLeft !== null ? [{ icon: Calendar, val: `${daysLeft}d`, label: tr('gd.mUntilDeadline'), color: daysLeft < 30 ? '#f59e0b' : '#3b82f6' }] : []),
+                ...(!isCompleted && hNeededPerWeek !== null && hoursLeft > 0 && daysLeft !== null && daysLeft >= 0
+                  ? [{ icon: TrendingUp, val: fmtHours(hNeededPerWeek), label: tr('gd.mNeedPerWeek'), color: onTrack ? '#22c55e' : '#ef4444' }] : []),
               ].map((m, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <m.icon className="w-4 h-4" style={{ color: m.color }} />
@@ -274,11 +277,19 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
             </span>
             <span className="text-[10px] font-bold text-[var(--text-dim)]">{tr('gd.remaining', { x: fmtHours(hoursLeft) })}</span>
           </div>
-          <div className="h-2 w-full bg-[var(--surface-2)] rounded-full overflow-hidden">
+          <div className="relative h-2 w-full bg-[var(--surface-2)] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all"
               style={{ width: `${progressPct}%`, background: `linear-gradient(to right, ${goal.color}cc, ${goal.color})` }}
             />
+            {/* Milestone ticks along the hours scale */}
+            {goal.totalHoursEstimated > 0 && goal.milestones
+              .filter(m => m.targetValue > 0 && m.targetValue <= goal.totalHoursEstimated)
+              .map(m => (
+                <div key={m.id} title={m.title}
+                  className="absolute top-0 bottom-0 w-[2px]"
+                  style={{ left: `${(m.targetValue / goal.totalHoursEstimated) * 100}%`, background: msReached(m) ? '#ffffff' : 'var(--text-mute)', opacity: msReached(m) ? 0.9 : 0.45 }} />
+              ))}
           </div>
         </div>
       </div>
@@ -602,26 +613,26 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
               <div className="absolute left-4 top-0 bottom-0 w-[2px] bg-[var(--surface-2)]" />
 
               <div className="space-y-6">
-                {goal.milestones.map((ml, i) => (
+                {goal.milestones.map((ml, i) => { const reached = msReached(ml); return (
                   <div key={ml.id} className="relative group">
                     {/* Node — tap to toggle done */}
                     <button
                       onClick={() => toggleMs(ml.id)}
                       title={tr('gd.doneCheck')}
-                      className={`absolute -left-[17px] w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-all ${ml.done ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30' : 'bg-[var(--surface)] border-[var(--border)] hover:border-emerald-500/60'}`}
+                      className={`absolute -left-[17px] w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-all ${reached ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30' : 'bg-[var(--surface)] border-[var(--border)] hover:border-emerald-500/60'}`}
                     >
-                      {ml.done && <Check className="w-3 h-3 text-black" strokeWidth={4} />}
+                      {reached && <Check className="w-3 h-3 text-black" strokeWidth={4} />}
                     </button>
 
-                    <div className={`card p-5 transition-all ${ml.done ? 'opacity-60' : ''}`}>
+                    <div className={`card p-5 transition-all ${reached ? 'opacity-60' : ''}`}>
                       <div className="flex items-start justify-between gap-3">
                         <button onClick={() => toggleMs(ml.id)} className="flex-1 text-left">
-                          <div className={`text-[15px] font-bold ${ml.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>{ml.title}</div>
+                          <div className={`text-[15px] font-bold ${reached ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>{ml.title}</div>
                           <div className="text-[11px] text-[var(--text-dim)] mt-1">{tr('gd.targetUnits', { n: ml.targetValue })}</div>
                         </button>
                         <div className="flex items-center gap-2 shrink-0">
-                          <div className={`px-3 py-1 rounded-lg text-[10px] font-bold ${ml.done ? 'bg-emerald-500/15 text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-dim)]'}`}>
-                            {ml.done ? tr('gd.doneCheck') : tr('gd.stepN', { n: i + 1 })}
+                          <div className={`px-3 py-1 rounded-lg text-[10px] font-bold ${reached ? 'bg-emerald-500/15 text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-dim)]'}`}>
+                            {reached && !ml.done ? tr('gd.autoByHours') : ml.done ? tr('gd.doneCheck') : tr('gd.stepN', { n: i + 1 })}
                           </div>
                           <button onClick={() => delMs(ml.id)} className="w-7 h-7 rounded-lg grid place-items-center text-[var(--text-mute)] hover:text-red-400 hover:bg-red-500/10 transition-colors hover-actions">
                             <X className="w-3.5 h-3.5" />
@@ -630,7 +641,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
                       </div>
                     </div>
                   </div>
-                ))}
+                ); })}
 
                 {/* Add milestone form */}
                 <div className="relative">

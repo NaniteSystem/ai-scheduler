@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { useStore, habitDueOn, habitStreak, dailyCompletion, goalInsight, goalProgressPct, goalStreak } from './store';
+import { useStore, habitDueOn, habitStreak, dailyCompletion, goalInsight, goalProgressPct, goalStreak, milestoneReached } from './store';
 import { useT, useDateLocale } from './i18n';
 import { useEffectiveTheme } from './hooks/useEffectiveTheme';
 import { syncReminders } from './utils/notifications';
@@ -533,7 +533,7 @@ export default function App(){
         const totalMins=doneSess.reduce((a,s)=>a+s.durationMinutes,0);
         const hoursReal=+(totalMins/60).toFixed(1);
         const pct=goalProgressPct(g,sessions);
-        const doneMil=g.milestones.filter(m=>m.done).length;
+        const doneMil=g.milestones.filter(m=>milestoneReached(m,hoursReal)).length;
         const gi=goalInsight(g,sessions); const giText=(gi.key==='gi.start'&&g.aiInsight)?g.aiInsight:t(gi.key,gi.vars);
         const needsAttention=(gi.key==='gi.behind'||gi.key==='gi.overdue'||gi.key==='gi.lowCompletion')&&gSessions.length>0;
         return <button key={g.id} onClick={()=>setSelectedGoalId(g.id)} className={`card overflow-hidden group anim-fade text-left border-l-4 hover:border-l-8 transition-all hover:shadow-xl hover:shadow-black/30`} style={{borderLeftColor:g.color}}>

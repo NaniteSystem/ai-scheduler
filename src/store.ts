@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { addDays, addWeeks, addMonths, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
-import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment } from './types';
+import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment, Milestone } from './types';
 import { getProvider, horizonRange } from './scheduler';
 import { hapticSuccess, hapticTick } from './utils/haptics';
 
@@ -153,6 +153,12 @@ export function moodHabitCorrelation(habits: Habit[], reflections: Record<string
   return { r: num / Math.sqrt(dx * dy), n };
 }
 
+/** A milestone counts as reached when marked done manually OR when the goal's
+ *  logged hours have crossed its targetValue (cumulative hours). Derived — never persisted. */
+export function milestoneReached(m: Milestone, hoursLogged: number): boolean {
+  return m.done || (m.targetValue > 0 && hoursLogged >= m.targetValue);
+}
+
 /** Single source of truth for a goal's progress %.
  *  Hours-based when an hours estimate exists; otherwise milestone-based (roadmap); else 0.
  *  (Replaces the vestigial stored `progressPercent`.) */
@@ -165,7 +171,7 @@ export function goalProgressPct(goal: Goal, sessions: Session[]): number {
   const hours = mins / 60;
   if (goal.totalHoursEstimated > 0) return Math.min(100, Math.round((hours / goal.totalHoursEstimated) * 100));
   const ms = goal.milestones;
-  if (ms.length > 0) return Math.round((ms.filter((m) => m.done).length / ms.length) * 100);
+  if (ms.length > 0) return Math.round((ms.filter((m) => milestoneReached(m, hours)).length / ms.length) * 100);
   return 0;
 }
 
