@@ -44,8 +44,37 @@ assert.equal(malformed.gtdTasks[1], 7);
 assert.deepEqual(migrateLegacyProjects(undefined, undefined), { projects: [], gtdTasks: [] });
 
 const baseProject = { id: 'p-health', title: 'Health', outcome: 'Known result', color: '#8b5cf6', status: 'active' as const, health: 'unknown' as const, createdAt };
-assert.equal(deriveProjectHealth(baseProject, [({ ...task('blocked'), projectId: 'p-health', status: 'next-action' as const, blockingReason: 'Need reply' } as unknown as GTDTask & { blockingReason: string })], '2026-07-18'), 'blocked');
+assert.equal(deriveProjectHealth(baseProject, [{ ...task('blocked'), projectId: 'p-health', status: 'next-action' as const, blockingReason: 'Need reply' }], '2026-07-18'), 'blocked');
 assert.equal(deriveProjectHealth({ ...baseProject, deadline: '2026-07-18' }, [task('open')], '2026-07-18'), 'at-risk');
 assert.equal(deriveProjectHealth(baseProject, [{ ...task('next'), status: 'next-action' as const }], '2026-07-18'), 'on-track');
 assert.equal(deriveProjectHealth(baseProject, [{ ...task('inbox'), status: 'inbox' as const }], '2026-07-18'), 'blocked');
 assert.equal(deriveProjectHealth(baseProject, [], '2026-07-18'), 'unknown');
+
+import { deriveProjectSection, nextReviewDateAfter, projectsNeedingReview } from './projects.ts';
+
+const sectionTask = (overrides: Partial<GTDTask>): GTDTask => ({
+  id: 'sect', title: 'sect', status: 'inbox', priority: 3, createdAt, ...overrides,
+});
+assert.equal(deriveProjectSection(sectionTask({ status: 'done' })), 'done');
+assert.equal(deriveProjectSection(sectionTask({ status: 'next-action', blockingReason: 'Waiting on vendor' })), 'waiting');
+assert.equal(deriveProjectSection(sectionTask({ status: 'next-action' })), 'next');
+assert.equal(deriveProjectSection(sectionTask({ status: 'scheduled' })), 'scheduled');
+assert.equal(deriveProjectSection(sectionTask({ status: 'inbox' })), 'backlog');
+assert.equal(deriveProjectSection(sectionTask({ status: 'someday-maybe' })), 'backlog');
+assert.equal(deriveProjectSection(sectionTask({ status: 'next-action', blockingReason: '   ' })), 'next');
+
+const reviewBase = { id: 'p-review', title: 'Review me', outcome: 'Shipped', color: '#8b5cf6', health: 'unknown' as const, createdAt };
+assert.deepEqual(
+  projectsNeedingReview([
+    { ...reviewBase, status: 'active', nextReviewDate: '2026-07-18' },
+    { ...reviewBase, id: 'p-future', status: 'active', nextReviewDate: '2026-07-20' },
+    { ...reviewBase, id: 'p-none', status: 'active' },
+    { ...reviewBase, id: 'p-archived', status: 'archived', nextReviewDate: '2026-07-10' },
+  ], '2026-07-19').map(p => p.id),
+  ['p-review'],
+);
+
+assert.equal(nextReviewDateAfter('none', '2026-07-19'), undefined);
+assert.equal(nextReviewDateAfter('weekly', '2026-07-19'), '2026-07-26');
+assert.equal(nextReviewDateAfter('biweekly', '2026-07-19'), '2026-08-02');
+assert.equal(nextReviewDateAfter('monthly', '2026-07-19'), '2026-08-19');

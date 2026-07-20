@@ -199,6 +199,8 @@ export interface GTDTask {
   /** @deprecated use todayFocusDate; retained only while older backups migrate. */
   isTodayFocus?: boolean;
   isArchived?: boolean;
+  /** Free-text reason this task is stuck (e.g. "waiting on vendor reply"). Non-empty ⇒ the task is in the project board's Waiting section regardless of status. */
+  blockingReason?: string;
 }
 
 // ─── Habits (routine tracker) ──────────────────────────────────────────────
