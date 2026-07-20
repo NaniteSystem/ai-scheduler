@@ -1,7 +1,7 @@
 import type { LifeBlock } from '../types.ts';
 import { migrateLegacyProjects } from '../domain/projects.ts';
 
-export const CURRENT_STORE_VERSION = 11;
+export const CURRENT_STORE_VERSION = 12;
 
 export const DEFAULT_LIFE_BLOCKS: LifeBlock[] = [
   { id:'sleep', label:'Sleep', emoji:'😴', color:'#6366f1', category:'essential', hoursPerDay:8, minHours:4, maxHours:14, recommended:8, enabled:true, flexible:false, fixedTime:'23:00', description:'Quality rest is the foundation of productivity' },
@@ -116,6 +116,7 @@ export function migratePersistedState(persisted: unknown, version: number, today
     next.projects = migrated.projects;
     next.gtdTasks = migrated.gtdTasks;
   }
+  if (version < 12 && !Array.isArray(next.areas)) next.areas = [];
 
   return next;
 }
