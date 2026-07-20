@@ -50,7 +50,7 @@ const validTask = {
   context: '@computer', projectId: 'p1', tags: ['release'],
   subtasks: [{ id: 'sub-1', title: 'Validate', done: false }], recurring: 'weekly',
   recurFromCompletion: true, completedPomodoros: 2, todayFocusDate: '2026-07-12',
-  isTodayFocus: false, isArchived: false,
+  isTodayFocus: false, isArchived: false, blockingReason: 'Waiting on vendor reply',
 };
 const validProject = {
   id: 'p1', title: 'Backup', color: '#8b5cf6', status: 'active',
@@ -60,6 +60,11 @@ const validProject = {
   nextReviewDate: '2026-07-17', defaultSectionId: 'section-next', notes: 'Keep import safe.',
   createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-07-11T00:00:00.000Z',
   completedAt: '2026-07-12T03:00:00.000Z', archivedAt: '2026-07-13T00:00:00.000Z',
+};
+const validArea = {
+  id: 'area-ops', title: 'Operations', color: '#0d9488', icon: '🛠️',
+  notes: 'Keep the lights on.', createdAt: '2026-07-05T00:00:00.000Z',
+  archivedAt: '2026-07-06T00:00:00.000Z',
 };
 const validHabit = {
   id: 'h1', title: 'Linked habit', emoji: '✓', color: '#654321', anchor: 'morning',
@@ -105,7 +110,7 @@ const validGeneratedPlan = {
 
 const state = {
   goals: [{ ...validGoal, ignored: true }],
-  sessions: [validSession], gtdTasks: [validTask], projects: [validProject], habits: [validHabit], habitGroups: [validHabitGroup],
+  sessions: [validSession], gtdTasks: [validTask], projects: [validProject], areas: [validArea], habits: [validHabit], habitGroups: [validHabitGroup],
   reflections: { '2026-07-12': { date: '2026-07-12', mood: 4, note: 'Good', metrics: { sleep: 8 } } },
   metricDefs: [{ id: 'sleep', name: 'Sleep', unit: 'hours' }], habitRemindersEnabled: false,
   notifPrefs: { sessions: false, tasks: true, quietEnabled: true, quietStart: '21:00', quietEnd: '07:00' },
@@ -160,6 +165,7 @@ const previewState = {
   sessions: [validSession, validSession],
   gtdTasks: [validTask, validTask],
   projects: [validProject, validProject],
+  areas: [validArea, validArea],
   habits: [validHabit, validHabit],
   habitGroups: [validHabitGroup, validHabitGroup],
   reflections: {
@@ -173,6 +179,7 @@ assert.deepEqual(fullPreview.goals, { action: 'replace', before: 2, after: 1, co
 assert.deepEqual(fullPreview.sessions, { action: 'replace', before: 2, after: 1, count: 1 });
 assert.deepEqual(fullPreview.gtdTasks, { action: 'replace', before: 2, after: 1, count: 1 });
 assert.deepEqual(fullPreview.projects, { action: 'replace', before: 2, after: 1, count: 1 });
+assert.deepEqual(fullPreview.areas, { action: 'replace', before: 2, after: 1, count: 1 });
 assert.deepEqual(fullPreview.habits, { action: 'replace', before: 2, after: 1, count: 1 });
 assert.deepEqual(fullPreview.habitGroups, { action: 'replace', before: 2, after: 1, count: 1 });
 assert.deepEqual(fullPreview.reflections, { action: 'replace', before: 2, after: 1, count: 1 });
@@ -219,9 +226,9 @@ assert.deepEqual(taskRepairState, taskRepairStateBeforePreview, 'task repair pre
 assert.deepEqual(taskRepairData, taskRepairDataBeforePreview, 'task repair preview does not mutate imported tasks');
 
 const emptyCollectionsPreview = buildBackupPreview(previewState, {
-  goals: [], sessions: [], gtdTasks: [], projects: [], habits: [], habitGroups: [], reflections: {}, metricDefs: [],
+  goals: [], sessions: [], gtdTasks: [], projects: [], areas: [], habits: [], habitGroups: [], reflections: {}, metricDefs: [],
 });
-for (const key of ['goals', 'sessions', 'gtdTasks', 'projects', 'habits', 'habitGroups', 'reflections', 'metricDefs'] as const) {
+for (const key of ['goals', 'sessions', 'gtdTasks', 'projects', 'areas', 'habits', 'habitGroups', 'reflections', 'metricDefs'] as const) {
   assert.equal(emptyCollectionsPreview[key]?.count, 0, `${key} previews an explicit empty collection`);
 }
 const clearPreview = buildBackupPreview(previewState, { generatedPlan: null, focusTimer: null });
@@ -388,6 +395,7 @@ for (const [field, value, error] of [
   ['sessions', [validSession, { ...validSession, title: 'Duplicate' }], /invalid-sessions/],
   ['gtdTasks', [validTask, { ...validTask, title: 'Duplicate' }], /invalid-tasks/],
   ['projects', [validProject, { ...validProject, title: 'Duplicate' }], /invalid-projects/],
+  ['areas', [validArea, { ...validArea, title: 'Duplicate' }], /invalid-areas/],
   ['habits', [validHabit, { ...validHabit, title: 'Duplicate' }], /invalid-habits/],
   ['habitGroups', [validHabitGroup, { ...validHabitGroup, name: 'Duplicate' }], /invalid-habit-groups/],
   ['metricDefs', [{ id: 'sleep', name: 'Sleep' }, { id: 'sleep', name: 'Duplicate' }], /invalid-metrics/],
@@ -587,6 +595,15 @@ for (const project of [
 assert.throws(
   () => parseBackup(JSON.stringify({ projects: [validProject], gtdTasks: [{ ...validTask, projectId: 'missing' }] })),
   /invalid-tasks/,
+);
+
+assert.throws(
+  () => parseBackup(JSON.stringify({ areas: [{ id: 'a-min' }] })),
+  /invalid-areas/,
+);
+assert.throws(
+  () => parseBackup(JSON.stringify({ areas: [{ ...validArea, archivedAt: 'not-a-date' }] })),
+  /invalid-areas/,
 );
 
 for (const [field, value] of [
