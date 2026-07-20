@@ -4,7 +4,7 @@ export type Category =
   | 'writing' | 'music' | 'meditation' | 'health';
 
 export type AppView =
-  | 'dashboard' | 'goals' | 'projects' | 'week' | 'inbox' | 'habits' | 'progress' | 'manager' | 'statistics'
+  | 'dashboard' | 'goals' | 'projects' | 'areas' | 'week' | 'inbox' | 'habits' | 'progress' | 'manager' | 'statistics'
   | 'architect' | 'planner' | 'archive' | 'settings';
 
 export type SessionType = 'regular' | 'checkpoint' | 'catchup' | 'intensive';
@@ -159,6 +159,18 @@ export interface Project {
   createdAt: string;
   updatedAt?: string;
   completedAt?: string;
+  archivedAt?: string;
+}
+
+export interface Area {
+  id: string;
+  title: string;
+  color: string;
+  /** Emoji marker, same convention as Goal.emoji. */
+  icon?: string;
+  notes?: string;
+  createdAt: string;
+  /** Areas don't complete — only archive. */
   archivedAt?: string;
 }
 
