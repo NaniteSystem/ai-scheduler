@@ -55,7 +55,9 @@ updateProject: (id: string, patch: Partial<Pick<Project,
 
 ### AppView (`src/types.ts`)
 
-Добавить `'areas'` и `'projectDetail'` в union.
+Добавить только `'areas'` в union — это независимый список со своим Manager-тайлом, как `'projects'`/`'goals'`.
+
+Project Detail **не** получает отдельный `AppView`: кодовая база уже решает эту задачу для Goal — `GoalDetailView` рендерится вместо списка, когда в `App.tsx` установлен локальный `selectedGoalId` при `activeView==='goals'`. Project Detail повторяет этот паттерн 1:1: локальный `selectedProjectId` в `App.tsx`, подменяющий `ProjectsView` на `ProjectDetailView` при `activeView==='projects'`. Это не требует изменений в `store.ts` (state полностью локален компоненту, как и `selectedGoalId`).
 
 ### Store (`src/store.ts`)
 
@@ -64,9 +66,6 @@ areas: Area[];
 addArea: (title: string, options?: { color?: string; icon?: string }) => string;
 updateArea: (id: string, patch: Partial<Pick<Area, 'title' | 'color' | 'icon' | 'notes' | 'archivedAt'>>) => void;
 deleteArea: (id: string) => void; // detaches projects (areaId -> undefined); does not delete projects
-selectedProjectId: string | null;
-openProjectDetail: (id: string) => void;
-closeProjectDetail: () => void;
 ```
 
 `areas: []` — дефолт при инициализации и при хайдрации старых бэкапов без этого поля.
@@ -90,10 +89,15 @@ closeProjectDetail: () => void;
 1. **Шапка**: back, цвет/иконка, title + health-бейдж + status-бейдж, кнопки Edit / Archive-Restore.
 2. **Brief-блок**: outcome, definitionOfDone (редактируется впервые), notes (свободный текст), target/deadline, ссылка на Goal (если есть, кликабельна → GoalDetailView), ссылка на Area (если есть, кликабельна → Areas).
 3. **Review-блок**: `reviewCadence` (none/weekly/biweekly/monthly) select + `nextReviewDate`. Кнопка «Review now» открывает мини-форму: подтвердить/поменять health, обновить outcome/next action, сдвигает `nextReviewDate` на следующий цикл согласно cadence.
-4. **Доска секций**: 5 колонок — Backlog / Next / Waiting / Scheduled / Done, задачи распределяются автоматически по `task.status` (не новое поле, не миграция).
+4. **Доска секций**: 5 колонок — Backlog / Next / Waiting / Scheduled / Done. `GTDStatus` не содержит значения `waiting`, а `deriveProjectHealth` уже (нерабочим образом) читает `task.blockingReason`, которого нет в типе `GTDTask`. Исправляем это здесь: добавляем реальное поле `blockingReason?: string` на `GTDTask` (types.ts, store `updateTask` patch, backup-валидация — без миграции, поле опционально). Секция задачи выводится чистой функцией `deriveProjectSection(task)`:
+   1. `status === 'done'` → Done
+   2. непустой `blockingReason` → Waiting (приоритет над статусом)
+   3. `status === 'next-action'` → Next
+   4. `status === 'scheduled'` → Scheduled
+   5. иначе (`inbox`/`someday-maybe`) → Backlog
    - Карточка задачи в колонке: title, due/scheduled date, приоритет.
-   - Desktop: drag-and-drop между колонками меняет `task.status` через существующий `updateTask`.
-   - Touch: fallback — кнопка/select на карточке задачи для смены статуса (drag ненадёжен в узких мобильных колонках).
+   - Desktop: drag-and-drop между колонками. Перетаскивание в Backlog/Next/Scheduled/Done меняет `status` через `processTask` (канонический переход, сохраняет recurring-логику) и очищает `blockingReason`. Перетаскивание в Waiting запрашивает текст причины (обязательный) и вызывает `updateTask(id, { blockingReason })`, не трогая status.
+   - Touch: fallback — кнопка/select на карточке задачи для смены секции (drag ненадёжен в узких мобильных колонках), вызывает ту же логику.
    - Быстрое добавление задачи в любую колонку — переиспользует `parseTaskCapture`, как в текущей карточке `ProjectsView`.
 5. **Progress-бар** — переносится как есть из текущей карточки проекта (done/total, %).
 
@@ -106,7 +110,8 @@ closeProjectDetail: () => void;
 ## 5. Миграция, бэкап, тесты
 
 - `areas: Area[]` — дефолт `[]` при хайдрации старых бэкапов (без этого поля).
-- `src/services/backup.ts`: валидация `Area[]` по аналогии с существующей валидацией `Project[]`; расширить валидацию `Project` под `goalId`/`areaId`/`reviewCadence`/`nextReviewDate` (частично уже есть на строках ~131-138).
+- `src/services/backup.ts`: валидация `Area[]` по аналогии с существующей валидацией `Project[]`; расширить валидацию `Project` под `goalId`/`areaId`/`reviewCadence`/`nextReviewDate` (частично уже есть на строках ~131-138); добавить `optionalFieldIsValid(value, 'blockingReason', ...)` в `gtdTaskIsValid`.
+- `src/domain/projects.ts`: `deriveProjectHealth` перестаёт кастовать `task as GTDTask & { blockingReason?: string }` — читает реальное поле напрямую.
 - Новые тесты:
   - `src/domain/projects.test.ts` — `projectsNeedingReview`.
   - `src/domain/areas.ts` (helper-логика, если появится) + тест.
