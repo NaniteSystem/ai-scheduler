@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticSuccess, hapticTick } from '../utils/haptics';
-import { extractNLDate } from '../utils/nlDate';
+import { parseTaskCapture } from '../utils/taskCapture';
 import { collectWeekStats, requestWeeklyReview, type WeeklyReviewText } from '../ai/weeklyReview';
 import { requestInboxTriage, type TriageSuggestion } from '../ai/inboxTriage';
 import { nextDueDate, useStore } from '../store';
@@ -12,14 +12,18 @@ import { Drawer } from './ui/Drawer';
 import { SelectMenu } from './ui/SelectMenu';
 import { ensureWebNotifPermission } from '../utils/timerNotifications';
 import {
-  Inbox, Zap, Folder, Users, Cloud, Trash2, Plus, Search,
+  Inbox, Zap, Folder, Cloud, Trash2, Plus, Search,
   X, Check, Clock, ChevronRight, ChevronDown, ChevronLeft, Edit2,
   Wifi, Phone, Home, ShoppingCart,
-  Timer, Hourglass, Minus, Circle, CheckCircle2, Calendar, Play, GripVertical,
+  Timer, Hourglass, Minus, Circle, CheckCircle2, Calendar, Play,
   SlidersHorizontal, MoreHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  Sun, Sparkles, BookOpen, Layers, Layers3, Target, Repeat, Bell, AlertTriangle, CalendarClock
+  Sun, Sparkles, Layers, Target, Repeat, Bell, AlertTriangle, CalendarClock
 } from 'lucide-react';
-import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { createId } from '../domain/id';
+import { fmtDur } from '../utils/duration';
+import { formatClock } from '../utils/time';
+import { hasTodayFocus } from '../domain/taskFocus';
 
 const PRIORITY_CONFIG = {
   1: { label: 'P1', color: '#ef4444', bg: '#ef444420', dot: 'bg-red-500' },
@@ -49,11 +53,8 @@ const STATUS_CONFIG: Record<GTDStatus | string, { label: string; icon: any; colo
   inbox:         { label: 'gtd.status.inbox',         icon: Inbox,      color: '#22c55e', desc: 'gtd.status.inboxDesc' },
   'next-action': { label: 'gtd.status.next-action',   icon: Zap,        color: '#eab308', desc: 'gtd.status.next-actionDesc' },
   other:         { label: 'gtd.status.other',         icon: Layers,     color: '#64748b', desc: 'gtd.status.otherDesc' },
-  project:       { label: 'gtd.status.project',       icon: Folder,     color: '#a855f7', desc: 'gtd.status.projectDesc' },
-  'waiting-for': { label: 'gtd.status.waiting-for',   icon: Users,      color: '#f97316', desc: 'gtd.status.waiting-forDesc' },
   scheduled:     { label: 'gtd.status.scheduled',     icon: Calendar,   color: '#3b82f6', desc: 'gtd.status.scheduledDesc' },
   'someday-maybe':{ label: 'gtd.status.someday-maybe', icon: Cloud,      color: '#64748b', desc: 'gtd.status.someday-maybeDesc' },
-  reference:     { label: 'gtd.status.reference',     icon: BookOpen,   color: '#14b8a6', desc: 'gtd.status.referenceDesc' },
   done:          { label: 'gtd.status.done',          icon: CheckCircle2,color: '#22c55e', desc: 'gtd.status.doneDesc' },
   trash:         { label: 'gtd.status.trash',         icon: Trash2,     color: '#ef4444', desc: 'gtd.status.trashDesc' },
 };
@@ -63,52 +64,11 @@ const todayStr = () => format(new Date(), 'yyyy-MM-dd');
 export const isOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate < todayStr();
 const dueTodayOrOverdue = (t: GTDTask) => !!t.dueDate && t.dueDate <= todayStr();
 
-// ─── Natural Language Parser (lightweight) ─────────────────────────────────
-export function parseNL(input: string): { title: string; priority?: Priority; context?: TaskContext; durationMinutes?: number; tags?: string[]; dueDate?: string; remindAt?: string; recurring?: GTDTask['recurring'] } {
-  let priority: Priority | undefined;
-  let context: TaskContext | undefined;
-  let durationMinutes: number | undefined;
-  let tags: string[] = [];
-
-  // Dates/time/recurrence in EN/RU/JA — full parser in utils/nlDate.ts
-  const nl = extractNLDate(input);
-  let title = nl.title;
-  const { dueDate, remindAt, recurring } = nl;
-
-  // Priority: p1, p2, p3, p4 or !!! !! !
-  const pMatch = title.match(/\b(p[1-4]|!!!|!!|!)\b/i);
-  if (pMatch) {
-    const p = pMatch[1].toLowerCase();
-    priority = p === 'p1' || p === '!!!' ? 1 : p === 'p2' || p === '!!' ? 2 : p === 'p3' || p === '!' ? 3 : 4;
-    title = title.replace(pMatch[0], '').trim();
-  }
-  // Context: @home @work @phone @computer @errand @anywhere
-  const ctxMatch = title.match(/@(home|work|phone|computer|errand|anywhere)/i);
-  if (ctxMatch) {
-    context = `@${ctxMatch[1].toLowerCase()}` as TaskContext;
-    title = title.replace(ctxMatch[0], '').trim();
-  }
-  // Duration: 30m 1h 90min
-  const durMatch = title.match(/(\d+)(m|min|h|hr)(?:\b|$)/i);
-  if (durMatch) {
-    const n = parseInt(durMatch[1]);
-    durationMinutes = durMatch[2].toLowerCase().startsWith('h') ? n * 60 : n;
-    title = title.replace(durMatch[0], '').trim();
-  }
-  // Tags: #tag
-  const tagMatches = title.match(/#(\w+)/g);
-  if (tagMatches) {
-    tags = tagMatches.map(t => t.slice(1));
-    title = title.replace(/#\w+/g, '').trim();
-  }
-
-  return { title: title.trim() || input, priority, context, durationMinutes, tags, dueDate, remindAt, recurring };
-}
-
 // ─── Task Card ───────────────────────────────────────────────────────────────
 function TaskCard({ task, compact = false, selecting = false, selected = false, onSelect }: { task: GTDTask; compact?: boolean; selecting?: boolean; selected?: boolean; onSelect?: () => void }) {
   const tr = useT();
-  const { processTask, deleteTask, toggleTodayFocus, openEditTask, openTimerLauncher, setDoingTask, scheduleFromTask } = useStore();
+  const locale = useDateLocale();
+  const { processTask, deleteTask, toggleTodayFocus, openEditTask, openTimerLauncher, setDoingTask, scheduleFromTask, lang, projects } = useStore();
   const [expanded, setExpanded] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   useBackClose(moreOpen, () => setMoreOpen(false));
@@ -120,14 +80,17 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
   const isDue = isOverdue(task) && task.status !== 'done';
   const isTodayDue = task.dueDate && isToday(parseISO(task.dueDate));
   const isTomorrowDue = task.dueDate && isTomorrow(parseISO(task.dueDate));
+  const isFocusedToday = hasTodayFocus(task);
   const nextRepeat = task.recurring ? nextDueDate(task.dueDate || task.scheduledDate || task.createdAt.slice(0, 10), task.recurring) : null;
+  const projectTitle = projects.find(project => project.id === task.projectId)?.title || task.project;
 
   // ── Mobile swipe: right = complete, left = delete ──
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<'h' | 'v' | null>(null);
   const SWIPE_TRIGGER = 80;
-  const swipeEnabled = !compact && task.status !== 'done' && !(typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+  // Touch-only gesture (touch events don't fire for mouse); axis lock below keeps vertical scroll intact.
+  const swipeEnabled = !compact && !selecting && task.status !== 'done';
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -189,7 +152,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
   };
 
   return (
-   <div className="relative rounded-xl overflow-visible">
+   <div className="relative rounded-[18px] overflow-visible" data-no-tab-swipe>
     {/* Swipe reveal backgrounds */}
     {dx !== 0 && (
       <div className="absolute inset-0 flex items-center justify-between px-5 pointer-events-none">
@@ -202,7 +165,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       style={{ transform: `translateX(${dx}px)`, transition: dx === 0 ? 'transform .2s ease, opacity .18s ease, box-shadow .18s ease' : 'none', opacity: completing ? 0.2 : 1 }}
-      className={`group relative border rounded-xl ${
+      className={`group relative border rounded-[18px] ${
         task.status === 'done'
           ? 'border-[var(--border)] bg-[var(--surface)] opacity-70'
           : isDue
@@ -213,7 +176,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
       }`}
     >
       {completing && (
-        <div className="absolute inset-0 pointer-events-none grid place-items-center overflow-hidden rounded-xl">
+        <div className="absolute inset-0 pointer-events-none grid place-items-center overflow-hidden rounded-[18px]">
           <motion.div
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -258,11 +221,11 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
             <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${p.dot}`} />
 
             {/* Title */}
-            <span className={`text-[13px] font-medium flex-1 ${task.status === 'done' ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>
+            <button onClick={() => openEditTask(task.id)} className={`text-left text-[13px] font-medium flex-1 hover:underline underline-offset-2 ${task.status === 'done' ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>
               {task.title}
-            </span>
+            </button>
 
-            {task.isTodayFocus && <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />}
+            {isFocusedToday && <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />}
           </div>
 
           {/* Meta row */}
@@ -270,7 +233,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
             {/* Duration */}
             {task.durationMinutes && (
               <span className="flex items-center gap-1 text-[10px] text-[var(--text-dim)]">
-                <Clock className="w-3 h-3" />{task.durationMinutes}m
+                <Clock className="w-3 h-3" />{fmtDur(task.durationMinutes, lang)}
               </span>
             )}
             {/* Due date */}
@@ -279,7 +242,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
                 isDue ? 'text-red-400' : isTodayDue ? 'text-amber-400' : isTomorrowDue ? 'text-blue-400' : 'text-[var(--text-dim)]'
               }`}>
                 <Calendar className="w-3 h-3" />
-                {isTodayDue ? tr('common.today') : isTomorrowDue ? tr('common.tomorrow') : format(parseISO(task.dueDate), 'MMM d')}
+                {isTodayDue ? tr('common.today') : isTomorrowDue ? tr('common.tomorrow') : format(parseISO(task.dueDate), 'MMM d', { locale })}
               </span>
             )}
             {/* Context */}
@@ -302,35 +265,29 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
             )}
             {nextRepeat && (
               <span className="flex items-center gap-1 text-[10px] text-[var(--text-dim)]">
-                <ChevronRight className="w-3 h-3" />{tr('gtd.nextRepeat', { d: format(parseISO(nextRepeat), 'MMM d') })}
+                <ChevronRight className="w-3 h-3" />{tr('gtd.nextRepeat', { d: format(parseISO(nextRepeat), 'MMM d', { locale }) })}
               </span>
             )}
             {task.scheduledDate && (
               <span className="flex items-center gap-1 text-[10px] text-blue-400">
-                <Calendar className="w-3 h-3" />{tr('gtd.scheduledFor', { d: format(parseISO(task.scheduledDate), 'MMM d') })}
+                <Calendar className="w-3 h-3" />{tr('gtd.scheduledFor', { d: format(parseISO(task.scheduledDate), 'MMM d', { locale }) })}
               </span>
             )}
-            {task.project && (
+            {projectTitle && (
               <span className="flex items-center gap-1 text-[10px] text-purple-400">
-                <Folder className="w-3 h-3" />{task.project}
+                <Folder className="w-3 h-3" />{projectTitle}
               </span>
             )}
             {/* Reminder */}
             {task.remindAt && (
               <span className="flex items-center gap-1 text-[10px] text-sky-400">
-                <Bell className="w-3 h-3" />{format(parseISO(task.remindAt), 'MMM d, HH:mm')}
+                <Bell className="w-3 h-3" />{format(parseISO(task.remindAt), 'MMM d', { locale })}, {formatClock(parseISO(task.remindAt).getHours() * 60 + parseISO(task.remindAt).getMinutes(), lang)}
               </span>
             )}
             {/* Tags */}
             {(task.tags || []).map(tag => (
               <span key={tag} className="px-1.5 py-0.5 rounded-md bg-[var(--surface-2)] text-[11px] text-[var(--text-dim)]">#{tag}</span>
             ))}
-            {/* Waiting for */}
-            {task.delegateTo && (
-              <span className="flex items-center gap-1 text-[10px] text-orange-400">
-                <Users className="w-3 h-3" />→ {task.delegateTo}
-              </span>
-            )}
             {/* Subtasks */}
             {(task.subtasks?.length || 0) > 0 && (
               <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] hover:text-[var(--text)]">
@@ -372,7 +329,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
           <button
             onClick={() => toggleTodayFocus(task.id)}
             title={tr('gtd.focusToday')}
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${task.isTodayFocus ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-dim)] hover:text-amber-400 hover:bg-[var(--surface-2)]'}`}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${isFocusedToday ? 'text-amber-400 bg-amber-500/10' : 'text-[var(--text-dim)] hover:text-amber-400 hover:bg-[var(--surface-2)]'}`}
           >
             <Sun className="w-3.5 h-3.5" />
           </button>
@@ -385,7 +342,7 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
               <MoreHorizontal className="w-4 h-4" />
             </button>
             {moreOpen && (
-              <div className="absolute right-0 bottom-9 z-[420] w-48 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl">
+              <div className="absolute right-0 bottom-9 z-[420] w-52 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5" style={{ boxShadow: 'var(--shadow-md)' }}>
                 {/* Quick priority (Todoist-style) */}
                 <div className="flex gap-1 px-1.5 py-1.5">
                   {([1, 2, 3, 4] as Priority[]).map(pr => (
@@ -398,9 +355,10 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
                 </div>
                 <button onClick={() => runMoreAction(() => openEditTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Edit2 className="w-3.5 h-3.5" />{tr('gtd.editTask')}</button>
                 {task.status !== 'inbox' && <button onClick={() => runMoreAction(() => processTask(task.id, 'inbox'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Inbox className="w-3.5 h-3.5" />{tr('gtd.moveInbox')}</button>}
-                {task.status !== 'next-action' && <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Zap className="w-3.5 h-3.5" />{tr('gtd.moveNext')}</button>}
+                {task.status !== 'next-action' && <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Zap className="w-3.5 h-3.5" />{tr('gtd.moveNext')}</button>}
                 {task.status !== 'someday-maybe' && <button onClick={() => runMoreAction(() => processTask(task.id, 'someday-maybe'))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Layers className="w-3.5 h-3.5" />{tr('gtd.moveOther')}</button>}
-                <button onClick={() => runMoreAction(() => { const d = new Date(); d.setDate(d.getDate() + 1); useStore.getState().updateTask(task.id, { dueDate: format(d, 'yyyy-MM-dd') }); })} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><CalendarClock className="w-3.5 h-3.5" />{tr('gtd.postponeTomorrow')}</button>
+                <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'), scheduledDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><CalendarClock className="w-3.5 h-3.5" />{tr('gtd.postponeTomorrow')}</button>
+                <button onClick={() => runMoreAction(() => processTask(task.id, 'next-action', { dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), scheduledDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Calendar className="w-3.5 h-3.5" />{tr('gtd.nextWeek')}</button>
                 <button onClick={() => runMoreAction(() => openTimerLauncher({ linkType: 'task', linkId: task.id, label: task.title }))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)] flex items-center gap-2"><Timer className="w-3.5 h-3.5" />{tr('gtd.pomodoro')}</button>
                 <button onClick={() => runMoreAction(() => deleteTask(task.id))} className="w-full h-9 px-3 rounded-lg text-left text-[12px] font-semibold text-red-400 hover:bg-red-500/10 flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" />{tr('common.delete')}</button>
               </div>
@@ -409,19 +367,14 @@ function TaskCard({ task, compact = false, selecting = false, selected = false, 
         </div>
       </div>
 
-      {/* Drag hint (shows on hover) */}
-      {!compact && <div className="absolute left-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity -ml-1 text-[var(--text-dim)] hover:text-[var(--text)]">
-        <GripVertical className="w-3 h-3" />
-      </div>}
-
       {/* Processing bar for inbox */}
       {task.status === 'inbox' && (
         <div className="px-4 pb-3 border-t border-[var(--surface-2)] mt-1 pt-3">
           <div className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">{tr('gtd.whatIsIt')}</div>
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={() => processTask(task.id, 'next-action', { dueDate: undefined, isTodayFocus: false })} className="h-7 px-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors">{tr('gtd.proc.nextAction')}</button>
+            <button onClick={() => processTask(task.id, 'next-action', { dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined })} className="h-7 px-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors">{tr('gtd.proc.nextAction')}</button>
             <button onClick={() => processTask(task.id, 'someday-maybe')} className="h-7 px-3 rounded-lg bg-slate-500/10 border border-slate-500/30 text-slate-400 text-[10px] font-bold hover:bg-slate-500/20 transition-colors">{tr('gtd.proc.other')}</button>
-            <button onClick={() => { processTask(task.id, 'scheduled', { dueDate: undefined, isTodayFocus: false }); scheduleFromTask(task.title, task.durationMinutes || 60, task.id); }} className="h-7 px-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition-colors">{tr('gtd.proc.schedule')}</button>
+            <button onClick={() => { processTask(task.id, 'next-action', { dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined }); scheduleFromTask(task.title, task.durationMinutes || 60, task.id); }} className="h-7 px-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition-colors">{tr('gtd.proc.schedule')}</button>
             <button onClick={() => processTask(task.id, 'done')} className="h-7 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/20 transition-colors">{tr('gtd.proc.done')}</button>
             <button onClick={() => deleteTask(task.id)} className="h-7 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] hover:bg-red-500/20 transition-colors">{tr('gtd.proc.trash')}</button>
           </div>
@@ -440,7 +393,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
 
   const handleChange = (val: string) => {
     setInput(val);
-    const parsed = parseNL(val);
+    const parsed = parseTaskCapture(val);
     const hints: string[] = [];
     if (parsed.priority) hints.push(`P${parsed.priority}`);
     if (parsed.context) hints.push(parsed.context);
@@ -458,22 +411,18 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
 
   const submit = () => {
     if (!input.trim()) return;
-    const parsed = parseNL(input);
+    const parsed = parseTaskCapture(input);
     const store = useStore.getState();
-    store.captureTask(parsed.title, parsed.durationMinutes || 5);
+    const newId = store.captureTask(parsed.title, parsed.durationMinutes);
     if (parsed.priority || parsed.context || parsed.tags?.length || parsed.dueDate || parsed.remindAt || parsed.recurring) {
-      // Re-read state: captureTask created a new task, prepended to the list.
-      const newId = useStore.getState().gtdTasks[0]?.id;
-      if (newId) {
-        store.updateTask(newId, {
-          priority: parsed.priority || 3,
-          context: parsed.context,
-          tags: parsed.tags || [],
-          dueDate: parsed.dueDate,
-          remindAt: parsed.remindAt,
-          recurring: parsed.recurring,
-        });
-      }
+      store.updateTask(newId, {
+        priority: parsed.priority || 3,
+        context: parsed.context,
+        tags: parsed.tags || [],
+        dueDate: parsed.dueDate,
+        remindAt: parsed.remindAt,
+        recurring: parsed.recurring,
+      });
     }
     setInput('');
     setHint('');
@@ -481,7 +430,7 @@ function QuickCaptureBar({ onAdd }: { onAdd?: () => void }) {
   };
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+    <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] overflow-hidden" style={{ boxShadow: 'var(--shadow-sm)' }}>
       <div className="flex items-center gap-3 px-4 py-3">
         <Plus className="w-4 h-4 text-[var(--text-dim)] shrink-0" />
         <input
@@ -522,7 +471,7 @@ function EditTaskModal() {
 
 function EditTaskForm({ task }: { task: GTDTask }) {
   const tr = useT();
-  const { updateTask, processTask, closeEditTask } = useStore();
+  const { updateTask, processTask, closeEditTask, askConfirm, projects } = useStore();
 
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes || '');
@@ -534,25 +483,39 @@ function EditTaskForm({ task }: { task: GTDTask }) {
   const [status, setStatus] = useState<GTDStatus>(task.status);
   const [newSub, setNewSub] = useState('');
   const [subtasks, setSubtasks] = useState(task.subtasks || []);
-  const [delegateTo, setDelegateTo] = useState(task.delegateTo || '');
-  const [project, setProject] = useState(task.project || '');
+  const [projectId, setProjectId] = useState(task.projectId || '');
   const [scheduledDate, setScheduledDate] = useState(task.scheduledDate || '');
   const [recurring, setRecurring] = useState<RecurringPattern | ''>(task.recurring || '');
   const [recurFromCompletion, setRecurFromCompletion] = useState(!!task.recurFromCompletion);
   const [remindAt, setRemindAt] = useState(task.remindAt ? task.remindAt.slice(0, 16) : '');
   const [tagsStr, setTagsStr] = useState((task.tags || []).map(t => `#${t}`).join(' '));
+  const [titleError, setTitleError] = useState(false);
+  const selectedProject = projects.find(project => project.id === projectId);
+  const projectHelpId = `task-project-help-${task.id}`;
+  const initialDraft = useRef(JSON.stringify({
+    title: task.title, notes: task.notes || '', dueDate: task.dueDate || '', priority: task.priority,
+    context: task.context || '', duration: task.durationMinutes || 0, energy: task.energyLevel || 'any', status: task.status,
+    subtasks: task.subtasks || [], projectId: task.projectId || '', scheduledDate: task.scheduledDate || '', recurring: task.recurring || '',
+    recurFromCompletion: !!task.recurFromCompletion, remindAt: task.remindAt ? task.remindAt.slice(0, 16) : '', tagsStr: (task.tags || []).map(t => `#${t}`).join(' '),
+  }));
+  const draftKey = JSON.stringify({ title, notes, dueDate, priority, context, duration, energy, status, subtasks, projectId, scheduledDate, recurring, recurFromCompletion, remindAt, tagsStr });
+  const requestClose = () => {
+    if (draftKey === initialDraft.current && !newSub) { closeEditTask(); return; }
+    askConfirm({ title: tr('gtd.discardChangesTitle'), message: tr('gtd.discardChangesMsg'), confirmLabel: tr('gtd.discardChanges'), danger: true, onConfirm: closeEditTask });
+  };
 
   const save = () => {
+    if (!title.trim()) { setTitleError(true); return; }
     updateTask(task.id, {
-      title,
+      title: title.trim(),
       notes,
       dueDate: dueDate || undefined,
       priority,
       context: context as TaskContext || undefined,
       durationMinutes: duration || undefined,
       energyLevel: energy as any,
-      delegateTo: delegateTo || undefined,
-      project: project.trim() || undefined,
+      projectId: projectId || undefined,
+      project: undefined,
       scheduledDate: scheduledDate || undefined,
       subtasks,
       recurring: recurring || undefined,
@@ -566,15 +529,16 @@ function EditTaskForm({ task }: { task: GTDTask }) {
 
   const addSub = () => {
     if (!newSub.trim()) return;
-    setSubtasks(s => [...s, { id: `st${Date.now()}`, title: newSub.trim(), done: false }]);
+    setSubtasks(s => [...s, { id: createId('subtask'), title: newSub.trim(), done: false }]);
     setNewSub('');
   };
 
   return (
-    <Drawer open={true} onClose={closeEditTask} width="lg" title={tr('gtd.editTask')} subtitle={task.title} noPadding>
+    <Drawer open={true} onClose={requestClose} width="lg" title={tr('gtd.editTask')} subtitle={task.title} noPadding>
 
         <div className="p-5 space-y-4">
-          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-transparent text-[var(--text)] text-[16px] font-semibold focus:outline-none border-b border-[var(--border)] pb-2" placeholder={tr('gtd.taskTitle')} />
+          <input value={title} onChange={e => { setTitle(e.target.value); if (titleError) setTitleError(false); }} aria-invalid={titleError} className={`w-full bg-transparent text-[var(--text)] text-[16px] font-semibold focus:outline-none border-b pb-2 ${titleError ? 'border-red-400' : 'border-[var(--border)]'}`} placeholder={tr('gtd.taskTitle')} />
+          {titleError && <p className="text-[11px] text-red-400 mt-1">{tr('gtd.titleRequired')}</p>}
 
           {/* Row 1: Priority + Status */}
           <div className="grid grid-cols-2 gap-3">
@@ -590,11 +554,10 @@ function EditTaskForm({ task }: { task: GTDTask }) {
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.statusLabel')}</label>
-              <SelectMenu value={status === 'project' || status === 'waiting-for' || status === 'reference' ? 'someday-maybe' : status} onChange={(v) => setStatus(v as GTDStatus)} size="sm" ariaLabel={tr('gtd.statusLabel')}
+              <SelectMenu value={status} onChange={(v) => setStatus(v as GTDStatus)} size="sm" ariaLabel={tr('gtd.statusLabel')}
                 options={[
                   { value: 'inbox', label: tr('gtd.status.inbox') },
                   { value: 'next-action', label: tr('gtd.status.next-action') },
-                  { value: 'scheduled', label: tr('gtd.status.scheduled') },
                   { value: 'someday-maybe', label: tr('gtd.status.other') },
                   { value: 'done', label: tr('gtd.status.done') },
                 ]} />
@@ -631,7 +594,19 @@ function EditTaskForm({ task }: { task: GTDTask }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.projectName')}</label>
-              <input value={project} onChange={e => setProject(e.target.value)} placeholder={tr('gtd.projectPlaceholder')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none placeholder:text-[var(--text-dim)]" />
+              <SelectMenu value={projectId} onChange={setProjectId}
+                ariaLabel={tr('gtd.projectSelection', { project: selectedProject?.title || tr('gtd.noProject') })}
+                ariaDescribedBy={projectHelpId}
+                options={[
+                  { value: '', label: tr('gtd.noProject') },
+                  ...projects.filter(project => project.status === 'active' || project.id === projectId).map(project => ({
+                    value: project.id,
+                    label: project.status === 'archived' ? tr('gtd.archivedProject', { project: project.title }) : project.title,
+                  })),
+                ]} />
+              <p id={projectHelpId} className="mt-1.5 text-[10px] leading-relaxed text-[var(--text-dim)]">
+                {selectedProject?.status === 'archived' ? tr('gtd.archivedProjectHint') : tr('gtd.projectAssignmentHint')}
+              </p>
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.scheduledDate')}</label>
@@ -645,8 +620,8 @@ function EditTaskForm({ task }: { task: GTDTask }) {
             <input value={tagsStr} onChange={e => setTagsStr(e.target.value)} placeholder={tr('gtd.tagsPlaceholder')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none placeholder:text-[var(--text-dim)]" />
           </div>
 
-          {/* Energy + Delegate */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Energy */}
+          <div>
             <div>
               <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.energyLevel')}</label>
               <div className="flex gap-1.5 flex-wrap">
@@ -657,12 +632,6 @@ function EditTaskForm({ task }: { task: GTDTask }) {
                 ))}
               </div>
             </div>
-            {(status === 'waiting-for') && (
-              <div>
-                <label className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{tr('gtd.delegatedTo')}</label>
-                <input value={delegateTo} onChange={e => setDelegateTo(e.target.value)} placeholder={tr('gtd.personName')} className="w-full h-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[11px] text-[var(--text)] px-2 focus:outline-none" />
-              </div>
-            )}
           </div>
 
           {/* Repeat + Reminder */}
@@ -721,7 +690,7 @@ function EditTaskForm({ task }: { task: GTDTask }) {
         </div>
 
         <div className="mt-4 pt-4 border-t border-[var(--surface-2)] flex gap-2">
-          <button onClick={closeEditTask} className="flex-1 h-10 rounded-xl border border-[var(--border)] text-[12px] text-[var(--text-dim)] hover:bg-[var(--surface-2)]">{tr('common.cancel')}</button>
+          <button onClick={requestClose} className="flex-1 h-10 rounded-xl border border-[var(--border)] text-[12px] text-[var(--text-dim)] hover:bg-[var(--surface-2)]">{tr('common.cancel')}</button>
           <button onClick={save} className="flex-1 h-10 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold">{tr('gtd.saveChanges')}</button>
         </div>
     </Drawer>
@@ -757,12 +726,10 @@ function InboxTriageModal({ open, onClose, inboxTasks }: { open: boolean; onClos
   const apply = () => {
     for (const s of suggestions) {
       if (!checked[s.id]) continue;
-      const goal = s.goalId ? goals.find(g => g.id === s.goalId) : undefined;
       updateTask(s.id, {
         priority: s.priority,
         dueDate: s.dueDate,
         scheduledDate: s.status === 'scheduled' ? s.dueDate : undefined,
-        project: goal?.title,
       });
       processTask(s.id, s.status);
     }
@@ -841,9 +808,8 @@ function WeeklyReviewModal() {
   const steps = [
     { title: tr('gtd.review1t'), desc: tr('gtd.review1d'), filter: 'inbox', done: gtdTasks.filter(t=>t.status==='inbox').length === 0 },
     { title: tr('gtd.review2t'), desc: tr('gtd.review2d'), filter: 'next-action', done: false },
-    { title: tr('gtd.review3t'), desc: tr('gtd.review3d'), filter: 'project', done: false },
-    { title: tr('gtd.review4t'), desc: tr('gtd.review4d'), filter: 'waiting-for', done: gtdTasks.filter(t=>t.status==='waiting-for').length === 0 },
-    { title: tr('gtd.review5t'), desc: tr('gtd.review5d'), filter: 'someday-maybe', done: false },
+    { title: tr('gtd.review3t'), desc: tr('gtd.review3d'), filter: 'scheduled', done: false },
+    { title: tr('gtd.review5t'), desc: tr('gtd.review5d'), filter: 'other', done: false },
     { title: tr('gtd.review6t'), desc: tr('gtd.review6d'), filter: 'today', done: false },
   ];
 
@@ -914,7 +880,9 @@ function WeeklyReviewModal() {
 // ─── Main GTD View (Content Only) ───────────────────────────────────────────
 // Sorted task lists live on the second level. The first level is Inbox triage.
 const SORTED_TABS: { id: string; label: string; icon: any; color: string }[] = [
+  { id: 'inbox',         label: 'gtd.status.inbox',        icon: Inbox,      color: '#22c55e' },
   { id: 'today',         label: 'gtd.todayBucket',        icon: Sun,         color: '#f59e0b' },
+  { id: 'upcoming',      label: 'gtd.upcoming',           icon: CalendarClock,color: '#8b5cf6' },
   { id: 'next-action',   label: 'gtd.status.next-action', icon: Zap,         color: '#eab308' },
   { id: 'scheduled',     label: 'gtd.status.scheduled',   icon: Calendar,    color: '#3b82f6' },
   { id: 'other',         label: 'gtd.status.other',       icon: Layers,      color: '#64748b' },
@@ -936,12 +904,10 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
     try { localStorage.setItem(SWIPE_HINT_KEY, '1'); } catch { /* private mode */ }
   };
   const {
-    gtdTasks, gtdFilter, setGTDFilter, activeContext, setActiveContext,
-    searchQuery, setSearchQuery, reorderTasks, openWeeklyReview,
+    gtdTasks, projects, gtdFilter, setGTDFilter, activeContext, setActiveContext,
+    searchQuery, setSearchQuery, openWeeklyReview,
     processTask, deleteTask, toggleTodayFocus, scheduleFromTask,
   } = useStore();
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'priority' | 'due' | 'created'>('priority');
   const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
@@ -951,7 +917,9 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   useBackClose(filtersOpen, () => setFiltersOpen(false));
   useBackClose(selecting, () => { setSelecting(false); setSelectedIds([]); });
-  const [viewMode, setViewMode] = useState<'inbox' | 'lists'>('inbox');
+  // A task manager starts with a recognisable list, not a gesture tutorial.
+  // Inbox is the default destination used by Todoist, Reminders and To Do.
+  const [viewMode, setViewMode] = useState<'inbox' | 'lists'>('lists');
   const tabsRef = useRef<HTMLDivElement>(null);
   const viewSwipeStart = useRef<{ x: number; y: number } | null>(null);
   const viewSwipeAxis = useRef<'h' | 'v' | null>(null);
@@ -971,8 +939,9 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
     .filter(t => t.status === 'inbox' && !t.processedAt && !t.isArchived)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const triageTask = rawTasks[0];
-  const otherStatuses: GTDStatus[] = ['project', 'waiting-for', 'someday-maybe', 'reference'];
+  const otherStatuses: GTDStatus[] = ['someday-maybe'];
   const todayDate = format(new Date(), 'yyyy-MM-dd');
+  const upcomingEnd = format(addDays(new Date(), 7), 'yyyy-MM-dd');
   const triageFxColors: Record<TriageDestination, string> = {
     today: '#f59e0b',
     other: '#64748b',
@@ -984,9 +953,10 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   // Count helper for the bucket tabs
   const bucketCount = (id: string) => {
     const activeTasks = gtdTasks.filter(t => t.status !== 'done' && t.status !== 'trash' && !t.isArchived);
-    if (id === 'today') return activeTasks.filter(t => t.status !== 'scheduled' && (t.isTodayFocus || dueTodayOrOverdue(t))).length;
+    if (id === 'today') return activeTasks.filter(t => t.status !== 'scheduled' && (hasTodayFocus(t, todayDate) || dueTodayOrOverdue(t))).length;
+    if (id === 'upcoming') return activeTasks.filter(t => { const date = t.scheduledDate || t.dueDate; return !!date && date >= todayDate && date <= upcomingEnd; }).length;
     if (id === 'other') return activeTasks.filter(t => otherStatuses.includes(t.status)).length;
-    if (id === 'next-action') return activeTasks.filter(t => t.status === 'next-action' && !t.isTodayFocus && !dueTodayOrOverdue(t)).length;
+    if (id === 'next-action') return activeTasks.filter(t => t.status === 'next-action' && !hasTodayFocus(t, todayDate) && !dueTodayOrOverdue(t)).length;
     return activeTasks.filter(t => t.status === id).length;
   };
 
@@ -994,9 +964,10 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const filtered = gtdTasks
     .filter(t => (t.status !== 'trash' && t.status !== 'done') || gtdFilter === 'done' || gtdFilter === 'trash')
     .filter(t => {
-      if (gtdFilter === 'today') return t.status !== 'scheduled' && (t.isTodayFocus || dueTodayOrOverdue(t));
+      if (gtdFilter === 'today') return t.status !== 'scheduled' && (hasTodayFocus(t, todayDate) || dueTodayOrOverdue(t));
+      if (gtdFilter === 'upcoming') { const date = t.scheduledDate || t.dueDate; return !!date && date >= todayDate && date <= upcomingEnd; }
       if (gtdFilter === 'other') return otherStatuses.includes(t.status);
-      if (gtdFilter === 'next-action') return t.status === 'next-action' && !t.isTodayFocus && !dueTodayOrOverdue(t);
+      if (gtdFilter === 'next-action') return t.status === 'next-action' && !hasTodayFocus(t, todayDate) && !dueTodayOrOverdue(t);
       return t.status === gtdFilter;
     })
     .filter(t => gtdFilter === 'today' || activeContext === 'all' || t.context === activeContext)
@@ -1004,7 +975,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
     .filter(t => gtdFilter === 'today' || tagFilter === 'all' || (t.tags || []).includes(tagFilter))
     .filter(t => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.tags || []).some(tag => tag.includes(searchQuery.toLowerCase())))
     .sort((a, b) => {
-      if (gtdFilter === 'scheduled') {
+      if (gtdFilter === 'scheduled' || gtdFilter === 'upcoming') {
         // Upcoming view groups by date — always chronological (Things-style)
         const ad = a.scheduledDate || a.dueDate || '9999', bd = b.scheduledDate || b.dueDate || '9999';
         if (ad !== bd) return ad.localeCompare(bd);
@@ -1030,29 +1001,29 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   };
 
   const projectGroups = Array.from(filtered.reduce((acc, task) => {
-    const name = task.project?.trim() || tr('gtd.noProject');
-    const current = acc.get(name) || { total: 0, next: 0, waiting: 0, scheduled: 0 };
+    const name = projects.find(project => project.id === task.projectId)?.title || task.project?.trim() || tr('gtd.noProject');
+    const current = acc.get(name) || { total: 0, next: 0, scheduled: 0 };
     current.total += 1;
     if (task.status === 'next-action') current.next += 1;
-    if (task.status === 'waiting-for') current.waiting += 1;
     if (task.status === 'scheduled') current.scheduled += 1;
     acc.set(name, current);
     return acc;
-  }, new Map<string, { total: number; next: number; waiting: number; scheduled: number }>()).entries());
+  }, new Map<string, { total: number; next: number; scheduled: number }>()).entries());
 
   const doneTasks = gtdTasks.filter(t => t.status === 'done');
-  const todayFocusTasks = gtdTasks.filter(t => t.isTodayFocus && t.status !== 'done');
+  const todayFocusTasks = gtdTasks.filter(t => hasTodayFocus(t, todayDate) && t.status !== 'done');
   const inboxCount = gtdTasks.filter(t => t.status === 'inbox').length;
   const nextCount = gtdTasks.filter(t => t.status === 'next-action').length;
   const statusConf = STATUS_CONFIG[gtdFilter as GTDStatus] || STATUS_CONFIG.other;
   const toggleSelected = (id: string) => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
   const selectedTaskIds = selectedIds.filter(id => gtdTasks.some(t => t.id === id && t.status !== 'trash'));
   const clearSelection = () => setSelectedIds([]);
-  const runBulk = (action: 'done' | 'next-action' | 'today' | 'trash') => {
+  const runBulk = (action: 'done' | 'next-action' | 'today' | 'tomorrow' | 'trash') => {
     selectedTaskIds.forEach(id => {
       if (action === 'today') toggleTodayFocus(id);
+      else if (action === 'tomorrow') processTask(id, 'next-action', { dueDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'), scheduledDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined });
       else if (action === 'trash') deleteTask(id);
-      else processTask(id, action, action === 'next-action' ? { dueDate: undefined, isTodayFocus: false } : undefined);
+      else processTask(id, action, action === 'next-action' ? { dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined } : undefined);
     });
     clearSelection();
     setSelecting(false);
@@ -1067,13 +1038,13 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
   const commitTriageTask = (destination: TriageDestination) => {
     if (!triageTask) return;
     if (destination === 'today') {
-      processTask(triageTask.id, 'inbox', { isTodayFocus: true, dueDate: todayDate });
+      processTask(triageTask.id, 'inbox', { todayFocusDate: todayDate, isTodayFocus: undefined, dueDate: todayDate });
     } else if (destination === 'other') {
       processTask(triageTask.id, 'someday-maybe');
     } else if (destination === 'next-action') {
-      processTask(triageTask.id, 'next-action', { dueDate: undefined, isTodayFocus: false });
+      processTask(triageTask.id, 'next-action', { dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined });
     } else if (destination === 'scheduled') {
-      processTask(triageTask.id, 'scheduled', { scheduledDate: todayDate, dueDate: undefined, isTodayFocus: false });
+      processTask(triageTask.id, 'scheduled', { scheduledDate: todayDate, dueDate: undefined, todayFocusDate: undefined, isTodayFocus: undefined });
       scheduleFromTask(triageTask.title, triageTask.durationMinutes || 60, triageTask.id);
     } else {
       processTask(triageTask.id, destination);
@@ -1158,21 +1129,14 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
 
   useEffect(() => {
     if (viewMode !== 'lists') return;
-    if (gtdFilter === 'all' || gtdFilter === 'inbox') setGTDFilter('today');
-    if (gtdFilter === 'project' || gtdFilter === 'waiting-for' || gtdFilter === 'reference' || gtdFilter === 'someday-maybe') setGTDFilter('other');
+    if (gtdFilter === 'all') setGTDFilter('inbox');
+    if (gtdFilter === 'someday-maybe') setGTDFilter('other');
   }, [gtdFilter, setGTDFilter, viewMode]);
 
   const openSortedLists = () => {
     setViewMode('lists');
     if (!SORTED_TABS.some(t => t.id === gtdFilter)) setGTDFilter('today');
   };
-  const openInboxLevel = () => {
-    setViewMode('inbox');
-    setGTDFilter('inbox');
-    clearSelection();
-    setSelecting(false);
-  };
-
   return (
     <div className="flex flex-col h-full w-full bg-[var(--bg)]">
       {/* Header */}
@@ -1180,10 +1144,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
         <div className="space-y-5">
           <div className="flex items-center gap-4 min-w-0">
             {onBack && <button
-              onClick={() => {
-                if (viewMode === 'lists' || gtdFilter !== 'inbox') openInboxLevel();
-                else onBack();
-              }}
+              onClick={onBack}
               className="hit w-10 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid place-items-center text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"
               aria-label={tr('bottomNav.stats')}
             >
@@ -1192,19 +1153,13 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             <div className="min-w-0 flex-1 pr-1">
               <div className="flex items-center gap-2 min-w-0">
                 <h1 className="display text-[22px] md:text-[32px] text-[var(--text)] truncate" style={{ lineHeight: 1.12 }}>
-                  {viewMode === 'inbox' ? tr('gtd.status.inbox') : gtdFilter === 'today' ? tr('gtd.todaysFocus') : tr(statusConf.label)}
+                  {viewMode === 'inbox' ? tr('gtd.status.inbox') : gtdFilter === 'today' ? tr('gtd.todaysFocus') : gtdFilter === 'upcoming' ? tr('gtd.upcoming') : tr(statusConf.label)}
                 </h1>
                 <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] text-[12px] text-[var(--text-dim)] font-medium border border-[var(--border)] shrink-0 ml-1">
                   {tr('gtd.tasksCount',{n:viewMode === 'inbox' ? rawTasks.length : filtered.length})}
                 </span>
               </div>
             </div>
-            <button
-              onClick={viewMode === 'inbox' ? openSortedLists : openInboxLevel}
-              className="hity h-9 px-3 rounded-xl border border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)] text-[12px] font-bold flex items-center justify-center gap-1.5 shrink-0"
-            >
-              {viewMode === 'inbox' ? <><Layers3 className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.sortedLists')}</span></> : <><Inbox className="w-4 h-4" /><span className="hidden sm:inline">{tr('gtd.backToInbox')}</span></>}
-            </button>
           </div>
 
           {/* Bucket tabs (GTD lists) */}
@@ -1453,7 +1408,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
           </section>
         )}
 
-        {viewMode === 'lists' && gtdFilter === 'project' && projectGroups.length > 0 && (
+        {viewMode === 'lists' && gtdFilter === 'other' && projectGroups.length > 0 && (
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
             <div className="flex items-center gap-2 mb-3">
               <Folder className="w-4 h-4 text-purple-400" />
@@ -1466,7 +1421,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
                     <div className="min-w-0">
                       <div className="text-[13px] font-bold text-[var(--text)] truncate">{name}</div>
                       <div className="text-[11px] text-[var(--text-dim)] mt-1">
-                        {tr('gtd.projectStats', { total: stats.total, next: stats.next, waiting: stats.waiting, scheduled: stats.scheduled })}
+                        {tr('gtd.projectStats', { total: stats.total, next: stats.next, scheduled: stats.scheduled })}
                       </div>
                     </div>
                     <span className="w-8 h-8 rounded-lg grid place-items-center bg-purple-500/10 text-purple-400 text-[12px] font-bold shrink-0">{stats.total}</span>
@@ -1483,6 +1438,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
             <button disabled={selectedCount === 0} onClick={() => runBulk('done')} className="h-8 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.done')}</button>
             <button disabled={selectedCount === 0} onClick={() => runBulk('next-action')} className="h-8 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.moveNext')}</button>
             <button disabled={selectedCount === 0} onClick={() => runBulk('today')} className="h-8 px-3 rounded-lg bg-[var(--surface-2)] text-[var(--text)] text-[11px] font-bold disabled:opacity-40">{tr('gtd.focusToday')}</button>
+            <button disabled={selectedCount === 0} onClick={() => runBulk('tomorrow')} className="h-8 px-3 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] text-[11px] font-bold disabled:opacity-40">{tr('gtd.toTomorrow')}</button>
             <button disabled={selectedCount === 0} onClick={() => runBulk('trash')} className="h-8 px-3 rounded-lg bg-red-500/10 text-red-400 text-[11px] font-bold disabled:opacity-40">{tr('gtd.proc.trash')}</button>
           </div>
         )}
@@ -1541,7 +1497,7 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
           );
         })()}
 
-        {viewMode === 'lists' && <div className={gtdFilter === 'reference' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-3'}>
+        {viewMode === 'lists' && <div className="space-y-3">
           <AnimatePresence mode="popLayout" initial={false}>
           {filtered.map((task, idx) => (
             <motion.div
@@ -1552,39 +1508,14 @@ export function GTDView({ onBack }: { onBack?: () => void }) {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
-            {gtdFilter === 'scheduled' && (idx === 0 || taskDateKey(task) !== taskDateKey(filtered[idx - 1])) && (
+            {(gtdFilter === 'scheduled' || gtdFilter === 'upcoming') && (idx === 0 || taskDateKey(task) !== taskDateKey(filtered[idx - 1])) && (
               <div className="flex items-center gap-2 pt-2 pb-3 first:pt-0">
                 <span className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{dateGroupLabel(taskDateKey(task))}</span>
                 <span className="flex-1 h-px bg-[var(--border)]" />
               </div>
             )}
-            {/* inner div keeps native HTML5 drag (motion would swallow onDragStart/End) */}
-            <div
-              draggable={!selecting}
-              onDragStart={(e) => { setDragId(task.id); e.dataTransfer.effectAllowed = 'move'; }}
-              onDragOver={(e) => { e.preventDefault(); if (dragId !== task.id) setOverId(task.id); }}
-              onDragEnd={() => { if (dragId && overId && dragId !== overId) reorderTasks(dragId, overId); setDragId(null); setOverId(null); }}
-              onDrop={(e) => { e.preventDefault(); if (dragId && dragId !== task.id) reorderTasks(dragId, task.id); setDragId(null); setOverId(null); }}
-              className={`transition-all cursor-grab active:cursor-grabbing ${overId === task.id && dragId !== task.id ? 'ring-2 ring-[var(--primary)]/50 -translate-y-1 scale-[1.01]' : ''}`}
-            >
-              {gtdFilter === 'reference' && !selecting ? (
-                <div className="card p-5 h-full flex flex-col hover:border-[var(--border)] transition-all bg-[var(--surface)]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-teal-400">
-                      <BookOpen className="w-4 h-4"/>
-                    </div>
-                    <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">{tr('gtd.referenceCard')}</span>
-                  </div>
-                  <h4 className="text-[15px] font-bold text-[var(--text)] mb-2">{task.title}</h4>
-                  <p className="text-[12px] text-[var(--text-dim)] leading-relaxed mb-4 flex-1">{task.notes || tr('gtd.noDescription')}</p>
-                  <div className="flex items-center gap-2 pt-3 border-t border-[var(--surface-2)]">
-                    {(task.tags || []).map(t => <span key={t} className="px-2 py-0.5 rounded-md bg-[var(--surface-2)] text-[11px] text-[var(--text-dim)] uppercase font-bold">#{t}</span>)}
-                    <button onClick={() => useStore.getState().openEditTask(task.id)} className="ml-auto text-[10px] font-bold text-[var(--primary)] hover:text-[var(--primary)] uppercase">{tr('gtd.editInfo')}</button>
-                  </div>
-                </div>
-              ) : (
-                <TaskCard task={task} selecting={selecting} selected={selectedIds.includes(task.id)} onSelect={() => toggleSelected(task.id)} />
-              )}
+            <div>
+              <TaskCard task={task} selecting={selecting} selected={selectedIds.includes(task.id)} onSelect={() => toggleSelected(task.id)} />
             </div>
             </motion.div>
           ))}
@@ -1687,12 +1618,12 @@ function DoTaskModal() {
               <button onClick={() => setMode('countdown')} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left hover:border-[var(--primary)] transition-colors">
                 <Hourglass className="w-5 h-5 text-[var(--primary)] mb-3" />
                 <div className="text-[15px] font-bold text-[var(--text)]">{tr('timer.modeTimer')}</div>
-                <div className="text-[12px] text-[var(--text-dim)] mt-1">Set a time and start.</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">{tr('gtd.modeTimerDesc')}</div>
               </button>
               <button onClick={() => setMode('stopwatch')} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left hover:border-[var(--primary)] transition-colors">
                 <Timer className="w-5 h-5 text-[var(--primary)] mb-3" />
                 <div className="text-[15px] font-bold text-[var(--text)]">{tr('timer.modeStopwatch')}</div>
-                <div className="text-[12px] text-[var(--text-dim)] mt-1">Just run it and track time forward.</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">{tr('gtd.modeStopwatchDesc')}</div>
               </button>
             </div>
           ) : (
@@ -1718,7 +1649,7 @@ function DoTaskModal() {
                 <div className="rounded-2xl bg-[var(--surface-2)] border border-[var(--border)] p-4 text-center">
                   <Timer className="w-7 h-7 mx-auto text-[var(--primary)] mb-2" />
                   <div className="text-[14px] font-bold text-[var(--text)]">{tr('timer.modeStopwatch')}</div>
-                  <div className="text-[12px] text-[var(--text-dim)] mt-1">Counts forward until you stop it.</div>
+                  <div className="text-[12px] text-[var(--text-dim)] mt-1">{tr('gtd.stopwatchHint')}</div>
                 </div>
               )}
             </div>
@@ -1747,7 +1678,7 @@ function DoTaskModal() {
             <Timer className="w-4 h-4" />{tr('common.back')}
           </button>
           <button onClick={startFocus} disabled={mode === 'choose'} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black text-[12px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-40">
-            <Check className="w-4 h-4" />Start
+            <Check className="w-4 h-4" />{tr('timer.startBtn')}
           </button>
         </div>
       </div>

@@ -12,12 +12,14 @@ export function SelectMenu<T extends string>({
   options,
   onChange,
   ariaLabel,
+  ariaDescribedBy,
   size = 'md',
 }: {
   value: T;
   options: SelectOption<T>[];
   onChange: (value: T) => void;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
   size?: 'sm' | 'md';
 }) {
   const [open, setOpen] = useState(false);
@@ -46,6 +48,7 @@ export function SelectMenu<T extends string>({
       <button
         type="button"
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}

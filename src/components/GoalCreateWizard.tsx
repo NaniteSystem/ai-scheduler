@@ -7,6 +7,7 @@ import { requestRoadmap, requestRoadmapQuestions, type RoadmapResult } from '../
 import { useBackClose } from '../hooks/useHardwareBack';
 import { AiOfflineError } from '../ai/llm';
 import { X, ArrowLeft, ArrowRight, Wand2, Sparkles, RotateCcw, AlertTriangle, WifiOff, Check, Edit2 } from 'lucide-react';
+import { createId } from '../domain/id';
 
 type Step = 'mode' | 'intent' | 'manual' | 'depth' | 'disclaimer' | 'questions' | 'generating' | 'refuse' | 'error';
 type ErrKind = 'offline' | 'unavailable';
@@ -25,6 +26,7 @@ export function GoalCreateWizard() {
   const [step, setStep] = useState<Step>('mode');
   const [intent, setIntent] = useState('');
   const [manualSub, setManualSub] = useState('');
+  const [manualCat, setManualCat] = useState<Category>('personal');
   const [depth, setDepth] = useState<RoadmapDepth>('medium');
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -77,7 +79,7 @@ export function GoalCreateWizard() {
   const createGoal = (res: Extract<RoadmapResult, { status: 'ok' | 'reframe' }>) => {
     const cat = res.category as Category;
     const meta = CATEGORY_META[cat] || CATEGORY_META.personal;
-    const id = `g${Date.now()}`;
+    const id = createId('goal');
     const goal: Goal = {
       id, title: intent.trim(), category: cat, emoji: meta.emoji, color: meta.color,
       priority: 2, totalHoursEstimated: 0, hoursPerWeekTarget: 3,
@@ -93,9 +95,9 @@ export function GoalCreateWizard() {
 
   const createManual = () => {
     if (!intent.trim()) return;
-    const cat: Category = 'personal';
+    const cat: Category = manualCat;
     const meta = CATEGORY_META[cat] || CATEGORY_META.personal;
-    const id = `g${Date.now()}`;
+    const id = createId('goal');
     store.addGoal({
       id, title: intent.trim(), subtitle: manualSub.trim() || undefined,
       category: cat, emoji: meta.emoji, color: meta.color,
@@ -144,6 +146,18 @@ export function GoalCreateWizard() {
               <div>
                 <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gd.subtitle')}</label>
                 <input value={manualSub} onChange={(e) => setManualSub(e.target.value)} placeholder={t('gw.intentPlaceholder')} className={fld} />
+              </div>
+              <div>
+                <label className="block text-[13px] font-bold text-[var(--text)] mb-2">{t('gw.category')}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(CATEGORY_META) as Category[]).map((c) => (
+                    <button key={c} onClick={() => setManualCat(c)}
+                      className={`h-10 px-3 rounded-xl border text-left text-[13px] flex items-center gap-2 transition-all ${manualCat === c ? 'text-[var(--text)]' : 'text-[var(--text-dim)] border-[var(--border)] hover:border-[var(--primary)]/40'}`}
+                      style={manualCat === c ? { borderColor: CATEGORY_META[c].color, background: `${CATEGORY_META[c].color}1a` } : {}}>
+                      <span>{CATEGORY_META[c].emoji}</span><span className="truncate">{t('cat.' + c)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

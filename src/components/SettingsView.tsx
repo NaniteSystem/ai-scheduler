@@ -2,18 +2,40 @@ import { useState, useRef } from 'react';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import { tasksFromCsv, toGTDTasks } from '../utils/importCsv';
-import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Trash2, Bell } from 'lucide-react';
+import {
+  buildBackupPreview,
+  downloadBackup,
+  inspectBackup,
+  type BackupInspection,
+  type BackupPreview,
+} from '../services/backup';
+import { APP_VERSION } from '../version';
+import { BackupImportPreview } from './BackupImportPreview';
+import { backupImportErrorMessage } from './settingsBackupImportError';
+import { User, Info, Clock, Target, Sparkles, Calendar, Check, Languages, LayoutGrid, Download, Upload, Trash2, Bell, ChevronLeft } from 'lucide-react';
 
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+function Toggle({ on, onClick, labelledBy, describedBy }: {
+  on: boolean;
+  onClick: () => void;
+  labelledBy: string;
+  describedBy: string;
+}) {
   return (
-    <button onClick={onClick} role="switch" aria-checked={on}
+    <button type="button" onClick={onClick} role="switch" aria-checked={on}
+      aria-labelledby={labelledBy} aria-describedby={describedBy}
       className={`hit w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${on ? 'bg-[var(--primary)]' : 'bg-[var(--surface-2)] border border-[var(--border)]'}`}>
-      <span className={`block w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+      <span aria-hidden="true" className={`block w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
   );
 }
 
-export function SettingsView() {
+interface PendingBackupImport {
+  fileName: string;
+  inspection: BackupInspection;
+  preview: BackupPreview;
+}
+
+export function SettingsView({ onBack }: { onBack?: () => void }) {
   const t = useT();
   const store = useStore();
   const { goals, sessions, gtdTasks, userName, schedulePrefs, lang, setLang, setUserName, updatePrefs,
@@ -22,7 +44,9 @@ export function SettingsView() {
   const [name, setName] = useState(userName);
   const [saved, setSaved] = useState(false);
   const [importMsg, setImportMsg] = useState('');
+  const [pendingBackup, setPendingBackup] = useState<PendingBackupImport | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
 
   const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,6 +63,46 @@ export function SettingsView() {
     }
   };
 
+  const exportBackup = () => {
+    try {
+      downloadBackup(store as unknown as Record<string, unknown>);
+      setImportMsg(t('settings.backupSaved'));
+    } catch {
+      setImportMsg(t('settings.backupErr'));
+    }
+  };
+
+  const onBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const inspection = inspectBackup(await file.text());
+      setPendingBackup({
+        fileName: file.name,
+        inspection,
+        preview: buildBackupPreview(
+          useStore.getState() as unknown as Record<string, unknown>,
+          inspection.data,
+        ),
+      });
+      setImportMsg('');
+    } catch (error) {
+      setPendingBackup(null);
+      setImportMsg(backupImportErrorMessage(error, t));
+    }
+  };
+
+  const confirmBackupImport = () => {
+    if (!pendingBackup) return;
+    store.restoreBackup(pendingBackup.inspection.data);
+    // Repair the former task.sessionId-only link immediately after the one restore.
+    useStore.getState().syncScheduledSessions();
+    setName(useStore.getState().userName);
+    setImportMsg(t('settings.backupRestored'));
+    setPendingBackup(null);
+  };
+
   const initials = userName.trim().split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '·';
   const weekStartsOn = schedulePrefs.weekStartsOn ?? 1;
 
@@ -49,13 +113,23 @@ export function SettingsView() {
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
-  const confirmReset = () => askConfirm({ title: t('settings.resetTitle'), message: t('settings.resetMsg'), confirmLabel: t('settings.reset'), danger: true, onConfirm: resetAll });
+  // A reset is irreversible in the app, so preserve a downloadable snapshot
+  // first. It makes an accidental confirmation recoverable without adding a
+  // second, easy-to-miss dialog to an already high-risk action.
+  const confirmReset = () => askConfirm({
+    title: t('settings.resetTitle'), message: t('settings.resetMsg'), confirmLabel: t('settings.reset'), danger: true,
+    onConfirm: () => { exportBackup(); resetAll(); },
+  });
 
   return (
-    <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] space-y-6">
-      <div className="anim-fade">
-        <h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('settings.title')}</h1>
-        <p className="text-[14px] text-[var(--text-dim)] mt-1">{t('settings.subtitle')}</p>
+    <>
+      <div className="px-4 md:px-10 py-6 md:py-8 max-w-[820px] space-y-6">
+      <div className="anim-fade flex items-start gap-3">
+        {onBack && <button onClick={onBack} aria-label={t('bottomNav.profile')} className="hit w-10 h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)] grid place-items-center shrink-0 mt-0.5"><ChevronLeft className="w-5 h-5" /></button>}
+        <div>
+          <h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('settings.title')}</h1>
+          <p className="text-[14px] text-[var(--text-dim)] mt-1">{t('settings.subtitle')}</p>
+        </div>
       </div>
 
       {/* Language */}
@@ -151,19 +225,21 @@ export function SettingsView() {
       <div className="card p-5 md:p-6 anim-fade anim-delay-2 space-y-4">
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest flex items-center gap-2"><Bell className="w-3.5 h-3.5" /> {t('settings.notifications')}</div>
         {([
-          { l: t('settings.notifSessions'), sub: t('settings.notifSessionsSub'), on: notifPrefs.sessions, fn: () => setNotifPrefs({ sessions: !notifPrefs.sessions }) },
-          { l: t('settings.notifTasks'), sub: t('settings.notifTasksSub'), on: notifPrefs.tasks, fn: () => setNotifPrefs({ tasks: !notifPrefs.tasks }) },
-          { l: t('settings.habitReminders'), sub: t('settings.habitRemindersSub'), on: habitRemindersEnabled, fn: () => setNotifPref({ habitRemindersEnabled: !habitRemindersEnabled }) },
-          { l: t('settings.quietHours'), sub: t('settings.quietHoursSub'), on: notifPrefs.quietEnabled, fn: () => setNotifPrefs({ quietEnabled: !notifPrefs.quietEnabled }) },
-        ]).map((row, i) => (
-          <div key={i} className="flex items-center justify-between gap-3">
+          { id: 'sessions', l: t('settings.notifSessions'), sub: t('settings.notifSessionsSub'), on: notifPrefs.sessions, fn: () => setNotifPrefs({ sessions: !notifPrefs.sessions }) },
+          { id: 'tasks', l: t('settings.notifTasks'), sub: t('settings.notifTasksSub'), on: notifPrefs.tasks, fn: () => setNotifPrefs({ tasks: !notifPrefs.tasks }) },
+          { id: 'habits', l: t('settings.habitReminders'), sub: t('settings.habitRemindersSub'), on: habitRemindersEnabled, fn: () => setNotifPref({ habitRemindersEnabled: !habitRemindersEnabled }) },
+          { id: 'quiet-hours', l: t('settings.quietHours'), sub: t('settings.quietHoursSub'), on: notifPrefs.quietEnabled, fn: () => setNotifPrefs({ quietEnabled: !notifPrefs.quietEnabled }) },
+        ]).map(row => {
+          const labelId = `notification-${row.id}-label`;
+          const descriptionId = `notification-${row.id}-description`;
+          return <div key={row.id} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[13px] text-[var(--text)] font-medium">{row.l}</div>
-              <div className="text-[11px] text-[var(--text-dim)]">{row.sub}</div>
+              <div id={labelId} className="text-[13px] text-[var(--text)] font-medium">{row.l}</div>
+              <div id={descriptionId} className="text-[11px] text-[var(--text-dim)]">{row.sub}</div>
             </div>
-            <Toggle on={row.on} onClick={row.fn} />
-          </div>
-        ))}
+            <Toggle on={row.on} onClick={row.fn} labelledBy={labelId} describedBy={descriptionId} />
+          </div>;
+        })}
         {notifPrefs.quietEnabled && (
           <div className="flex items-center gap-3 pt-1">
             {([['quietStart', t('settings.quietFrom')], ['quietEnd', t('settings.quietTo')]] as const).map(([field, label]) => (
@@ -204,9 +280,16 @@ export function SettingsView() {
         </button>
       </div>
 
-      {/* Data: CSV import (Todoist / TickTick) + reset */}
+      {/* Data: full JSON backup + CSV task import + reset */}
       <div className="card p-5 md:p-6 anim-fade anim-delay-3">
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Download className="w-3.5 h-3.5" /> {t('settings.data')}</div>
+        <p className="text-[12px] text-[var(--text-dim)] leading-relaxed mb-3">{t('settings.backupSub')}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input ref={backupRef} type="file" accept=".json,application/json" className="hidden" onChange={onBackupFile} />
+          <button onClick={exportBackup} className="h-10 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 text-[12px] font-bold text-[var(--primary)] flex items-center justify-center gap-1.5"><Download className="w-4 h-4" />{t('settings.export')}</button>
+          <button onClick={() => backupRef.current?.click()} className="h-10 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[12px] font-bold text-[var(--text)] flex items-center justify-center gap-1.5"><Upload className="w-4 h-4" />{t('settings.import')}</button>
+        </div>
+        <div className="my-4 h-px bg-[var(--border)]" />
         <p className="text-[12px] text-[var(--text-dim)] leading-relaxed mb-3">{t('settings.importSub')}</p>
         <div className="grid grid-cols-1 gap-2">
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImportFile} />
@@ -221,10 +304,20 @@ export function SettingsView() {
         <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-4 flex items-center gap-2"><Info className="w-3.5 h-3.5" /> {t('settings.about')}</div>
         <div className="space-y-2 text-[12px]">
           <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.appField')}</span><span className="text-[var(--text)]">Nebulla — {t('app.tagline')}</span></div>
-          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.version')}</span><span className="text-[var(--text)] mono">1.0.0</span></div>
+          <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.version')}</span><span className="text-[var(--text)] mono">{APP_VERSION}</span></div>
           <div className="flex items-center justify-between"><span className="text-[var(--text-dim)]">{t('settings.weekStart')}</span><span className="text-[var(--text)]">{weekStartsOn === 1 ? t('settings.monday') : t('settings.sunday')}</span></div>
         </div>
       </div>
-    </div>
+      </div>
+      {pendingBackup && (
+        <BackupImportPreview
+          fileName={pendingBackup.fileName}
+          inspection={pendingBackup.inspection}
+          preview={pendingBackup.preview}
+          onCancel={() => setPendingBackup(null)}
+          onConfirm={confirmBackupImport}
+        />
+      )}
+    </>
   );
 }

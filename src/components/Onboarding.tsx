@@ -28,8 +28,6 @@ export function Onboarding() {
   const [peak, setPeak] = useState<'morning' | 'afternoon' | 'evening' | ''>('');
   const [sleep, setSleep] = useState('');
   const [struggles, setStruggles] = useState<string[]>([]);
-  const [age, setAge] = useState('');
-  const [source, setSource] = useState('');
 
   const FOCUS: Opt[] = [
     { id: 'procrast', emoji: '⚡', label: t('onb.focus.procrast') },
@@ -57,22 +55,7 @@ export function Onboarding() {
     { id: 'procrast', emoji: '🐢', label: t('onb.str.procrast') },
     { id: 'distract', emoji: '🎯', label: t('onb.str.distract') },
   ];
-  const AGES: Opt[] = [
-    { id: 'lt18', emoji: '🌱', label: t('onb.age.lt18') },
-    { id: '18to24', emoji: '🎓', label: '18–24' },
-    { id: '25to34', emoji: '💼', label: '25–34' },
-    { id: '35to44', emoji: '🏡', label: '35–44' },
-    { id: '45plus', emoji: '🌟', label: '45+' },
-  ];
-  const SOURCES: Opt[] = [
-    { id: 'friends', emoji: '💬', label: t('onb.src.friends') },
-    { id: 'social', emoji: '📱', label: t('onb.src.social') },
-    { id: 'store', emoji: '🛍️', label: t('onb.src.store') },
-    { id: 'search', emoji: '🔎', label: t('onb.src.search') },
-    { id: 'other', emoji: '✨', label: t('onb.src.other') },
-  ];
-
-  const STEPS = 8;
+  const STEPS = 4;
   const toggle = (set: React.Dispatch<React.SetStateAction<string[]>>, id: string) =>
     set(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
@@ -84,7 +67,7 @@ export function Onboarding() {
     if (peak) prefs.productivityPeak = peak;
     if (sleep && SLEEP_PREFS[sleep]) Object.assign(prefs, SLEEP_PREFS[sleep]);
     if (Object.keys(prefs).length) updatePrefs(prefs);
-    setUserProfile({ focus, struggles, sleep, age: age || undefined, source: source || undefined });
+    setUserProfile({ focus, struggles, sleep });
     completeOnboarding(name.trim() || 'You');
   };
 
@@ -92,9 +75,8 @@ export function Onboarding() {
   const canNext =
     step === 0 ? !!name.trim() :
     step === 1 ? focus.length > 0 :
-    step === 2 ? !!peak :
-    step === 3 ? !!sleep :
-    true; // struggles optional, final always ok
+    step === 2 ? !!peak && !!sleep :
+    true; // struggles are optional
 
   const OptionCard = ({ o, selected, onClick, multi }: { o: Opt; selected: boolean; onClick: () => void; multi?: boolean }) => (
     <button onClick={onClick}
@@ -106,6 +88,13 @@ export function Onboarding() {
         selected ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-[var(--border)]'}`}>
         {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
       </span>
+    </button>
+  );
+
+  const CompactChoice = ({ o, selected, onClick }: { o: Opt; selected: boolean; onClick: () => void }) => (
+    <button onClick={onClick} className={`min-h-[76px] rounded-2xl border p-2.5 text-center transition-all ${selected ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)]'}`}>
+      <span className="block text-[21px] leading-none mb-2">{o.emoji}</span>
+      <span className="block text-[11px] leading-tight font-bold">{o.label}</span>
     </button>
   );
 
@@ -168,43 +157,20 @@ export function Onboarding() {
           )}
 
           {step === 2 && (
-            <Question title={t('onb.q.peak')}>
-              {PEAK.map(o => <OptionCard key={o.id} o={o} selected={peak === o.id} onClick={() => setPeak(o.id as typeof peak)} />)}
-            </Question>
+            <div className="pt-4">
+              <p className="text-[12px] font-semibold text-[var(--primary)] mb-1.5">{t('onb.rhythmHint')}</p>
+              <h2 className="display text-[26px] text-[var(--text)] leading-tight mb-6">{t('onb.rhythmTitle')}</h2>
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-dim)] mb-2.5">{t('onb.q.peak')}</h3>
+              <div className="grid grid-cols-3 gap-2">{PEAK.map(o => <CompactChoice key={o.id} o={o} selected={peak === o.id} onClick={() => setPeak(o.id as typeof peak)} />)}</div>
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-dim)] mt-6 mb-2.5">{t('onb.q.sleep')}</h3>
+              <div className="grid grid-cols-2 gap-2">{SLEEP.map(o => <CompactChoice key={o.id} o={o} selected={sleep === o.id} onClick={() => setSleep(o.id)} />)}</div>
+            </div>
           )}
 
           {step === 3 && (
-            <Question title={t('onb.q.sleep')}>
-              {SLEEP.map(o => <OptionCard key={o.id} o={o} selected={sleep === o.id} onClick={() => setSleep(o.id)} />)}
-            </Question>
-          )}
-
-          {step === 4 && (
             <Question title={t('onb.q.struggles')} hint={t('onb.multiHint')}>
               {STRUGGLES.map(o => <OptionCard key={o.id} o={o} multi selected={struggles.includes(o.id)} onClick={() => toggle(setStruggles, o.id)} />)}
             </Question>
-          )}
-
-          {step === 5 && (
-            <Question title={t('onb.q.age')} hint={t('onb.optionalHint')}>
-              {AGES.map(o => <OptionCard key={o.id} o={o} selected={age === o.id} onClick={() => setAge(a => a === o.id ? '' : o.id)} />)}
-            </Question>
-          )}
-
-          {step === 6 && (
-            <Question title={t('onb.q.source')} hint={t('onb.optionalHint')}>
-              {SOURCES.map(o => <OptionCard key={o.id} o={o} selected={source === o.id} onClick={() => setSource(s => s === o.id ? '' : o.id)} />)}
-            </Question>
-          )}
-
-          {step === 7 && (
-            <div className="flex flex-col items-center text-center pt-10">
-              <div className="w-20 h-20 rounded-[28px] grid place-items-center mb-6 anim-pop" style={{ background: 'var(--grad)', boxShadow: 'var(--shadow-primary)' }}>
-                <Check className="w-10 h-10 text-white" strokeWidth={3} />
-              </div>
-              <h1 className="display text-[30px] text-[var(--text)] leading-tight">{t('onb.finalTitle', { name: name.trim() || '' })}</h1>
-              <p className="text-[14px] text-[var(--text-dim)] mt-3 leading-relaxed max-w-xs">{t('onb.finalSub')}</p>
-            </div>
           )}
         </div>
       </div>

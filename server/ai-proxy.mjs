@@ -14,9 +14,12 @@
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT || 8787);
-const ORIGIN = process.env.ALLOW_ORIGIN || '*';
+const APP_SECRET = process.env.APP_SECRET || '';
+const RATE_LIMIT_PER_MINUTE = Math.max(1, Number(process.env.RATE_LIMIT_PER_MINUTE || 6));
+const MAX_REQUEST_BYTES = Math.max(1024, Number(process.env.MAX_REQUEST_BYTES || 262144));
 
 const list = (...vals) => [...new Set(vals.join(',').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
+const ALLOWED_ORIGINS = list(process.env.ALLOW_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,https://localhost');
 
 const GEMINI_KEYS = list(process.env.GEMINI_API_KEYS || '', process.env.GEMINI_API_KEY || '');
 const OPENROUTER_KEYS = list(process.env.OPENROUTER_API_KEYS || '', process.env.OPENROUTER_API_KEY || '');
@@ -94,25 +97,64 @@ async function callWithRetry(attempt, tries = 3) {
 }
 
 let reqSeq = 0;   // round-robin key start, spreads quota across the pool
+const RATE_WINDOW_MS = 60_000;
+const rateBuckets = new Map();
 
-const cors = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', ORIGIN);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const cors = (req, res) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-app-secret');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 };
-const send = (res, code, obj) => { cors(res); res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const send = (req, res, code, obj, headers = {}) => {
+  cors(req, res);
+  res.writeHead(code, { 'Content-Type': 'application/json', ...headers });
+  res.end(JSON.stringify(obj));
+};
+
+function consumeRateLimit(req) {
+  const now = Date.now();
+  const key = req.socket.remoteAddress || 'unknown';
+  const current = rateBuckets.get(key);
+  if (!current || current.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return { allowed: true, retryAfter: 0 };
+  }
+  if (current.count >= RATE_LIMIT_PER_MINUTE) {
+    return { allowed: false, retryAfter: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
+  }
+  current.count += 1;
+  return { allowed: true, retryAfter: 0 };
+}
 
 const server = createServer((req, res) => {
-  if (req.method === 'OPTIONS') { cors(res); res.writeHead(204); return res.end(); }
-  if (req.method !== 'POST' || !req.url.startsWith('/api/ai')) return send(res, 404, { error: 'not found' });
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) return send(req, res, 403, { error: 'origin not allowed' });
+  if (req.method === 'OPTIONS') { cors(req, res); res.writeHead(204); return res.end(); }
+  if (req.method !== 'POST' || !req.url.startsWith('/api/ai')) return send(req, res, 404, { error: 'not found' });
+
+  const rate = consumeRateLimit(req);
+  if (!rate.allowed) return send(req, res, 429, { error: 'rate limit exceeded' }, { 'Retry-After': String(rate.retryAfter) });
+
+  if (APP_SECRET && req.headers['x-app-secret'] !== APP_SECRET) {
+    return send(req, res, 401, { error: 'unauthorized' });
+  }
 
   let body = '';
-  req.on('data', (c) => { body += c; if (body.length > 1_000_000) req.destroy(); });
+  req.on('data', (c) => {
+    body += c;
+    if (Buffer.byteLength(body, 'utf8') > MAX_REQUEST_BYTES) req.destroy();
+  });
   req.on('end', async () => {
     let payload;
-    try { payload = JSON.parse(body || '{}'); } catch { return send(res, 400, { error: 'bad json' }); }
+    try { payload = JSON.parse(body || '{}'); } catch { return send(req, res, 400, { error: 'bad json' }); }
     const { prompt } = payload;
-    if (typeof prompt !== 'string' || !prompt) return send(res, 400, { error: 'missing prompt' });
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 100_000) {
+      return send(req, res, 400, { error: 'invalid prompt' });
+    }
 
     const t0 = Date.now();
     const secs = () => ((Date.now() - t0) / 1000).toFixed(1);
@@ -127,7 +169,7 @@ const server = createServer((req, res) => {
             last = await callWithRetry(() => prov.attempt(model, key, payload));
             if (last.ok) {
               console.log(`✓ ${prov.name} ${mask(key)} ${model} ${secs()}s`);
-              return send(res, 200, { text: last.text });
+              return send(req, res, 200, { text: last.text });
             }
             console.warn(`✗ ${prov.name} ${mask(key)} ${model} (${last.status}): ${last.detail?.replace(/\s+/g, ' ').slice(0, 55)}`);
             if (last.status && !TRANSIENT.has(last.status)) { keyDead = true; break; }  // bad/blocked key → next key
@@ -136,9 +178,10 @@ const server = createServer((req, res) => {
         }
       }
       console.warn(`✗✗ all providers/keys/models failed ${secs()}s`);
-      return send(res, 502, { error: `llm ${last?.status || 'error'}`, detail: last?.detail || '' });
+      return send(req, res, 502, { error: 'upstream unavailable' });
     } catch (e) {
-      return send(res, 502, { error: 'upstream error', detail: String(e).slice(0, 300) });
+      console.error(`proxy failure: ${String(e).replace(/\s+/g, ' ').slice(0, 160)}`);
+      return send(req, res, 502, { error: 'upstream unavailable' });
     }
   });
 });

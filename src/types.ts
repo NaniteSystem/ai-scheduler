@@ -3,6 +3,10 @@ export type Category =
   | 'career' | 'personal' | 'home' | 'finance' | 'social'
   | 'writing' | 'music' | 'meditation' | 'health';
 
+export type AppView =
+  | 'dashboard' | 'goals' | 'projects' | 'week' | 'inbox' | 'habits' | 'progress' | 'manager' | 'statistics'
+  | 'architect' | 'planner' | 'archive' | 'settings';
+
 export type SessionType = 'regular' | 'checkpoint' | 'catchup' | 'intensive';
 export type SessionStatus = 'planned' | 'confirmed' | 'done' | 'skipped';
 
@@ -82,6 +86,8 @@ export interface Session {
    *  nominal 60 for grid layout/engine, but UI hides the end/duration. */
   openEnd?: boolean;
   goalId: string;
+  /** Optional actionable item whose time this session reserves. */
+  taskId?: string;
   date: string;
   startHour: number;
   startMinute?: number;
@@ -104,6 +110,7 @@ export interface Session {
   // ── Provenance when created by the multi-week AI Scheduler ──
   sourceKind?: 'goal' | 'habit' | 'task' | 'life';
   planSourceId?: string;           // originating habit/task id (separate from goalId/seriesId)
+  planId?: string;                 // provenance only; unlike seriesId it does not couple deletion
 }
 
 // ── Focus timer (Pomodoro / stopwatch) ──
@@ -115,12 +122,45 @@ export interface FocusTimer {
   accumulatedMs: number;     // elapsed time banked before the current stretch
   running: boolean;
   finished: boolean;         // countdown reached zero, awaiting user confirm/dismiss
-  linkType: 'task' | 'session' | null;
+  linkType: 'task' | 'session' | 'habit' | null;
   linkId: string | null;
   label: string;             // task/session title, for the bar + notification
 }
 
-export type GTDStatus = 'inbox' | 'next-action' | 'project' | 'waiting-for' | 'scheduled' | 'someday-maybe' | 'reference' | 'done' | 'trash';
+export type GTDStatus = 'inbox' | 'next-action' | 'scheduled' | 'someday-maybe' | 'done' | 'trash';
+
+export type ProjectStatus = 'idea' | 'planned' | 'active' | 'waiting' | 'paused' | 'completed' | 'canceled' | 'archived';
+export type ProjectHealth = 'on-track' | 'at-risk' | 'blocked' | 'unknown';
+export type ProjectReviewCadence = 'none' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface Project {
+  id: string;
+  title: string;
+  /** What should become true when this finite project is finished. */
+  outcome: string;
+  /** Optional completion criteria that separate "done" from merely archived. */
+  definitionOfDone?: string;
+  color: string;
+  status: ProjectStatus;
+  health: ProjectHealth;
+  /** Optional long-term outcome or responsibility this project contributes to. */
+  goalId?: string;
+  areaId?: string;
+  /** When to begin work; unlike deadline this is not external pressure. */
+  startDate?: string;
+  /** Planned finish date. */
+  targetDate?: string;
+  /** Hard external finish date. */
+  deadline?: string;
+  reviewCadence?: ProjectReviewCadence;
+  nextReviewDate?: string;
+  defaultSectionId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+  completedAt?: string;
+  archivedAt?: string;
+}
 
 export type Priority = 1 | 2 | 3 | 4; // P1=urgent, P4=none
 export type EnergyLevel = 'deep' | 'medium' | 'shallow' | 'any';
@@ -129,6 +169,7 @@ export type RecurringPattern = 'daily' | 'weekly' | 'monthly' | 'weekdays' | 'we
 
 export interface GTDTask {
   id: string;
+  /** Legacy/shortcut back-reference. Session.taskId is the canonical link. */
   sessionId?: string;
   title: string;
   description?: string;
@@ -145,25 +186,36 @@ export interface GTDTask {
   energyLevel?: EnergyLevel;
   remindAt?: string;     // ISO datetime to fire a local notification reminder
   context?: TaskContext;
-  project?: string;      // free-text project name (grouping in GTD views)
-  delegateTo?: string;
+  projectId?: string;    // operational container; Goals remain outcome-oriented
+  /** @deprecated migrated to projectId; retained for older backup compatibility. */
+  project?: string;
   tags?: string[];
   subtasks?: { id: string; title: string; done: boolean }[];
   recurring?: RecurringPattern;
   recurFromCompletion?: boolean;   // Todoist "every!": next occurrence counts from completion, not due date
   completedPomodoros?: number;
+  /** Calendar date for the My Day selection. Replaces the old permanent flag. */
+  todayFocusDate?: string;
+  /** @deprecated use todayFocusDate; retained only while older backups migrate. */
   isTodayFocus?: boolean;
   isArchived?: boolean;
 }
 
 // ─── Habits (routine tracker) ──────────────────────────────────────────────
-export type HabitStatus = 'done' | 'failed' | 'rest';   // per-day outcome; 'rest' = excused skip (keeps streak)
+export type HabitStatus = 'done' | 'failed' | 'rest' | 'partial';   // per-day outcome; 'rest' = excused skip (keeps streak); 'partial' = counter habit under target
 export type HabitAnchor =
   | 'none' | 'wake' | 'morning' | 'afternoon' | 'evening' | 'sleep'
   | 'afterBreakfast' | 'afterLunch' | 'afterDinner';     // situational trigger instead of a clock time
 export type HabitRecurrence = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'everyN' | 'timesPerWeek';
 
 export interface HabitLogEntry { status: HabitStatus; count: number }
+
+export interface HabitGroup {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
 
 export interface Habit {
   id: string;
@@ -177,6 +229,7 @@ export interface Habit {
   targetCount: number;         // quantitative target per day (default 1)
   unit?: string;               // e.g. 'glasses', 'pages'
   goalId?: string;             // link to a long-term goal (hierarchy)
+  groupId?: string;            // optional routine group; the habit remains independently editable
   reminderTime?: string;       // optional daily reminder 'HH:MM'
   createdAt: string;
   archived?: boolean;
@@ -295,13 +348,6 @@ export interface GeneratedPlan {
   range: { start: string; end: string };
   options: PlanOptions;
   days: GeneratedDay[];
-}
-
-export interface Message {
-  id: string;
-  role: 'user' | 'ai';
-  content: string;
-  options?: string[];
 }
 
 export const CATEGORY_META: Record<Category, { emoji: string; label: string; color: string; gradient: string }> = {

@@ -1,4 +1,5 @@
 node_modules
+.gradle-user/
 dist
 .env
 .env.*
@@ -10,10 +11,12 @@ server/.env
 # Local tooling / session artifacts
 .playwright-mcp/
 .claude/
+android/.gradle-user/
 
 # Build outputs
 *.apk
 builds/
+tmp-*.json
 
 # release signing (keep local, do not publish)
 android/release.keystore

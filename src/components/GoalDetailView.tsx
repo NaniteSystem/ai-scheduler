@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
 import { useStore, goalInsight, goalProgressPct, goalStreak, milestoneReached } from '../store';
-import type { Goal, RoadmapNode } from '../types';
+import { CATEGORY_META } from '../types';
+import type { Goal, RoadmapNode, Category } from '../types';
 import {
   ArrowLeft, Sparkles, CheckCircle2, Clock, Target, Flame, Calendar,
   TrendingUp, ChevronRight, Check, AlertCircle, Play, BookOpen,
@@ -11,6 +12,8 @@ import { format, differenceInDays, parseISO, isSameDay } from 'date-fns';
 import { fmtHours } from '../utils/duration';
 import { useT, useDateLocale, useLang } from '../i18n';
 import { lt } from '../utils/localized';
+import { createId } from '../domain/id';
+import { SelectMenu } from './ui/SelectMenu';
 
 function Ring({ pct, size = 80, stroke = 5, color = '#22c55e', bg = 'var(--border)', children }: {
   pct: number; size?: number; stroke?: number; color?: string; bg?: string; children?: React.ReactNode;
@@ -53,7 +56,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
     const t = newTitle.trim();
     if (!t) return;
     addSession({
-      id: `s${Date.now()}`, goalId: goal.id, date: '', startHour: 0, startMinute: 0,
+      id: createId('session'), goalId: goal.id, date: '', startHour: 0, startMinute: 0,
       durationMinutes: Math.max(15, newDur), title: t, description: '', tasks: [],
       sessionType: 'regular', status: 'planned',
     });
@@ -90,7 +93,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
   const delMs = (id: string) => setMilestones(goal.milestones.filter(m => m.id !== id));
   const addMs = () => {
     if (!mlTitle.trim()) return;
-    setMilestones([...goal.milestones, { id: `m${Date.now()}`, title: mlTitle.trim(), targetValue: Math.max(1, mlTarget), done: false }]);
+    setMilestones([...goal.milestones, { id: createId('milestone'), title: mlTitle.trim(), targetValue: Math.max(1, mlTarget), done: false }]);
     setMlTitle(''); setMlTarget(1);
   };
 
@@ -201,12 +204,12 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
             <div className="flex items-center gap-6 mt-4 flex-wrap">
               {[
                 { icon: Flame, val: `${goalStreak(goal, sessions)}d`, label: tr('gd.mStreak'), color: '#f59e0b' },
-                { icon: Clock, val: fmtHours(hoursLogged), label: tr('gd.mLogged'), color: goal.color },
+                { icon: Clock, val: fmtHours(hoursLogged, lang), label: tr('gd.mLogged'), color: goal.color },
                 { icon: CheckCircle2, val: `${doneCount}/${totalCount}`, label: tr('gd.mSessions'), color: '#22c55e' },
                 { icon: TrendingUp, val: `${completionRate}%`, label: tr('gd.mCompletionRate'), color: '#8b5cf6' },
                 ...(daysLeft !== null ? [{ icon: Calendar, val: `${daysLeft}d`, label: tr('gd.mUntilDeadline'), color: daysLeft < 30 ? '#f59e0b' : '#3b82f6' }] : []),
                 ...(!isCompleted && hNeededPerWeek !== null && hoursLeft > 0 && daysLeft !== null && daysLeft >= 0
-                  ? [{ icon: TrendingUp, val: fmtHours(hNeededPerWeek), label: tr('gd.mNeedPerWeek'), color: onTrack ? '#22c55e' : '#ef4444' }] : []),
+                  ? [{ icon: TrendingUp, val: fmtHours(hNeededPerWeek, lang), label: tr('gd.mNeedPerWeek'), color: onTrack ? '#22c55e' : '#ef4444' }] : []),
               ].map((m, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <m.icon className="w-4 h-4" style={{ color: m.color }} />
@@ -273,9 +276,9 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
         <div className="mt-6">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
-              {tr('gd.ofEstimated', { a: fmtHours(hoursLogged), b: fmtHours(goal.totalHoursEstimated) })}
+              {tr('gd.ofEstimated', { a: fmtHours(hoursLogged, lang), b: fmtHours(goal.totalHoursEstimated, lang) })}
             </span>
-            <span className="text-[10px] font-bold text-[var(--text-dim)]">{tr('gd.remaining', { x: fmtHours(hoursLeft) })}</span>
+            <span className="text-[10px] font-bold text-[var(--text-dim)]">{tr('gd.remaining', { x: fmtHours(hoursLeft, lang) })}</span>
           </div>
           <div className="relative h-2 w-full bg-[var(--surface-2)] rounded-full overflow-hidden">
             <div
@@ -323,7 +326,7 @@ export function GoalDetailView({ goal, onBack }: { goal: Goal; onBack: () => voi
               {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {[
-                  { label: tr('gd.hoursLogged'), value: fmtHours(hoursLogged), sub: tr('gd.ofX', { x: fmtHours(goal.totalHoursEstimated) }), color: goal.color, icon: Clock },
+                  { label: tr('gd.hoursLogged'), value: fmtHours(hoursLogged, lang), sub: tr('gd.ofX', { x: fmtHours(goal.totalHoursEstimated, lang) }), color: goal.color, icon: Clock },
                   { label: tr('gd.sessionsDone'), value: doneCount, sub: tr('gd.nSkipped', { n: skippedSessions.length }), color: '#22c55e', icon: CheckCircle2 },
                   { label: tr('gd.avgSession'), value: avgDuration > 0 ? `${avgDuration}m` : '—', sub: tr('gd.perSession'), color: '#8b5cf6', icon: Activity },
                   { label: tr('gd.mStreak'), value: `${goalStreak(goal, sessions)}d`, sub: tr('gd.streakSub'), color: '#f59e0b', icon: Flame },
@@ -859,8 +862,28 @@ function EditGoalModal({ goal, onClose, onDeleted }: { goal: Goal; onClose: () =
   const tr = useT();
   const { updateGoal, deleteGoal, askConfirm } = useStore();
   const [title, setTitle] = useState(goal.title);
+  const [subtitle, setSubtitle] = useState(goal.subtitle || '');
+  const [category, setCategory] = useState<Category>(goal.category);
+  const [deadline, setDeadline] = useState(goal.deadline?.slice(0, 10) || '');
+  const [estimatedHours, setEstimatedHours] = useState(goal.totalHoursEstimated || 0);
+  const [weeklyHours, setWeeklyHours] = useState(goal.hoursPerWeekTarget || 3);
+  const [priority, setPriority] = useState(Math.min(4, Math.max(1, goal.priority || 2)));
+  const [completionType, setCompletionType] = useState<'hours' | 'date'>(goal.completionType || 'hours');
 
-  const save = () => { if (!title.trim()) return; updateGoal(goal.id, { title: title.trim() }); onClose(); };
+  const save = () => {
+    if (!title.trim()) return;
+    const meta = CATEGORY_META[category];
+    updateGoal(goal.id, {
+      title: title.trim(), subtitle: subtitle.trim() || undefined, category,
+      emoji: meta.emoji, color: meta.color,
+      deadline: deadline || undefined,
+      totalHoursEstimated: Math.max(0, Number(estimatedHours) || 0),
+      hoursPerWeekTarget: Math.max(0.5, Number(weeklyHours) || 0.5),
+      priority,
+      completionType: completionType === 'date' && !deadline ? 'hours' : completionType,
+    });
+    onClose();
+  };
 
   const remove = () => askConfirm({
     title: tr('gd.deleteGoalQ'), message: tr('gd.deleteGoalMsg', { title: goal.title }),
@@ -875,14 +898,48 @@ function EditGoalModal({ goal, onClose, onDeleted }: { goal: Goal; onClose: () =
       <div className="w-full max-w-lg card overflow-hidden flex flex-col max-h-[88vh]" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${goal.color}22`, color: goal.color }}><Edit2 className="w-4 h-4" /></div>
-          <div className="flex-1 font-bold text-[var(--text)] text-[14px]">{tr('gd.rename')}</div>
+          <div className="flex-1 font-bold text-[var(--text)] text-[14px]">{tr('gd.editGoal')}</div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-[var(--border)] grid place-items-center text-[var(--text-dim)]"><Plus className="w-4 h-4 rotate-45" /></button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 flex-1 overflow-y-auto">
           <div>
             <label className={lbl}>{tr('gd.name')}</label>
             <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder={tr('gd.goalNamePlaceholder')} className={field} />
+          </div>
+          <div>
+            <label className={lbl}>{tr('gd.subtitle')}</label>
+            <input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder={tr('gd.subtitlePlaceholder')} className={field} />
+          </div>
+          <div>
+            <label className={lbl}>{tr('gd.category')}</label>
+            <SelectMenu value={category} onChange={value => setCategory(value as Category)} ariaLabel={tr('gd.category')}
+              options={(Object.keys(CATEGORY_META) as Category[]).map(value => ({ value, label: `${CATEGORY_META[value].emoji} ${tr('cat.' + value)}` }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>{tr('gd.totalHours')}</label>
+              <input type="number" min="0" step="1" value={estimatedHours} onChange={e => setEstimatedHours(Number(e.target.value))} className={field} />
+            </div>
+            <div>
+              <label className={lbl}>{tr('gd.weeklyHours')}</label>
+              <input type="number" min="0.5" step="0.5" value={weeklyHours} onChange={e => setWeeklyHours(Number(e.target.value))} className={field} />
+            </div>
+          </div>
+          <div>
+            <label className={lbl}>{tr('gd.deadline')}</label>
+            <input type="date" value={deadline} onChange={e => { setDeadline(e.target.value); if (!e.target.value && completionType === 'date') setCompletionType('hours'); }} className={field} />
+          </div>
+          <div>
+            <label className={lbl}>{tr('gd.priority')}</label>
+            <div className="grid grid-cols-4 gap-2">{[1,2,3,4].map(value => <button key={value} onClick={() => setPriority(value)} className={`h-10 rounded-xl border text-[12px] font-bold ${priority === value ? 'border-[var(--primary)] bg-[var(--primary)]/12 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>P{value}</button>)}</div>
+          </div>
+          <div>
+            <label className={lbl}>{tr('gd.completionRule')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setCompletionType('hours')} className={`min-h-11 rounded-xl border px-3 text-[12px] font-bold ${completionType === 'hours' ? 'border-[var(--primary)] bg-[var(--primary)]/12 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>{tr('gd.completeByHours')}</button>
+              <button disabled={!deadline} onClick={() => setCompletionType('date')} className={`min-h-11 rounded-xl border px-3 text-[12px] font-bold disabled:opacity-35 ${completionType === 'date' ? 'border-[var(--primary)] bg-[var(--primary)]/12 text-[var(--primary)]' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>{tr('gd.completeByDate')}</button>
+            </div>
           </div>
         </div>
         <div className="px-6 py-4 border-t border-[var(--border)] flex gap-2">

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_bg">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nebulla"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/widget_capture"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/widget_action_capture"
+            android:textColor="@color/widget_accent"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_add_bg" />
+        <TextView
+            android:id="@+id/widget_today_action"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/widget_action_today"
+            android:textColor="@color/widget_text"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_add_bg" />
+        <TextView
+            android:id="@+id/widget_calendar_action"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/widget_action_calendar"
+            android:textColor="@color/widget_text"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_add_bg" />
+    </LinearLayout>
+</LinearLayout>

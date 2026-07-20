@@ -1,4 +1,5 @@
 import type { GTDTask, Priority } from '../types';
+import { createId } from '../domain/id.ts';
 
 // ─── CSV import from Todoist / TickTick exports ─────────────────────────────
 
@@ -48,7 +49,7 @@ const toDate = (raw: string): string | undefined => {
   return undefined;
 };
 
-const rid = () => Math.random().toString(36).slice(2, 10);
+const rid = () => createId('import');
 
 /** Detect the source app and convert its CSV export into importable tasks. */
 export function tasksFromCsv(text: string): ImportedTask[] | null {
@@ -121,7 +122,7 @@ export function tasksFromCsv(text: string): ImportedTask[] | null {
 export function toGTDTasks(items: ImportedTask[]): GTDTask[] {
   const now = new Date().toISOString();
   return items.map(it => ({
-    id: `imp-${rid()}`,
+    id: rid(),
     title: it.title,
     notes: it.notes,
     status: 'inbox' as const,

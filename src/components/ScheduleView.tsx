@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useBackClose } from '../hooks/useHardwareBack';
-import { format, isToday, isPast, isSameDay, addDays, addMonths, addYears, startOfMonth, endOfMonth, startOfWeek, getYear, getMonth, differenceInCalendarWeeks, differenceInCalendarDays, parseISO, isSameMonth, addWeeks } from 'date-fns';
+import { format, isToday, isSameDay, addDays, addMonths, addYears, startOfMonth, endOfMonth, startOfWeek, getYear, getMonth, differenceInCalendarWeeks, differenceInCalendarDays, parseISO, isSameMonth, addWeeks } from 'date-fns';
 import { useT, useDateLocale } from '../i18n';
 import type { Session, Goal, SessionType, RecurringPattern } from '../types';
 import { ChevronLeft, ChevronRight, ChevronDown, Plus, RotateCcw, X, Repeat, Clock, Target, CalendarDays, Bell, MapPin, Link as LinkIcon, Check } from 'lucide-react';
@@ -11,6 +11,8 @@ import { fmtDur } from '../utils/duration';
 import { WeekGrid } from './WeekGrid';
 import { SelectMenu } from './ui/SelectMenu';
 import { extractNLDate } from '../utils/nlDate';
+import { createId } from '../domain/id';
+import { useStore } from '../store';
 
 const HOUR_H = 52; // px per hour (taller rows → bigger, easier-to-tap blocks; labels every 2h)
 const SLOT = 15;   // snap to 15 min
@@ -446,13 +448,14 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
       ? Array.from({ length: span }, (_, i) => addDays(baseDate, i))
       : expandRecurrence(baseDate, d0.recurrence, d0.weekdays);
     const linked = span > 1 || d0.recurrence !== 'none';
-    const seriesId = linked ? `ser${Date.now()}` : undefined;
+    const seriesId = linked ? createId('series') : undefined;
     const h = d0.allDay ? 0 : Math.floor(d0.startMin / 60);
     const m = d0.allDay ? 0 : d0.startMin % 60;
     const note = d0.description.trim();
-    const newSessions: Session[] = dates.map((d, i) => ({
-      id: `s${Date.now()}-${i}`,
+    const newSessions: Session[] = dates.map((d) => ({
+      id: createId('session'),
       goalId: d0.goalId,
+      ...(d0.sourceTaskId && dates.length === 1 ? { taskId: d0.sourceTaskId } : {}),
       date: format(d, 'yyyy-MM-dd'),
       startHour: h,
       startMinute: m,
@@ -481,7 +484,8 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
         scheduledDate: sess.date,
         durationMinutes: sess.durationMinutes || undefined,
         dueDate: undefined,
-        isTodayFocus: false,
+        todayFocusDate: undefined,
+        isTodayFocus: undefined,
       });
     }
     if (newSessions.length === 1) store.addSession(newSessions[0]);
@@ -615,12 +619,13 @@ export function ScheduleView({ ws, days, sessions, goals, weekOffset, store, goa
             )}
           </button>
 
-          {/* Missed */}
-          {sessions.filter(s => !!s.date && isPast(new Date(s.date)) && s.status === 'planned').length > 0 && (
+          {/* Missed — date-string compare: `new Date('yyyy-MM-dd')` is UTC midnight and
+              marks TODAY as past in UTC+ zones. Today is not missed. */}
+          {sessions.filter(s => !!s.date && s.date < format(today, 'yyyy-MM-dd') && s.status === 'planned').length > 0 && (
             <div className="card p-4 border-red-500/10 bg-red-500/[.02]">
-              <div className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Missed</div>
+              <div className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1"><RotateCcw className="w-3 h-3" /> {tr('sched.missed')}</div>
               <div className="space-y-1.5">
-                {sessions.filter(s => !!s.date && isPast(new Date(s.date)) && s.status === 'planned').slice(0, 3).map(s => (
+                {sessions.filter(s => !!s.date && s.date < format(today, 'yyyy-MM-dd') && s.status === 'planned').slice(0, 3).map(s => (
                   <div key={s.id} className="flex items-center justify-between gap-2 text-[10px]">
                     <span className="truncate text-[var(--text-dim)]">{s.title}</span>
                     <button onClick={() => store.moveSession(s.id, format(new Date(), 'yyyy-MM-dd'))} className="text-[11px] font-bold text-[var(--text)] bg-[var(--border)] px-2 py-0.5 rounded hover:bg-[var(--border)] shrink-0">↻</button>
@@ -1019,7 +1024,13 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
   onCreate: (override?: Draft) => void;
 }) {
   const tr = useT();
+  const askConfirm = useStore(s => s.askConfirm);
   const locale = useDateLocale();
+  const initialDraft = useRef(JSON.stringify(draft));
+  const requestClose = () => {
+    if (JSON.stringify(draft) === initialDraft.current) { onClose(); return; }
+    askConfirm({ title: tr('gtd.discardChangesTitle'), message: tr('gtd.discardChangesMsg'), confirmLabel: tr('gtd.discardChanges'), danger: true, onConfirm: onClose });
+  };
   const weekdayLabel = (v: number) => format(new Date(2024, 0, 7 + v), 'EEEEEE', { locale });
   const upd = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
   const goal = goals.find(g => g.id === draft.goalId);
@@ -1108,7 +1119,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
   const dateInWeek = days.some(d => format(d, 'yyyy-MM-dd') === baseDateStr);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={requestClose}>
       <div className="w-full max-w-lg card overflow-hidden flex flex-col max-h-[88vh]" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-3">
@@ -1119,7 +1130,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
             <div className="font-bold text-[var(--text)] text-[14px]">{draft.editId ? tr('sched.editSession') : tr('sched.newSession')}</div>
             <div className="text-[10px] text-[var(--text-dim)] capitalize">{format(baseDate, 'EEEE, d MMM', { locale })}{draft.allDay ? ' · ' + tr('sched.allDayShort') : ' · ' + minToTime(draft.startMin)}</div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-[var(--border)] flex items-center justify-center text-[var(--text-dim)]"><X className="w-4 h-4" /></button>
+          <button onClick={requestClose} className="w-8 h-8 rounded-lg hover:bg-[var(--border)] flex items-center justify-center text-[var(--text-dim)]"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -1354,7 +1365,7 @@ function CreateSessionModal({ draft, setDraft, days, goals, sessions, weekStarts
 
         {/* Footer */}
         <div className="border-t border-[var(--border)] p-4 flex gap-2">
-          <button onClick={onClose} className="h-11 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[13px] font-bold text-[var(--text)] hover:text-[var(--text)] transition-colors">{tr('common.cancel')}</button>
+          <button onClick={requestClose} className="h-11 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[13px] font-bold text-[var(--text)] hover:text-[var(--text)] transition-colors">{tr('common.cancel')}</button>
           <button onClick={handleCreate} disabled={!draft.title.trim()}
             className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold disabled:bg-[var(--border)] disabled:text-[var(--text-mute)] flex items-center justify-center gap-2 hover:opacity-90 transition-colors">
             <Plus className="w-4 h-4" /> {draft.editId ? tr('sched.saveBtn') : tr('sched.createBtn')}{!draft.editId && (draft.spanDays > 1 ? ` (${draft.spanDays})` : draft.recurrence !== 'none' ? ` (${occCount})` : '')}

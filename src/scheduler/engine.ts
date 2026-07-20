@@ -1,5 +1,6 @@
 import { addDays, parseISO, format, isWeekend, differenceInCalendarDays, getDay, getDate } from 'date-fns';
 import type { PlanInput, GeneratedPlan, GeneratedDay, GeneratedBlock, Goal, Habit, GTDTask } from '../types';
+import { createId } from '../domain/id.ts';
 
 // ─── Multi-week scheduling engine ───────────────────────────────────────────
 // Pure & deterministic so it is unit-testable and can be swapped for a real AI
@@ -230,7 +231,7 @@ export function generateRangePlan(input: PlanInput): GeneratedPlan {
   const days: GeneratedDay[] = [];
   for (let d = start; d <= end; d = addDays(d, 1)) days.push(buildDay(input, format(d, 'yyyy-MM-dd'), scheds));
   return {
-    id: `plan-${Date.now()}`,
+    id: createId('plan'),
     createdAt: new Date().toISOString(),
     providerId: 'rule-based',
     range: input.range,

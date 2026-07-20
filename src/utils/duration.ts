@@ -1,12 +1,16 @@
 // Format an amount of effort (in hours) as days + hours.
 // < 24h  → "5h" / "2.5h"
 // >= 24h → "1d 5h" / "21d 16h" / "1d" (when remainder rounds to 0)
-export function fmtHours(hours: number): string {
+const HOUR_DAY_UNITS: Record<'en' | 'ru' | 'ja', { h: string; d: string }> = {
+  en: { h: 'h', d: 'd' }, ru: { h: 'ч', d: 'д' }, ja: { h: '時間', d: '日' },
+};
+export function fmtHours(hours: number, lang: 'en' | 'ru' | 'ja' = 'en'): string {
+  const { h: hUnit, d: dUnit } = HOUR_DAY_UNITS[lang];
   const h = Math.round((hours || 0) * 10) / 10;
-  if (h < 24) return `${h % 1 === 0 ? h : h.toFixed(1)}h`;
+  if (h < 24) return `${h % 1 === 0 ? h : h.toFixed(1)}${hUnit}`;
   const days = Math.floor(h / 24);
   const rem = Math.round(h % 24);
-  return rem > 0 ? `${days}d ${rem}h` : `${days}d`;
+  return rem > 0 ? `${days}${dUnit} ${rem}${hUnit}` : `${days}${dUnit}`;
 }
 
 // Format a session length (in minutes) in hours, with minutes only for odd remainders.

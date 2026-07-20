@@ -1,31 +1,26 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { useT, useDateLocale } from '../i18n';
+import { useT, useDateLocale, useLang } from '../i18n';
 import type { PlanHorizon, PlanOptions, PlanIntensity, GeneratedDay, GeneratedBlock } from '../types';
 import { format, parseISO, differenceInCalendarWeeks } from 'date-fns';
 import { aiConfigured } from '../scheduler';
 import { lbLabel } from './AIScheduler';
+import { formatClock } from '../utils/time';
 import {
   Wand2, Sparkles, Target, Flame, Repeat2, CheckSquare, Calendar,
-  Check, X, RotateCcw, ChevronDown, CalendarRange, Info, WifiOff,
+  Check, X, RotateCcw, ChevronDown, CalendarRange, Info, WifiOff, AlertTriangle,
 } from 'lucide-react';
 
-const fmtTime = (mins: number) => {
-  const m = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
-  const h = Math.floor(m / 60), min = m % 60;
-  const ap = h < 12 ? 'AM' : 'PM';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(min).padStart(2, '0')} ${ap}`;
-};
 const fmtDur = (mins: number) => (mins >= 60 ? `${(mins / 60).toFixed(mins % 60 ? 1 : 0)}h` : `${mins}m`);
 
 const HORIZONS: PlanHorizon[] = ['1w', '2w', '3w', '4w'];
 
 export function AIPlanner() {
   const t = useT();
+  const lang = useLang();
   const locale = useDateLocale();
   const store = useStore();
-  const { generatedPlan, isPlanning, goals, habits, gtdTasks,
+  const { generatedPlan, isPlanning, planningError, goals, habits, gtdTasks,
     generatePlan, regeneratePlan, acceptAllPlanBlocks, commitPlan, clearPlan } = store;
 
   const [tab, setTab] = useState<'setup' | 'preview'>('setup');
@@ -162,6 +157,16 @@ export function AIPlanner() {
                 <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-2)] flex items-center justify-center mb-6 animate-pulse"><CalendarRange className="w-7 h-7 text-white" /></div>
                 <h3 className="text-[18px] font-bold text-[var(--text)]">{t('planner.building')}</h3>
               </div>
+            ) : planningError ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center anim-fade">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 grid place-items-center mb-4"><AlertTriangle className="w-6 h-6" /></div>
+                <h3 className="text-[17px] font-bold text-[var(--text)]">{t('planner.errorTitle')}</h3>
+                <p className="text-[12px] leading-relaxed text-[var(--text-dim)] mt-2 max-w-sm">{t('planner.errorDesc')}</p>
+                <div className="flex gap-2 mt-5">
+                  <button onClick={() => setTab('setup')} className="h-11 px-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[13px] font-bold text-[var(--text)]">{t('planner.setup')}</button>
+                  <button onClick={handleGenerate} className="h-11 px-5 rounded-xl bg-[var(--primary)] text-white text-[13px] font-bold flex items-center gap-2"><RotateCcw className="w-4 h-4" />{t('planner.retry')}</button>
+                </div>
+              </div>
             ) : generatedPlan ? (
               <div className="anim-fade">
                 {/* AI fallback notice */}
@@ -199,7 +204,7 @@ export function AIPlanner() {
                       {t('planner.weekN', { n: wi + 1 })} · {format(parseISO(wk[0].date), 'MMM d', { locale })} – {format(parseISO(wk[wk.length - 1].date), 'MMM d', { locale })}
                     </div>
                     <div className="space-y-2">
-                      {wk.map(day => <DayRow key={day.date} day={day} open={drill === day.date} onToggle={() => setDrill(drill === day.date ? null : day.date)} locale={locale} t={t} store={store} />)}
+                      {wk.map(day => <DayRow key={day.date} day={day} open={drill === day.date} onToggle={() => setDrill(drill === day.date ? null : day.date)} locale={locale} lang={lang} t={t} store={store} />)}
                     </div>
                   </div>
                 ))}
@@ -220,7 +225,7 @@ export function AIPlanner() {
 }
 
 // One day: compact chip row that expands into a per-block timeline.
-function DayRow({ day, open, onToggle, locale, t, store }: { day: GeneratedDay; open: boolean; onToggle: () => void; locale: any; t: any; store: any }) {
+function DayRow({ day, open, onToggle, locale, lang, t, store }: { day: GeneratedDay; open: boolean; onToggle: () => void; locale: any; lang: 'en'|'ru'|'ja'; t: any; store: any }) {
   const editable = day.blocks.filter(b => !b.locked);
   const accepted = editable.filter(b => b.status === 'accepted').length;
   const date = parseISO(day.date);
@@ -244,21 +249,21 @@ function DayRow({ day, open, onToggle, locale, t, store }: { day: GeneratedDay; 
 
       {open && (
         <div className="border-t border-[var(--border)] p-3 space-y-1.5">
-          {day.blocks.map(b => <BlockRow key={b.id} block={b} date={day.date} t={t} store={store} />)}
+          {day.blocks.map(b => <BlockRow key={b.id} block={b} date={day.date} lang={lang} t={t} store={store} />)}
         </div>
       )}
     </div>
   );
 }
 
-function BlockRow({ block, date, t, store }: { block: GeneratedBlock; date: string; t: any; store: any }) {
+function BlockRow({ block, date, lang, t, store }: { block: GeneratedBlock; date: string; lang: 'en'|'ru'|'ja'; t: any; store: any }) {
   const rejected = block.status === 'rejected';
   const accepted = block.status === 'accepted';
   const reason = block.reasoning?.startsWith('plan.r.') ? t(block.reasoning) : block.reasoning;
   const title = block.sourceKind === 'life' ? lbLabel(block.sourceId, block.title, t) : block.title;
   return (
     <div className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-all ${rejected ? 'opacity-40' : ''}`} style={{ borderColor: accepted ? `${block.color}55` : 'var(--border)', background: accepted ? `${block.color}0c` : 'var(--surface-2)' }}>
-      <div className="w-12 shrink-0 text-[10px] text-[var(--text-dim)] mono leading-tight">{fmtTime(block.startMinutes)}<br />{fmtDur(block.durationMinutes)}</div>
+      <div className="w-14 shrink-0 text-[10px] text-[var(--text-dim)] mono leading-tight">{formatClock(block.startMinutes, lang)}<br />{fmtDur(block.durationMinutes)}</div>
       <span className="text-base shrink-0">{block.emoji}</span>
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-semibold text-[var(--text)] truncate">{title}</div>

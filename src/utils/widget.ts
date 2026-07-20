@@ -4,6 +4,7 @@ import { ru, ja } from 'date-fns/locale';
 import type { Session, GTDTask, Habit } from '../types';
 import { useStore, habitDueOn } from '../store';
 import { translate } from '../i18n';
+import { hasTodayFocus } from '../domain/taskFocus';
 
 interface WidgetBridgePlugin {
   setToday(opts: { date: string; lines: string; empty: string }): Promise<void>;
@@ -29,7 +30,7 @@ export async function syncWidget(sessions: Session[], tasks: GTDTask[], habits: 
 
     const due = tasks.filter(t =>
       t.status !== 'done' && t.status !== 'trash' && !t.isArchived &&
-      (t.isTodayFocus || (t.dueDate && t.dueDate.slice(0, 10) <= todayKey)));
+      (hasTodayFocus(t, todayKey) || (t.dueDate && t.dueDate.slice(0, 10) <= todayKey)));
     for (const t of due) items.push(`•  ${t.title}`);
 
     for (const h of habits) {

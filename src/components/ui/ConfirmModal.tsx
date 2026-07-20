@@ -22,8 +22,8 @@ export function ConfirmModal() {
   const { title = t('confirm.title'), message, confirmLabel = t('confirm.confirm'), cancelLabel = t('common.cancel'), danger, onConfirm } = dialog;
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center p-5 bg-black/70 backdrop-blur-sm anim-fade" onClick={close}>
-      <div className="w-full max-w-sm card p-6" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-5 bg-black/45 backdrop-blur-[3px] anim-fade" onClick={close}>
+      <div className="w-full max-w-sm card p-6 anim-pop" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3.5">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${danger ? 'bg-red-500/15 text-red-400' : 'bg-[var(--primary)]/15 text-[var(--primary)]'}`}>
             <AlertTriangle className="w-5 h-5" />

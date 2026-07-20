@@ -6,4 +6,9 @@
     <string name="custom_url_scheme">com.scheduler.app</string>
     <string name="widget_today_label">Nebulla — Today</string>
     <string name="widget_today_desc">Today\'s sessions, tasks and habits with quick add</string>
+    <string name="widget_actions_label">Nebulla — Quick actions</string>
+    <string name="widget_actions_desc">Quickly capture a task or open Today and Calendar</string>
+    <string name="widget_action_capture">Capture</string>
+    <string name="widget_action_today">Today</string>
+    <string name="widget_action_calendar">Calendar</string>
 </resources>

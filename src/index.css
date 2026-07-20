@@ -1,10 +1,9 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Nebulla design system — "night sky" redesign 2026-07
-   Dark-first: deep blue-black surfaces, indigo→cyan brand gradient.
-   Light theme is the same system re-tinted on cool paper.
-   Display face: Unbounded (latin+cyrillic); JA falls back to system.
+   Nebulla product system — calm, precise and deliberately quiet.
+   One spatial language across Today, Tasks, Calendar and profile:
+   canvas → elevated surface → inset control. Accent is reserved for intent.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Unbounded (variable): latin + cyrillic subsets only — JA headlines fall back to the body stack */
@@ -20,36 +19,37 @@
 }
 
 :root{
-  --bg:#eef0f8; --surface:#ffffff; --surface-2:#f3f5fc; --border:#e3e7f3;
-  --text:#171a2b; --text-dim:#666d89; --text-mute:#9aa1bb;
-  --primary:#5457e8; --primary-2:#0aa6c9; --accent:#0aa6c9; --on-primary:#ffffff;
-  --grad:linear-gradient(135deg,#5457e8 10%,#0aa6c9 100%);
-  --shadow-sm:0 2px 8px rgba(38,46,92,.06);
-  --shadow:0 8px 24px rgba(38,46,92,.09);
-  --shadow-md:0 14px 34px rgba(38,46,92,.12);
-  --shadow-lg:0 22px 50px rgba(38,46,92,.16);
-  --shadow-primary:0 10px 26px rgba(84,87,232,.32);
-  --nav-bg:rgba(255,255,255,.86);
+  --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f0f2f8; --border:#e3e6ef;
+  --text:#1b1d28; --text-dim:#6d7285; --text-mute:#a1a6b6;
+  --primary:#6659e8; --primary-2:#8275f5; --accent:#2ca6a4; --on-primary:#ffffff;
+  --grad:linear-gradient(135deg,#6659e8 0%,#8777f4 100%);
+  --shadow-sm:0 1px 2px rgba(28,31,48,.04),0 3px 12px rgba(28,31,48,.045);
+  --shadow:0 8px 24px rgba(28,31,48,.075);
+  --shadow-md:0 16px 38px rgba(28,31,48,.11);
+  --shadow-lg:0 24px 64px rgba(28,31,48,.15);
+  --shadow-primary:0 12px 28px rgba(102,89,232,.26);
+  --nav-bg:rgba(255,255,255,.88);
 }
 .theme-dark{
-  --bg:#06070d; --surface:#0c0e18; --surface-2:#121524; --border:#1d2136;
-  --text:#eceef8; --text-dim:#8d93b3; --text-mute:#585e7e;
-  --primary:#6467f2; --primary-2:#2dd4ee; --accent:#2dd4ee; --on-primary:#ffffff;
-  --grad:linear-gradient(135deg,#6467f2 10%,#2dd4ee 100%);
-  --shadow-sm:0 2px 8px rgba(0,0,0,.35);
-  --shadow:0 8px 24px rgba(0,0,0,.45);
-  --shadow-md:0 14px 34px rgba(0,0,0,.5);
-  --shadow-lg:0 22px 50px rgba(0,0,0,.58);
-  --shadow-primary:0 10px 28px rgba(100,103,242,.45);
-  --nav-bg:rgba(14,16,28,.82);
+  --bg:#101116; --surface:#181a21; --surface-2:#20232c; --border:#2d303b;
+  --text:#f2f1f7; --text-dim:#acaebb; --text-mute:#747887;
+  --primary:#9a8cff; --primary-2:#b5a9ff; --accent:#55c5bd; --on-primary:#17131f;
+  --grad:linear-gradient(135deg,#9788ff 0%,#b4a8ff 100%);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.25),0 5px 15px rgba(0,0,0,.2);
+  --shadow:0 10px 28px rgba(0,0,0,.3);
+  --shadow-md:0 18px 42px rgba(0,0,0,.42);
+  --shadow-lg:0 28px 70px rgba(0,0,0,.5);
+  --shadow-primary:0 12px 30px rgba(151,136,255,.28);
+  --nav-bg:rgba(24,26,33,.86);
 }
 
 html,body,#root{height:100%;width:100%;max-width:100%;overflow-x:hidden;background:var(--bg);color:var(--text)}
 html{-webkit-tap-highlight-color:transparent;scroll-behavior:smooth}
-body{font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 /* Smooth, consistent easing for all interactive state changes */
-button,a,input,select,textarea,[role="button"]{transition-property:background-color,border-color,color,box-shadow,transform,opacity;transition-duration:.14s;transition-timing-function:cubic-bezier(.4,0,.2,1)}
-button:active,[role="button"]:active{transform:scale(.97)}
+button,a,input,select,textarea,[role="button"]{transition-property:background-color,border-color,color,box-shadow,transform,opacity;transition-duration:.18s;transition-timing-function:cubic-bezier(.2,.8,.2,1)}
+button:active,[role="button"]:active{transform:scale(.985)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 34%,transparent);outline-offset:2px}
 /* Momentum scrolling on touch + smoother scroll containers */
 .overflow-y-auto,.overflow-x-auto,.overflow-auto{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
@@ -57,7 +57,7 @@ button:active,[role="button"]:active{transform:scale(.97)}
 
 /* Display face: Unbounded for latin/cyrillic headlines; JA text falls back
    cleanly to the body stack. Unbounded runs wide — weight/tracking tuned. */
-.display{font-family:"Unbounded Variable","Inter",ui-sans-serif,system-ui,sans-serif;font-weight:640;letter-spacing:-0.015em;line-height:1.05}
+.display{font-family:"Unbounded Variable","Inter",ui-sans-serif,system-ui,sans-serif;font-weight:560;letter-spacing:-.035em;line-height:1.12}
 
 /* Brand gradient helpers */
 .grad{background:var(--grad)}
@@ -65,9 +65,9 @@ button:active,[role="button"]:active{transform:scale(.97)}
 
 /* Aurora: the signature ambient glow behind the Home header */
 .aurora{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.aurora::before,.aurora::after{content:"";position:absolute;border-radius:9999px;filter:blur(70px)}
-.aurora::before{width:340px;height:340px;top:-180px;left:-90px;background:color-mix(in srgb,var(--primary) 34%,transparent)}
-.aurora::after{width:280px;height:280px;top:-150px;right:-70px;background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.aurora::before,.aurora::after{content:"";position:absolute;border-radius:9999px;filter:blur(86px)}
+.aurora::before{width:320px;height:320px;top:-190px;left:-100px;background:color-mix(in srgb,var(--primary) 18%,transparent)}
+.aurora::after{width:260px;height:260px;top:-170px;right:-90px;background:color-mix(in srgb,var(--accent) 10%,transparent)}
 
 *::-webkit-scrollbar{width:6px;height:6px}
 *::-webkit-scrollbar-track{background:transparent}
@@ -86,10 +86,10 @@ button:active,[role="button"]:active{transform:scale(.97)}
 @keyframes fadeOnly{from{opacity:0}to{opacity:1}}
 @keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 
-.anim-sheet{animation:sheetUp .22s cubic-bezier(.22,1,.36,1) both}
-.anim-backdrop{animation:fadeOnly .15s ease both}
-.anim-fade{animation:fadeUp .28s cubic-bezier(.22,1,.36,1) both}
-.anim-slide{animation:slide-in .25s cubic-bezier(.22,1,.36,1) both}
+.anim-sheet{animation:sheetUp .3s cubic-bezier(.22,1,.36,1) both}
+.anim-backdrop{animation:fadeOnly .2s ease both}
+.anim-fade{animation:fadeUp .34s cubic-bezier(.22,1,.36,1) both}
+.anim-slide{animation:slide-in .3s cubic-bezier(.22,1,.36,1) both}
 /* Slight overshoot pop for emphasis (badges, hero icons, modals) */
 .anim-pop{animation:pop .26s cubic-bezier(.34,1.56,.64,1) both}
 .anim-delay-1{animation-delay:.03s}
@@ -109,13 +109,13 @@ button:active,[role="button"]:active{transform:scale(.97)}
 .stagger>*:nth-child(7){animation-delay:.165s}
 .stagger>*:nth-child(8){animation-delay:.19s}
 
-.glass{background:var(--nav-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);transition:border-color .15s cubic-bezier(.4,0,.2,1),box-shadow .15s cubic-bezier(.4,0,.2,1),transform .15s cubic-bezier(.4,0,.2,1),background-color .15s cubic-bezier(.4,0,.2,1)}
-.card-inner{background:var(--surface-2);border:1px solid var(--border);border-radius:16px}
-.tcard{background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow-sm);transition:border-color .15s cubic-bezier(.4,0,.2,1),box-shadow .15s cubic-bezier(.4,0,.2,1),transform .15s cubic-bezier(.4,0,.2,1),background-color .15s cubic-bezier(.4,0,.2,1)}
-/* Interactive elevation: lift + deepen shadow on hover, settle on press */
-.lift:hover{transform:translateY(-2px) scale(1.02);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--primary) 35%,var(--border))}
-.lift:active{transform:translateY(-1px) scale(1.0)}
+.glass{background:var(--nav-bg);backdrop-filter:blur(22px) saturate(1.15);-webkit-backdrop-filter:blur(22px) saturate(1.15)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:24px;box-shadow:var(--shadow);transition:border-color .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s cubic-bezier(.2,.8,.2,1),transform .18s cubic-bezier(.2,.8,.2,1),background-color .18s cubic-bezier(.2,.8,.2,1)}
+.card-inner{background:var(--surface-2);border:1px solid color-mix(in srgb,var(--border) 82%,transparent);border-radius:18px}
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow-sm);transition:border-color .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s cubic-bezier(.2,.8,.2,1),transform .18s cubic-bezier(.2,.8,.2,1),background-color .18s cubic-bezier(.2,.8,.2,1)}
+/* Interactive elevation stays spatially calm: no scale-jumps in dense lists. */
+.lift:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:color-mix(in srgb,var(--primary) 25%,var(--border))}
+.lift:active{transform:translateY(0)}
 
 /* Touch-target extension (Material: hit area ≥48dp even if the visual is smaller).
    .hit  — invisible hit area grows to at least 48×48, centered (standalone controls only:

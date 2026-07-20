@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useStore, habitDueOn, habitStreak, habitBestStreak, habitRate, habitHeatmap, dailyCompletion } from '../store';
 import { useT } from '../i18n';
-import type { Habit, HabitAnchor, HabitRecurrence } from '../types';
+import type { Habit, HabitAnchor, HabitGroup, HabitRecurrence } from '../types';
 import { Drawer } from './ui/Drawer';
 import { SelectMenu } from './ui/SelectMenu';
 import { TimePicker } from './ui/TimePicker';
 import { format, addDays } from 'date-fns';
-import { Plus, Check, X, Moon, Flame, Repeat, Edit2, Trash2, RotateCcw, Target, BarChart3, Trophy, Award, LayoutGrid, ChevronLeft } from 'lucide-react';
+import { Plus, Check, X, Moon, Flame, Repeat, Edit2, Trash2, RotateCcw, Target, BarChart3, Trophy, Award, LayoutGrid, ChevronLeft, FolderOpen } from 'lucide-react';
+import { createId } from '../domain/id';
 
 type TplHabit = { key: string; emoji: string; color: string; anchor: HabitAnchor; recurrence: HabitRecurrence; targetCount: number; unitKey?: string };
 const TEMPLATES: { id: string; emoji: string; habits: TplHabit[] }[] = [
@@ -33,19 +34,31 @@ const TEMPLATES: { id: string; emoji: string; habits: TplHabit[] }[] = [
 const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899'];
 const EMOJI_SUGGESTIONS = ['💧', '💪', '📖', '🧘', '🏃', '🥗', '💊', '😴', '☀️', '🦷', '🚶', '✍️', '🎯', '🌱', '🧹', '🎧', '☕', '🚭', '🙏', '🎨'];
 const ANCHORS: HabitAnchor[] = ['wake', 'afterBreakfast', 'morning', 'afterLunch', 'afternoon', 'afterDinner', 'evening', 'sleep', 'none'];
+const ANCHOR_EMOJI: Record<HabitAnchor, string> = {
+  wake: '🌅', afterBreakfast: '🍳', morning: '☀️', afterLunch: '🥪', afternoon: '🌤️',
+  afterDinner: '🍽️', evening: '🌆', sleep: '🌙', none: '✨',
+};
 const RECURRENCES: HabitRecurrence[] = ['daily', 'weekdays', 'weekends', 'weekly', 'everyN', 'timesPerWeek'];
 const hmToMin = (t: string) => { const [h, m] = (t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const minToHm = (v: number) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 
 export function HabitsView({ onBack }: { onBack?: () => void }) {
   const tr = useT();
-  const { habits, goals, setHabitStatus, incHabit, clearHabitDay } = useStore();
+  const { habits, habitGroups, goals, setHabitStatus, incHabit, clearHabitDay } = useStore();
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
   const [templates, setTemplates] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState('all');
   const [tab, setTab] = useState<'today' | 'stats'>('today');
 
   const today = format(new Date(), 'yyyy-MM-dd');
-  const active = habits.filter(h => !h.archived);
+  const activeAll = habits.filter(h => !h.archived);
+  const selectedGroup = selectedGroupId === 'all' || selectedGroupId === 'ungrouped' || habitGroups.some(group => group.id === selectedGroupId)
+    ? selectedGroupId
+    : 'all';
+  const knownGroupIds = new Set(habitGroups.map(group => group.id));
+  const active = activeAll.filter(habit => selectedGroup === 'all'
+    || (selectedGroup === 'ungrouped' ? !habit.groupId || !knownGroupIds.has(habit.groupId) : habit.groupId === selectedGroup));
   const due = active.filter(h => habitDueOn(h, new Date()));
   const others = active.filter(h => !habitDueOn(h, new Date()));
   const allDone = due.length > 0 && due.every(h => h.log[today]?.status === 'done');
@@ -61,6 +74,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
     const count = entry?.count || 0;
     const isCounter = h.targetCount > 1;
     const streak = habitStreak(h);
+    const group = habitGroups.find(candidate => candidate.id === h.groupId);
     return (
       <div className={`card p-4 flex items-center gap-3 ${dim ? 'opacity-50' : ''}`}>
         <div className="w-10 h-10 rounded-xl grid place-items-center text-lg shrink-0" style={{ background: `${h.color}22` }}>{h.emoji || '✅'}</div>
@@ -73,6 +87,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
             <Repeat className="w-3 h-3" />{tr('habits.rec.' + (h.recurrence || 'daily'))}
             {isCounter && <span>· {count}/{h.targetCount}{h.unit ? ' ' + h.unit : ''}</span>}
             {h.goalId && goals.find(g => g.id === h.goalId) && <span>· {goals.find(g => g.id === h.goalId)!.emoji}</span>}
+            {group && <span className="flex items-center gap-1 truncate">· <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: group.color }} />{group.name}</span>}
           </div>
         </div>
         {/* Actions */}
@@ -87,15 +102,16 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
             </>
           ) : (
             <>
-              <button onClick={() => setHabitStatus(h.id, today, status === 'done' ? 'rest' : 'done')} title={tr('habits.done')}
+              {/* Second tap on the active status CLEARS the day (undo), it does not silently swap to another status. */}
+              <button onClick={() => status === 'done' ? clearHabitDay(h.id, today) : setHabitStatus(h.id, today, 'done')} title={tr('habits.done')}
                 className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'done' ? 'bg-emerald-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-emerald-400'}`}>
                 <Check className="w-4 h-4" strokeWidth={3} />
               </button>
-              <button onClick={() => setHabitStatus(h.id, today, status === 'rest' ? 'done' : 'rest')} title={tr('habits.rest')}
+              <button onClick={() => status === 'rest' ? clearHabitDay(h.id, today) : setHabitStatus(h.id, today, 'rest')} title={tr('habits.rest')}
                 className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'rest' ? 'bg-amber-500 text-black' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-amber-400'}`}>
                 <Moon className="w-4 h-4" />
               </button>
-              <button onClick={() => setHabitStatus(h.id, today, status === 'failed' ? 'done' : 'failed')} title={tr('habits.failed')}
+              <button onClick={() => status === 'failed' ? clearHabitDay(h.id, today) : setHabitStatus(h.id, today, 'failed')} title={tr('habits.failed')}
                 className={`hity w-10 h-10 rounded-xl grid place-items-center transition-colors ${status === 'failed' ? 'bg-red-500 text-white' : 'bg-[var(--surface-2)] text-[var(--text-dim)] hover:text-red-400'}`}>
                 <X className="w-4 h-4" strokeWidth={3} />
               </button>
@@ -117,6 +133,7 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
             <p className="text-[13px] text-[var(--text-dim)] mt-1.5">{tr('habits.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setGroupsOpen(true)} className="h-10 px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center gap-1.5 hover:border-[var(--primary)]/40 transition-colors"><FolderOpen className="w-4 h-4" />{tr('habits.groups')}</button>
             <button onClick={() => setTemplates(true)} className="h-10 px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold flex items-center gap-1.5 hover:text-[var(--text)] hover:border-[var(--border)] transition-colors"><LayoutGrid className="w-4 h-4" />{tr('habits.templates')}</button>
             <button onClick={() => setEditing('new')} className="h-10 px-4 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold flex items-center gap-1.5 hover:bg-[var(--primary)] transition-colors"><Plus className="w-4 h-4" />{tr('habits.new')}</button>
           </div>
@@ -127,6 +144,18 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
           <button onClick={() => setTab('stats')} className={`hity h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-1.5 transition-colors ${tab === 'stats' ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}><BarChart3 className="w-4 h-4" />{tr('habits.tabStats')}</button>
         </div>
 
+        {(habitGroups.length > 0 || activeAll.length > 0) && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 anim-fade" aria-label={tr('habits.groupFilter')}>
+            <button onClick={() => setSelectedGroupId('all')} className={`shrink-0 h-9 px-3 rounded-xl text-[12px] font-bold border transition-colors ${selectedGroup === 'all' ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)]'}`}>{tr('habits.allGroups')}</button>
+            {habitGroups.map(group => (
+              <button key={group.id} onClick={() => setSelectedGroupId(group.id)} className={`shrink-0 h-9 px-3 rounded-xl text-[12px] font-bold border flex items-center gap-1.5 transition-colors ${selectedGroup === group.id ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--text)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)]'}`}>
+                <span className="w-2 h-2 rounded-full" style={{ background: group.color }} />{group.name}
+              </button>
+            ))}
+            <button onClick={() => setSelectedGroupId('ungrouped')} className={`shrink-0 h-9 px-3 rounded-xl text-[12px] font-bold border transition-colors ${selectedGroup === 'ungrouped' ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--text)]' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)]'}`}>{tr('habits.ungrouped')}</button>
+          </div>
+        )}
+
         {tab === 'stats' && (active.length > 0
           ? <HabitsStats habits={active} />
           : <div className="card border-dashed p-10 text-center text-[13px] text-[var(--text-dim)] anim-fade">{tr('habits.statsEmpty')}</div>)}
@@ -134,12 +163,12 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
         {tab === 'today' && active.length === 0 && (
           <div className="card border-dashed p-12 text-center anim-fade">
             <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/10 grid place-items-center mx-auto mb-4"><Target className="w-6 h-6 text-[var(--primary)]" /></div>
-            <h3 className="text-[16px] font-bold text-[var(--text)] mb-1">{tr('habits.empty')}</h3>
-            <p className="text-[13px] text-[var(--text-dim)] mb-4">{tr('habits.emptyDesc')}</p>
-            <div className="flex items-center justify-center gap-2">
+            <h3 className="text-[16px] font-bold text-[var(--text)] mb-1">{tr(activeAll.length === 0 ? 'habits.empty' : 'habits.groupEmpty')}</h3>
+            <p className="text-[13px] text-[var(--text-dim)] mb-4">{tr(activeAll.length === 0 ? 'habits.emptyDesc' : 'habits.groupEmptyDesc')}</p>
+            {activeAll.length === 0 && <div className="flex items-center justify-center gap-2">
               <button onClick={() => setEditing('new')} className="h-10 px-5 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold inline-flex items-center gap-2 hover:bg-[var(--primary)]"><Plus className="w-4 h-4" />{tr('habits.new')}</button>
               <button onClick={() => setTemplates(true)} className="h-10 px-5 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[12px] font-bold inline-flex items-center gap-2 hover:text-[var(--text)] hover:border-[var(--border)]"><LayoutGrid className="w-4 h-4" />{tr('habits.templates')}</button>
-            </div>
+            </div>}
           </div>
         )}
 
@@ -161,8 +190,67 @@ export function HabitsView({ onBack }: { onBack?: () => void }) {
       </div>
 
       {editing && <HabitModal habit={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {groupsOpen && <HabitGroupsDrawer onClose={() => setGroupsOpen(false)} onDeleted={id => { if (selectedGroup === id) setSelectedGroupId('all'); }} />}
       {templates && <TemplatesDrawer onClose={() => setTemplates(false)} onAdded={() => { setTemplates(false); setTab('today'); }} />}
     </div>
+  );
+}
+
+function HabitGroupsDrawer({ onClose, onDeleted }: { onClose: () => void; onDeleted: (id: string) => void }) {
+  const tr = useT();
+  const { habitGroups, habits, addHabitGroup, updateHabitGroup, deleteHabitGroup, askConfirm } = useStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#8b5cf6');
+
+  const clearForm = () => { setEditingId(null); setName(''); setColor('#8b5cf6'); };
+  const edit = (group: HabitGroup) => { setEditingId(group.id); setName(group.name); setColor(group.color); };
+  const save = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (editingId) updateHabitGroup(editingId, { name: trimmed, color });
+    else addHabitGroup({ id: createId('habit-group'), name: trimmed, color, createdAt: new Date().toISOString() });
+    clearForm();
+  };
+  const remove = (group: HabitGroup) => {
+    const count = habits.filter(habit => habit.groupId === group.id).length;
+    askConfirm({
+      title: tr('habits.deleteGroupTitle'),
+      message: tr('habits.deleteGroupMsg', { name: group.name, count }),
+      confirmLabel: tr('common.delete'),
+      danger: true,
+      onConfirm: () => { deleteHabitGroup(group.id); if (editingId === group.id) clearForm(); onDeleted(group.id); },
+    });
+  };
+
+  return (
+    <Drawer open={true} onClose={onClose} width="md" title={tr('habits.groupsTitle')}>
+      <p className="text-[13px] text-[var(--text-dim)] mb-5">{tr('habits.groupsSub')}</p>
+      <div className="card p-4 mb-5">
+        <label className="block text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">{editingId ? tr('habits.editGroup') : tr('habits.newGroup')}</label>
+        <div className="flex gap-2">
+          <input value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') save(); }} placeholder={tr('habits.groupNamePlaceholder')} className="flex-1 min-w-0 h-11 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--primary)]" />
+          <button onClick={save} disabled={!name.trim()} className="h-11 px-4 rounded-xl bg-[var(--primary)] text-white text-[12px] font-bold disabled:opacity-40">{editingId ? tr('common.save') : tr('common.add')}</button>
+          {editingId && <button onClick={clearForm} aria-label={tr('common.cancel')} className="w-11 h-11 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-dim)] grid place-items-center"><X className="w-4 h-4" /></button>}
+        </div>
+        <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+          {COLORS.map(candidate => <button key={candidate} onClick={() => setColor(candidate)} aria-label={candidate} className="w-7 h-7 shrink-0 rounded-full grid place-items-center" style={{ background: candidate, boxShadow: color === candidate ? `0 0 0 2px var(--surface), 0 0 0 4px ${candidate}` : undefined }}>{color === candidate && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}</button>)}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {habitGroups.length === 0 && <div className="text-[13px] text-[var(--text-dim)] text-center py-6">{tr('habits.noGroups')}</div>}
+        {habitGroups.map(group => {
+          const count = habits.filter(habit => habit.groupId === group.id).length;
+          return <div key={group.id} className="card p-3 flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ background: group.color }} />
+            <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-[var(--text)] truncate">{group.name}</div><div className="text-[10px] text-[var(--text-dim)]">{tr('habits.groupHabitCount', { count })}</div></div>
+            <button onClick={() => edit(group)} aria-label={tr('habits.editGroup')} className="w-9 h-9 rounded-lg grid place-items-center text-[var(--text-dim)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"><Edit2 className="w-3.5 h-3.5" /></button>
+            <button onClick={() => remove(group)} aria-label={tr('common.delete')} className="w-9 h-9 rounded-lg grid place-items-center text-[var(--text-dim)] hover:bg-red-500/10 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>;
+        })}
+      </div>
+    </Drawer>
   );
 }
 
@@ -170,9 +258,8 @@ function TemplatesDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: (
   const tr = useT();
   const { addHabit } = useStore();
   const addTemplate = (tpl: typeof TEMPLATES[number]) => {
-    const now = Date.now();
-    tpl.habits.forEach((h, i) => addHabit({
-      id: `h${now}${i}`, createdAt: new Date().toISOString(), log: {},
+    tpl.habits.forEach((h) => addHabit({
+      id: createId('habit'), createdAt: new Date().toISOString(), log: {},
       title: tr('tpl.h.' + h.key), emoji: h.emoji, color: h.color, anchor: h.anchor,
       recurrence: h.recurrence, targetCount: h.targetCount, unit: h.unitKey ? tr(h.unitKey) : undefined,
     }));
@@ -365,17 +452,18 @@ function HabitsStats({ habits }: { habits: Habit[] }) {
 
 export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: () => void }) {
   const tr = useT();
-  const { addHabit, updateHabit, deleteHabit, askConfirm, goals } = useStore();
+  const { addHabit, updateHabit, deleteHabit, askConfirm, goals, habitGroups } = useStore();
   const [title, setTitle] = useState(habit?.title || '');
   const [emoji, setEmoji] = useState(habit?.emoji || '✅');
   const [color, setColor] = useState(habit?.color || '#8b5cf6');
-  const anchor = habit?.anchor || 'none';
+  const [anchor, setAnchor] = useState<HabitAnchor>(habit?.anchor || 'none');
   const [recurrence, setRecurrence] = useState<HabitRecurrence>(habit?.recurrence || 'daily');
   const [intervalDays, setIntervalDays] = useState(habit?.intervalDays || 2);
   const [timesPerWeek, setTimesPerWeek] = useState(habit?.timesPerWeek || 3);
   const [targetCount, setTargetCount] = useState(habit?.targetCount || 1);
   const [unit, setUnit] = useState(habit?.unit || '');
   const [goalId, setGoalId] = useState(habit?.goalId || '');
+  const [groupId, setGroupId] = useState(habit?.groupId || '');
   const [reminderTime, setReminderTime] = useState(habit?.reminderTime ?? '');
 
   const save = () => {
@@ -385,10 +473,10 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
       intervalDays: recurrence === 'everyN' ? Math.max(2, intervalDays) : undefined,
       timesPerWeek: recurrence === 'timesPerWeek' ? Math.min(7, Math.max(1, timesPerWeek)) : undefined,
       targetCount: Math.max(1, targetCount), unit: unit.trim() || undefined,
-      goalId: goalId || undefined, reminderTime: reminderTime || undefined,
+      goalId: goalId || undefined, groupId: groupId || undefined, reminderTime: reminderTime || undefined,
     };
     if (habit) updateHabit(habit.id, data);
-    else addHabit({ id: `h${Date.now()}`, createdAt: new Date().toISOString(), log: {}, ...data });
+    else addHabit({ id: createId('habit'), createdAt: new Date().toISOString(), log: {}, ...data });
     onClose();
   };
 
@@ -440,14 +528,38 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
           </div>
         </div>
 
-        {/* Time */}
+        {/* When (situational anchor) — groups the Today list and guides the AI planner */}
+        <div>
+          <label className={lbl}>{tr('habits.anchor')}</label>
+          <div className="flex gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1">
+            {ANCHORS.map(a => (
+              <button key={a} onClick={() => setAnchor(a)}
+                className={`shrink-0 h-9 px-3 rounded-xl text-[12px] font-medium border transition-all active:scale-95 whitespace-nowrap flex items-center gap-1.5 ${anchor === a ? 'border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm' : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-dim)] hover:border-[var(--primary)]/40'}`}>
+                <span>{ANCHOR_EMOJI[a]}</span>{tr('habits.anchor.' + a)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Reminder — explicit "none" state; a set time gets a clear (✕) button */}
         <div>
           <label className={lbl}>{tr('habits.reminder')}</label>
-          <TimePicker
-            label={tr('habits.reminder')}
-            value={hmToMin(reminderTime || '09:00')}
-            onChange={m => setReminderTime(minToHm(m))}
-          />
+          {reminderTime ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <TimePicker label={tr('habits.reminder')} value={hmToMin(reminderTime)} onChange={m => setReminderTime(minToHm(m))} />
+              </div>
+              <button type="button" onClick={() => setReminderTime('')} title={tr('gtd.reminderClear')} aria-label={tr('gtd.reminderClear')}
+                className="w-11 h-11 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text-dim)] grid place-items-center hover:text-red-400 transition-colors shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setReminderTime('09:00')}
+              className="h-11 px-4 rounded-xl border border-dashed border-[var(--border)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--primary)] flex items-center gap-1.5 transition-colors">
+              <Plus className="w-4 h-4" />{tr('habits.addReminder')}
+            </button>
+          )}
         </div>
 
         {/* Recurrence */}
@@ -489,6 +601,13 @@ export function HabitModal({ habit, onClose }: { habit: Habit | null; onClose: (
             <label className={lbl}>{tr('habits.unit')}</label>
             <input value={unit} onChange={e => setUnit(e.target.value)} placeholder={tr('habits.unitPlaceholder')} className={field} />
           </div>
+        </div>
+
+        {/* Habit group */}
+        <div>
+          <label className={lbl}>{tr('habits.group')}</label>
+          <SelectMenu value={groupId} onChange={setGroupId} ariaLabel={tr('habits.group')}
+            options={[{ value: '', label: tr('habits.noGroup') }, ...habitGroups.map(group => ({ value: group.id, label: group.name }))]} />
         </div>
 
         {/* Linked goal */}

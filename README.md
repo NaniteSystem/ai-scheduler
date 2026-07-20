@@ -18,10 +18,12 @@ node --env-file=.env.local server/ai-proxy.mjs   # прокси на :8787, кл
 
 `.env.local` (gitignored) содержит:
 - `VITE_AI_PROXY_URL` — адрес прокси для клиента. Локально `http://localhost:8787`; для телефона/APK — публичный Vercel-URL `https://proxy-nine-eta.vercel.app` (см. ниже).
-- `VITE_AI_PROXY_SECRET` — секрет, который клиент шлёт в заголовке `x-app-secret` (должен совпадать с `APP_SECRET` на прокси).
+- `VITE_AI_PROXY_SECRET` — дополнительный shared token для совместимости с `APP_SECRET`. Он зашивается в клиент и **не считается самостоятельной защитой**.
 - `GEMINI_API_KEYS` — Gemini-ключи **через запятую** (первичный провайдер).
 - `OPENROUTER_API_KEYS` — OpenRouter-ключи (резервный провайдер, бесплатные модели).
-- `APP_SECRET` — тот же секрет на стороне прокси (для локального `server/ai-proxy.mjs` необязателен; на Vercel — обязателен).
+- `APP_SECRET` — тот же дополнительный shared token на стороне прокси.
+- `ALLOW_ORIGIN` — разрешённые browser origins через запятую; wildcard не используется.
+- `RATE_LIMIT_PER_MINUTE` и `MAX_REQUEST_BYTES` — обязательные серверные пределы независимо от shared token.
 
 Прокси перебирает **провайдер → ключ → модель**, пока кто-то не ответит. Без прокси приложение полностью работает — недоступны только ИИ-генерации.
 
@@ -116,7 +118,7 @@ capacitor.config.ts        appId com.scheduler.app, appName Scheduler, webDir di
 
 ## Состояние (`src/store.ts`)
 
-Один большой стор `S`. Persist в localStorage под ключом `ai-scheduler-store`, **version 3** с `migrate()` (чинит малформ/legacy-сессии: `tasks:[]`, `startHour:9` если не finite). `activeView` управляет текущим экраном.
+Один большой стор `S`. Persist в localStorage под ключом `ai-scheduler-store`, **version 9** с `migrate()` (чинит малформ/legacy-сессии: `tasks:[]`, `startHour:9` если не finite). `activeView` управляет текущим экраном.
 
 При проверках через Playwright: сеять состояние в localStorage `ai-scheduler-store`, после теста — чистить.
 
@@ -156,7 +158,7 @@ capacitor.config.ts        appId com.scheduler.app, appName Scheduler, webDir di
 4. `429` (квота) → мгновенный переход к следующей модели/ключу/провайдеру. `503/5xx` (перегрузка) → ретрай с паузой (0.6→1.2→2.4с). `400/403` (битый ключ) → ключ пропускается.
 5. Gemini: `maxOutputTokens 65536`; OpenRouter: `max_tokens 16000` — запас под большой мультиязычный roadmap.
 6. Ключи в логах **маскируются** (`AIzaSy…r4oc`); лог каждого запроса: `✓ <provider> <key> <model> <время>` или `✗ ...`.
-7. Авторизация: если задан `APP_SECRET`, прокси требует заголовок `x-app-secret` (иначе `401`). Клиент шлёт его из `VITE_AI_PROXY_SECRET`.
+7. Защита прокси: origin allowlist, ограничение размера запроса и per-IP rate limit применяются всегда. Если задан `APP_SECRET`, дополнительно проверяется `x-app-secret`, но этот token извлекаем из APK и не заменяет серверные лимиты.
 
 Env: `GEMINI_API_KEYS`/`GEMINI_API_KEY` и/или `OPENROUTER_API_KEYS`/`OPENROUTER_API_KEY` (нужен хотя бы один провайдер); `GEMINI_MODEL`, `OPENROUTER_MODELS` (переопределить списки), `PORT` (def 8787), `ALLOW_ORIGIN` (def *). Запуск: `node --env-file=.env.local server/ai-proxy.mjs`.
 
@@ -166,7 +168,7 @@ Env: `GEMINI_API_KEYS`/`GEMINI_API_KEY` и/или `OPENROUTER_API_KEYS`/`OPENROU
 
 **Важно для телефона:** `VITE_AI_PROXY_URL` зашивается в APK на build-time. `localhost` на телефоне = сам телефон, не Мак.
 
-**Прокси задеплоен на Vercel** (папка `proxy/`, проект `eightsimvols-9770s-projects/proxy`): публичный URL `https://proxy-nine-eta.vercel.app` → `POST /api/ai`. Ключи и `APP_SECRET` хранятся как Vercel env vars (production). Этот URL + `VITE_AI_PROXY_SECRET` зашиты в текущий APK, поэтому ИИ работает на телефоне по любой сети, без Мака.
+**Прокси задеплоен на Vercel** (папка `proxy/`, проект `eightsimvols-9770s-projects/proxy`): публичный URL `https://proxy-nine-eta.vercel.app` → `POST /api/ai`. Provider keys хранятся только как Vercel env vars. Перед новым деплоем также задайте `ALLOW_ORIGIN=https://localhost`, `RATE_LIMIT_PER_MINUTE` и `MAX_REQUEST_BYTES`.
 
 ```bash
 # Редеплой прокси после правок proxy/api/ai.mjs:

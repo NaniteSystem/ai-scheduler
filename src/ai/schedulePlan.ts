@@ -4,6 +4,7 @@ import type { PlanInput, GeneratedPlan, GeneratedDay, Goal, PlanIntensity } from
 import { llmJson, AiOfflineError } from './llm.ts';
 import { lt } from '../utils/localized.ts';
 import { makeDayCtx, fillLifeBlocks, habitFiresOn, recurringFiresOn, hm } from '../scheduler/engine.ts';
+import { createId } from '../domain/id.ts';
 
 // ─── AI plan: hybrid "LLM decides strategy, local assembler guarantees precision" ───
 // The model never emits 28 days of raw blocks (slow, drifts, hallucinates times).
@@ -241,7 +242,7 @@ export function assemble(input: PlanInput, strategy: AiStrategy): GeneratedPlan 
   }
 
   return {
-    id: `plan-${Date.now()}`,
+    id: createId('plan'),
     createdAt: new Date().toISOString(),
     providerId: 'ai',
     advice: typeof strategy.advice === 'string' ? strategy.advice.slice(0, 400) : undefined,

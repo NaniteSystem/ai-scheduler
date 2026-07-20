@@ -3,6 +3,7 @@ import { CATEGORY_META } from '../types';
 import { llmJson, AiUnavailableError, AiOfflineError } from './llm';
 import { normLT } from '../utils/localized';
 import { isObviouslyNonsenseIntent } from './intentFilter';
+import { createId } from '../domain/id';
 
 const LT_SCHEMA = { type: 'object', properties: { en: { type: 'string' }, ru: { type: 'string' }, ja: { type: 'string' } } } as const;
 
@@ -96,8 +97,7 @@ const RESULT_SCHEMA = {
   required: ['status'],
 } as const;
 
-let _seq = 0;
-const rid = (p: string) => `${p}${Date.now().toString(36)}${(_seq++).toString(36)}`;
+const rid = (prefix: string) => createId(prefix);
 
 const safeUrl = (u?: string): string | undefined =>
   u && /^https?:\/\//i.test(u) ? u : undefined;

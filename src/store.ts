@@ -1,9 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { addDays, addWeeks, addMonths, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
-import type { Goal, Session, Message, GTDTask, GTDStatus, Priority, TaskContext, RecurringPattern, SchedulePrefs, LifeBlock, GeneratedDay, GeneratedBlock, Habit, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment, Milestone } from './types';
+import { addDays, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
+import type { Goal, Session, GTDTask, GTDStatus, Priority, TaskContext, SchedulePrefs, LifeBlock, Habit, HabitGroup, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment, Milestone, AppView, Project } from './types';
 import { getProvider, horizonRange } from './scheduler';
 import { hapticSuccess, hapticTick } from './utils/haptics';
+import { createId } from './domain/id';
+import { removeSessions, transitionSession, transitionTaskStatus } from './domain/taskTransitions';
+import { extendRecurringSeries } from './domain/recurrence';
+import { todayFocusKey } from './domain/taskFocus';
+import { removeHabitGroup } from './domain/habitGroups';
+import { migrateLegacyProjects } from './domain/projects';
+import { CURRENT_STORE_VERSION, DEFAULT_LIFE_BLOCKS, migratePersistedState } from './services/persistence';
+import { restoreBackupState } from './services/backup';
+
+export { nextDueDate } from './domain/taskTransitions';
 
 /** Is a habit scheduled on the given date (by its recurrence rule)? */
 export function habitDueOn(h: Habit, date: Date): boolean {
@@ -219,67 +229,6 @@ export function goalInsight(goal: Goal, sessions: Session[], today: Date = new D
   return { key: 'gi.progress', vars: { pct, h: hoursLogged } };
 }
 
-/** Next due date (yyyy-MM-dd) for a recurring task, from its current due date (or today). */
-export function nextDueDate(base: string | undefined, pattern: RecurringPattern, today: Date = new Date()): string {
-  const step = (from: Date): Date => {
-    switch (pattern) {
-      case 'daily':    return addDays(from, 1);
-      case 'weekly':   return addWeeks(from, 1);
-      case 'monthly':  return addMonths(from, 1);
-      case 'weekdays': { let d = addDays(from, 1); while (isWeekend(d)) d = addDays(d, 1); return d; }
-      case 'weekends': { let d = addDays(from, 1); while (!isWeekend(d)) d = addDays(d, 1); return d; }
-      default:         return addWeeks(from, 1);
-    }
-  };
-  // The next occurrence is always in the future: completing an overdue "daily"
-  // lands on tomorrow, an overdue "weekly" on the next matching weekday, etc.
-  const todayKey = format(today, 'yyyy-MM-dd');
-  let d = step(base ? parseISO(base) : today);
-  while (format(d, 'yyyy-MM-dd') <= todayKey) d = step(d);
-  return format(d, 'yyyy-MM-dd');
-}
-
-function taskFromSession(session: Session, createdAt = new Date().toISOString()): GTDTask {
-  return {
-    id: `t-${session.id}`,
-    sessionId: session.id,
-    title: session.title,
-    description: session.description || undefined,
-    status: 'scheduled',
-    priority: 3,
-    createdAt,
-    processedAt: createdAt,
-    updatedAt: createdAt,
-    durationMinutes: session.durationMinutes || undefined,
-    scheduledDate: session.date || undefined,
-    context: '@anywhere',
-    tags: [],
-  };
-}
-
-function syncTaskWithSession(task: GTDTask, session: Session): GTDTask {
-  return {
-    ...task,
-    title: session.title || task.title,
-    description: session.description || task.description,
-    durationMinutes: session.durationMinutes || task.durationMinutes,
-    scheduledDate: session.date || task.scheduledDate,
-    status: task.status === 'trash' || task.status === 'done' ? task.status : 'scheduled',
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-const defaultLifeBlocks: LifeBlock[] = [
-  { id:'sleep', label:'Sleep', emoji:'😴', color:'#6366f1', category:'essential', hoursPerDay:8, minHours:4, maxHours:14, recommended:8, enabled:true, flexible:false, fixedTime:'23:00', description:'Quality rest is the foundation of productivity' },
-  { id:'breakfast', label:'Breakfast', emoji:'🍳', color:'#f59e0b', category:'essential', hoursPerDay:0.5, minHours:0, maxHours:1.5, recommended:0.5, enabled:true, flexible:true, fixedTime:'07:30', description:'Morning fuel' },
-  { id:'lunch', label:'Lunch', emoji:'🥗', color:'#84cc16', category:'essential', hoursPerDay:0.75, minHours:0, maxHours:1.5, recommended:0.75, enabled:true, flexible:true, fixedTime:'13:00', description:'Midday meal' },
-  { id:'dinner', label:'Dinner', emoji:'🍽️', color:'#ef4444', category:'essential', hoursPerDay:1, minHours:0, maxHours:2, recommended:1, enabled:true, flexible:true, fixedTime:'19:00', description:'Evening meal' },
-  { id:'exercise', label:'Exercise', emoji:'💪', color:'#10b981', category:'wellbeing', hoursPerDay:1, minHours:0, maxHours:3, recommended:1, enabled:true, flexible:true, description:'Physical health & energy' },
-  { id:'friends', label:'Friends & Social', emoji:'🤝', color:'#ec4899', category:'social', hoursPerDay:1, minHours:0, maxHours:5, recommended:1, enabled:true, flexible:true, description:'Time with people you love' },
-  { id:'relax', label:'Relax & Recharge', emoji:'☕', color:'#0ea5e9', category:'wellbeing', hoursPerDay:1.5, minHours:0.5, maxHours:5, recommended:1.5, enabled:true, flexible:true, description:'Downtime to avoid burnout' },
-  { id:'commute', label:'Commute / Transit', emoji:'🚗', color:'#737373', category:'buffer', hoursPerDay:0.5, minHours:0, maxHours:3, recommended:0.5, enabled:false, flexible:false, description:'Travel time between places' },
-];
-
 const defaultPrefs: SchedulePrefs = {
   wakeTime: '06:30',
   sleepTime: '23:00',
@@ -289,122 +238,33 @@ const defaultPrefs: SchedulePrefs = {
   hasWork: true,
   productivityPeak: 'morning',
   weekStartsOn: 1,
-  lifeBlocks: defaultLifeBlocks,
+  lifeBlocks: DEFAULT_LIFE_BLOCKS,
   commitments: [],
 };
 
-const hm = (t: string) => { const [h,m] = t.split(':').map(Number); return h*60+m; };
-
-export function generateSchedule(prefs: SchedulePrefs, goals: Goal[], tasks: GTDTask[], dateStr: string): GeneratedDay {
-  const blocks: GeneratedBlock[] = [];
-  let id = 0;
-  const nid = () => `gb${dateStr}-${id++}`;
-
-  const wake = hm(prefs.wakeTime);
-  let sleep = hm(prefs.sleepTime);
-  if (sleep <= wake) sleep += 24*60;
-
-  // 1. Sleep (essential, fixed)
-  const sleepBlock = prefs.lifeBlocks.find(b => b.id==='sleep');
-  if (sleepBlock?.enabled) {
-    blocks.push({ id:nid(), title:'Sleep', emoji:'😴', color:sleepBlock.color, startMinutes:sleep, durationMinutes:sleepBlock.hoursPerDay*60, type:'essential', status:'proposed', locked:true, reasoning:`${sleepBlock.hoursPerDay}h of rest as you set` });
-  }
-
-  // Build occupied set: list of {start,end}
-  const occupied: {start:number;end:number}[] = [];
-  const overlaps = (s:number,e:number) => occupied.some(o => s < o.end && e > o.start);
-  const place = (start:number, dur:number): number | null => {
-    // find nearest free slot at or after start within wake..sleep
-    for (let t = start; t + dur <= sleep; t += 15) {
-      if (!overlaps(t, t+dur)) return t;
-    }
-    return null;
-  };
-  const occupy = (s:number,e:number) => occupied.push({start:s,end:e});
-
-  // 2. Work + user commitments (fixed). An optional break window splits the
-  // block and stays free for meals/tasks.
-  const pushFixed = (title:string, emoji:string, color:string, startT:string, endT:string, breakS?:string, breakE?:string, reason='Your fixed work hours') => {
-    const s0 = hm(startT), e0 = hm(endT);
-    if (e0 <= s0) return;
-    const bs = breakS ? hm(breakS) : null, be = breakE ? hm(breakE) : null;
-    const segs: [number,number][] = bs!=null && be!=null && bs>s0 && be<e0 && be>bs ? [[s0,bs],[be,e0]] : [[s0,e0]];
-    for (const [s,e] of segs) {
-      blocks.push({ id:nid(), title, emoji, color, startMinutes:s, durationMinutes:e-s, type:'work', status:'proposed', locked:true, reasoning:reason });
-      occupy(s, e);
-    }
-  };
-  if (prefs.hasWork) pushFixed('Work', '💼', '#64748b', prefs.workStart, prefs.workEnd, prefs.workBreakStart, prefs.workBreakEnd);
-  const todayWd = parseISO(dateStr).getDay();
-  for (const c of prefs.commitments || []) {
-    if (!c.enabled || !c.days?.includes(todayWd)) continue;
-    pushFixed(c.title, c.emoji || '📌', '#8b5cf6', c.start, c.end, c.breakStart, c.breakEnd, 'Your fixed commitment');
-  }
-
-  // 3. Meals (essential, near fixed times) — skip if fasting
-  const mealIds = ['breakfast','lunch','dinner'];
-  for (const mid of mealIds) {
-    const mb = prefs.lifeBlocks.find(b => b.id===mid);
-    if (!mb?.enabled) continue;
-    if (prefs.fasting && (mid==='breakfast' || (prefs.fastingType==='full-day'))) continue;
-    if (prefs.fasting && prefs.fastingType==='16:8' && mid==='breakfast') continue;
-    const target = mb.fixedTime ? hm(mb.fixedTime) : wake+180;
-    const dur = mb.hoursPerDay*60;
-    const slot = place(Math.max(target, wake), dur) ?? target;
-    blocks.push({ id:nid(), title:mb.label, emoji:mb.emoji, color:mb.color, startMinutes:slot, durationMinutes:dur, type:'essential', status:'proposed', reasoning:prefs.fasting?'Adjusted for fasting':'Regular meal time' });
-    occupy(slot, slot+dur);
-  }
-
-  // 4. Goal sessions (deep work in productivity peak)
-  const peakStart = prefs.productivityPeak==='morning' ? wake+30 : prefs.productivityPeak==='afternoon' ? hm('13:00') : hm('18:00');
-  const activeGoals = [...goals].sort((a,b)=>a.priority-b.priority).slice(0,3);
-  let cursor = peakStart;
-  for (const g of activeGoals) {
-    const dur = 60;
-    const slot = place(Math.max(cursor, wake), dur);
-    if (slot===null) continue;
-    blocks.push({ id:nid(), title:`${g.title.split(' ').slice(0,3).join(' ')}`, emoji:g.emoji, color:g.color, startMinutes:slot, durationMinutes:dur, type:'goal', sourceId:g.id, status:'proposed', reasoning:`Priority ${g.priority} goal, scheduled in your ${prefs.productivityPeak} peak` });
-    occupy(slot, slot+dur);
-    cursor = slot+dur+15;
-  }
-
-  // 5. Exercise (wellbeing)
-  const ex = prefs.lifeBlocks.find(b=>b.id==='exercise');
-  if (ex?.enabled && ex.hoursPerDay>0) {
-    const dur = ex.hoursPerDay*60;
-    const slot = place(wake, dur);
-    if (slot!==null) { blocks.push({ id:nid(), title:'Exercise', emoji:'💪', color:ex.color, startMinutes:slot, durationMinutes:dur, type:'wellbeing', status:'proposed', reasoning:'Boosts energy and focus' }); occupy(slot,slot+dur); }
-  }
-
-  // 6. Top GTD next-actions
-  const nextActions = tasks.filter(t=>t.status==='next-action').sort((a,b)=>a.priority-b.priority).slice(0,3);
-  for (const t of nextActions) {
-    const dur = t.durationMinutes||30;
-    const slot = place(wake, dur);
-    if (slot===null) continue;
-    blocks.push({ id:nid(), title:t.title, emoji:'✓', color:'#eab308', startMinutes:slot, durationMinutes:dur, type:'task', sourceId:t.id, status:'proposed', reasoning:`P${t.priority} next action` });
-    occupy(slot, slot+dur);
-  }
-
-  // 7. Social
-  const soc = prefs.lifeBlocks.find(b=>b.id==='friends');
-  if (soc?.enabled && soc.hoursPerDay>0) {
-    const dur = soc.hoursPerDay*60;
-    const slot = place(hm('18:00'), dur) ?? place(wake, dur);
-    if (slot!==null) { blocks.push({ id:nid(), title:'Friends & Social', emoji:'🤝', color:soc.color, startMinutes:slot, durationMinutes:dur, type:'social', status:'proposed', reasoning:'Social connection prevents burnout' }); occupy(slot,slot+dur); }
-  }
-
-  // 8. Relax
-  const rx = prefs.lifeBlocks.find(b=>b.id==='relax');
-  if (rx?.enabled && rx.hoursPerDay>0) {
-    const dur = rx.hoursPerDay*60;
-    const slot = place(hm('20:00'), dur) ?? place(wake, dur);
-    if (slot!==null) { blocks.push({ id:nid(), title:'Relax & Recharge', emoji:'☕', color:rx.color, startMinutes:slot, durationMinutes:dur, type:'wellbeing', status:'proposed', reasoning:'Wind-down time' }); occupy(slot,slot+dur); }
-  }
-
-  blocks.sort((a,b)=>a.startMinutes-b.startMinutes);
-  return { date: dateStr, blocks };
+/** Add calendar allocations and connect only sessions that explicitly came from a task. */
+function appendSessions(tasks: GTDTask[], current: Session[], incoming: Session[]) {
+  const timestamp = new Date().toISOString();
+  const taskBySession = new Map(tasks.filter(task => task.sessionId).map(task => [task.sessionId!, task.id]));
+  const normalized = incoming.map(session => session.taskId || !taskBySession.has(session.id)
+    ? session
+    : { ...session, taskId: taskBySession.get(session.id) });
+  const sessionByTask = new Map(normalized.filter(session => session.taskId).map(session => [session.taskId!, session]));
+  const gtdTasks = tasks.map(task => {
+    const session = sessionByTask.get(task.id);
+    if (!session) return task;
+    return {
+      ...task,
+      sessionId: session.id,
+      scheduledDate: session.date || task.scheduledDate,
+      durationMinutes: session.durationMinutes || task.durationMinutes,
+      status: task.status === 'done' || task.status === 'trash' ? task.status : 'scheduled' as const,
+      updatedAt: timestamp,
+    };
+  });
+  return { sessions: [...current, ...normalized], gtdTasks };
 }
+
 
 export interface NotifPrefs {
   sessions: boolean;
@@ -427,10 +287,15 @@ interface S {
   goals: Goal[];
   sessions: Session[];
   gtdTasks: GTDTask[];
+  projects: Project[];
   habits: Habit[];
+  habitGroups: HabitGroup[];
   addHabit: (h: Habit) => void;
   updateHabit: (id: string, patch: Partial<Habit>) => void;
   deleteHabit: (id: string) => void;
+  addHabitGroup: (group: HabitGroup) => void;
+  updateHabitGroup: (id: string, patch: Pick<Partial<HabitGroup>, 'name' | 'color'>) => void;
+  deleteHabitGroup: (id: string) => void;
   setHabitStatus: (id: string, dateStr: string, status: HabitStatus) => void;
   incHabit: (id: string, dateStr: string) => void;
   clearHabitDay: (id: string, dateStr: string) => void;
@@ -443,8 +308,6 @@ interface S {
   setNotifPref: (patch: { habitRemindersEnabled?: boolean }) => void;
   notifPrefs: NotifPrefs;
   setNotifPrefs: (patch: Partial<NotifPrefs>) => void;
-  density: 'comfortable' | 'compact';
-  setDensity: (d: 'comfortable' | 'compact') => void;
   theme: 'light' | 'dark' | 'system';
   setTheme: (t: 'light' | 'dark' | 'system') => void;
   userName: string;
@@ -460,16 +323,16 @@ interface S {
   setPendingGoalId: (id: string | null) => void;
   lang: 'en' | 'ru' | 'ja';
   setLang: (l: 'en' | 'ru' | 'ja') => void;
-  activeView: 'dashboard' | 'goals' | 'week' | 'inbox' | 'habits' | 'progress' | 'ai' | 'architect' | 'planner' | 'archive' | 'settings';
+  activeView: AppView;
   gtdFilter: string;
   activeContext: string;
   activePriority: string;
   searchQuery: string;
   focusTimer: FocusTimer | null;
-  timerLauncher: { linkType: 'task' | 'session' | null; linkId: string | null; label: string } | null;
+  timerLauncher: { linkType: 'task' | 'session' | 'habit' | null; linkId: string | null; label: string } | null;
+  timerAssignmentOpen: boolean;
   weeklyReviewOpen: boolean;
   wizardOpen: boolean;
-  wizardMessages: Message[];
   logOpen: boolean;
   loggingSessionId: string | null;
   sessionModalId: string | null;
@@ -477,8 +340,6 @@ interface S {
   weekOffset: number;
   // AI Scheduler
   schedulePrefs: SchedulePrefs;
-  generatedDay: GeneratedDay | null;
-  isGenerating: boolean;
   doingTaskId: string | null;
 
   confirmDialog: ConfirmOpts | null;
@@ -495,7 +356,9 @@ interface S {
   resetAll: () => void;
   restoreBackup: (data: any) => void;
   importTasks: (tasks: GTDTask[]) => void;
-  setActiveView: (v: S['activeView']) => void;
+  addProject: (title: string, options?: { outcome?: string; targetDate?: string; deadline?: string }) => string;
+  updateProject: (id: string, patch: Partial<Pick<Project, 'title' | 'outcome' | 'definitionOfDone' | 'color' | 'status' | 'health' | 'targetDate' | 'deadline' | 'notes'>>) => void;
+  setActiveView: (v: AppView) => void;
   setGTDFilter: (f: string) => void;
   setActiveContext: (c: string) => void;
   setActivePriority: (p: string) => void;
@@ -503,7 +366,6 @@ interface S {
   setWeekOffset: (n: number) => void;
   openWizard: () => void;
   closeWizard: () => void;
-  addWizardMessage: (m: Message) => void;
   addGoal: (g: Goal) => void;
   updateGoal: (id: string, patch: Partial<Goal>) => void;
   toggleRoadmapNode: (goalId: string, nodeId: string) => void;
@@ -518,23 +380,32 @@ interface S {
   moveSession: (id: string, newDate: string, newHour?: number, newMinute?: number) => void;
   resizeSession: (id: string, newDuration: number) => void;
   syncScheduledSessions: () => void;
+  extendRecurringSeries: () => void;
   openSessionModal: (id: string) => void;
   closeSessionModal: () => void;
-  captureTask: (title: string, dur?: number) => void;
+  captureTask: (title: string, dur?: number) => string;
   processTask: (id: string, status: GTDStatus, ctx?: Partial<GTDTask>) => void;
   updateTask: (id: string, patch: Partial<GTDTask>) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   deleteTask: (id: string) => void;
-  pendingUndo: { items: { id: string; status: GTDStatus; isArchived?: boolean }[]; ts: number } | null;
+  pendingUndo: {
+    kind?: 'delete' | 'complete';
+    items: { id: string; status: GTDStatus; isArchived?: boolean; sessionId?: string; scheduledDate?: string }[];
+    taskSnapshot?: GTDTask;
+    sessionSnapshots?: { id: string; status: Session['status'] }[];
+    ts: number;
+  } | null;
   undoDelete: () => void;
   clearUndo: () => void;
-  reorderTasks: (fromId: string, toId: string) => void;
   toggleTodayFocus: (id: string) => void;
   openEditTask: (id: string) => void;
   closeEditTask: () => void;
-  openTimerLauncher: (o: { linkType: 'task' | 'session' | null; linkId: string | null; label: string }) => void;
+  openTimerLauncher: (o: { linkType: 'task' | 'session' | 'habit' | null; linkId: string | null; label: string }) => void;
   closeTimerLauncher: () => void;
-  startTimer: (o: { mode: import('./types').TimerMode; targetMinutes: number; linkType: 'task' | 'session' | null; linkId: string | null; label: string }) => void;
+  openTimerAssignment: () => void;
+  closeTimerAssignment: () => void;
+  assignTimerLink: (o: { linkType: 'task' | 'session' | 'habit'; linkId: string; label: string }) => void;
+  startTimer: (o: { mode: import('./types').TimerMode; targetMinutes: number; linkType: 'task' | 'session' | 'habit' | null; linkId: string | null; label: string }) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   adjustTimer: (deltaMinutes: number) => void;
@@ -548,15 +419,11 @@ interface S {
   addCommitment: (c: Omit<FixedCommitment, 'id'>) => void;
   updateCommitment: (id: string, patch: Partial<FixedCommitment>) => void;
   removeCommitment: (id: string) => void;
-  generateAISchedule: () => void;
-  setBlockStatus: (blockId: string, status: 'accepted' | 'rejected' | 'proposed') => void;
-  acceptAllBlocks: () => void;
-  commitGeneratedDay: () => void;
-  clearGenerated: () => void;
   setDoingTask: (id: string | null) => void;
   // ── Multi-week AI Scheduler ──
   generatedPlan: GeneratedPlan | null;
   isPlanning: boolean;
+  planningError: string | null;
   generatePlan: (horizon: PlanHorizon, options: PlanOptions) => void;
   regeneratePlan: () => void;
   setPlanBlockStatus: (date: string, blockId: string, status: 'accepted' | 'rejected' | 'proposed') => void;
@@ -566,14 +433,25 @@ interface S {
   clearPlan: () => void;
 }
 
+// Guards async planning from committing an obsolete result after a newer run
+// (or after the user discards the draft) has already started.
+let latestPlanRequest = 0;
+
 export const useStore = create<S>()(persist((set) => ({
   goals: [],
   sessions: [],
   gtdTasks: [],
+  projects: [],
   habits: [],
+  habitGroups: [],
   addHabit: (h) => set((s) => ({ habits: [...s.habits, h] })),
   updateHabit: (id, patch) => set((s) => ({ habits: s.habits.map((h) => h.id === id ? { ...h, ...patch } : h) })),
   deleteHabit: (id) => set((s) => ({ habits: s.habits.filter((h) => h.id !== id) })),
+  addHabitGroup: (group) => set((s) => ({ habitGroups: [...s.habitGroups, group] })),
+  updateHabitGroup: (id, patch) => set((s) => ({
+    habitGroups: s.habitGroups.map(group => group.id === id ? { ...group, ...patch } : group),
+  })),
+  deleteHabitGroup: (id) => set((s) => removeHabitGroup(s.habitGroups, s.habits, id)),
   setHabitStatus: (id, dateStr, status) => set((s) => {
     if (status === 'done') hapticSuccess(); else hapticTick();
     return {
@@ -588,7 +466,8 @@ export const useStore = create<S>()(persist((set) => ({
       const cur = h.log[dateStr]?.count || 0;
       const count = Math.min(h.targetCount, cur + 1);
       if (count >= h.targetCount) hapticSuccess(); else hapticTick();
-      return { ...h, log: { ...h.log, [dateStr]: { status: count >= h.targetCount ? 'done' : 'failed', count } } };
+      // Under-target progress is 'partial', not 'failed' — 3/8 glasses is not a failure.
+      return { ...h, log: { ...h.log, [dateStr]: { status: count >= h.targetCount ? 'done' : 'partial', count } } };
     })
   })),
   clearHabitDay: (id, dateStr) => set((s) => ({
@@ -610,8 +489,6 @@ export const useStore = create<S>()(persist((set) => ({
   setNotifPref: (patch) => set(() => patch),
   notifPrefs: { sessions: true, tasks: true, quietEnabled: false, quietStart: '22:00', quietEnd: '08:00' },
   setNotifPrefs: (patch) => set((s) => ({ notifPrefs: { ...s.notifPrefs, ...patch } })),
-  density: 'comfortable',
-  setDensity: (d) => set({ density: d }),
   theme: 'light',
   setTheme: (t) => set({ theme: t }),
   userName: '',
@@ -634,9 +511,9 @@ export const useStore = create<S>()(persist((set) => ({
   searchQuery: '',
   focusTimer: null,
   timerLauncher: null,
+  timerAssignmentOpen: false,
   weeklyReviewOpen: false,
   wizardOpen: false,
-  wizardMessages: [],
   logOpen: false,
   loggingSessionId: null,
   sessionModalId: null,
@@ -653,40 +530,63 @@ export const useStore = create<S>()(persist((set) => ({
   requestEditSession: (id) => set({ editSessionId: id, sessionModalId: null, activeView: 'week' }),
   consumeEditSession: () => set({ editSessionId: null }),
   setUserName: (name) => set({ userName: name.trim() }),
-  completeOnboarding: (name) => set({ userName: name.trim(), onboarded: true }),
-  resetAll: () => set({ goals: [], sessions: [], gtdTasks: [], habits: [], reflections: {}, metricDefs: [], generatedDay: null, weekOffset: 0 }),
-  importTasks: (tasks) => set((s) => ({ gtdTasks: [...tasks, ...s.gtdTasks] })),
-  restoreBackup: (data) => set((s) => ({
-    goals: Array.isArray(data?.goals) ? data.goals : s.goals,
-    sessions: Array.isArray(data?.sessions) ? data.sessions : s.sessions,
-    gtdTasks: Array.isArray(data?.gtdTasks) ? data.gtdTasks : s.gtdTasks,
-    habits: Array.isArray(data?.habits) ? data.habits : s.habits,
-    reflections: data?.reflections && typeof data.reflections === 'object' ? data.reflections : s.reflections,
-    metricDefs: Array.isArray(data?.metricDefs) ? data.metricDefs : s.metricDefs,
-    schedulePrefs: data?.schedulePrefs && typeof data.schedulePrefs === 'object' ? { ...s.schedulePrefs, ...data.schedulePrefs } : s.schedulePrefs,
-    userName: typeof data?.userName === 'string' ? data.userName : s.userName,
-    userProfile: data?.userProfile && typeof data.userProfile === 'object' ? data.userProfile : s.userProfile,
-    onboarded: typeof data?.onboarded === 'boolean' ? data.onboarded : s.onboarded,
-    introCourseCompleted: typeof data?.introCourseCompleted === 'boolean' ? data.introCourseCompleted : s.introCourseCompleted,
-    lang: data?.lang === 'en' || data?.lang === 'ru' || data?.lang === 'ja' ? data.lang : s.lang,
-    theme: data?.theme === 'light' || data?.theme === 'dark' ? data.theme : s.theme,
-    density: data?.density === 'comfortable' || data?.density === 'compact' ? data.density : s.density,
-    habitRemindersEnabled: typeof data?.habitRemindersEnabled === 'boolean' ? data.habitRemindersEnabled : s.habitRemindersEnabled,
-    notifPrefs: data?.notifPrefs && typeof data.notifPrefs === 'object' ? { ...s.notifPrefs, ...data.notifPrefs } : s.notifPrefs,
-    generatedDay: data?.generatedDay ?? s.generatedDay,
-    generatedPlan: data?.generatedPlan ?? s.generatedPlan,
-    weekOffset: Number.isFinite(data?.weekOffset) ? data.weekOffset : s.weekOffset,
+  completeOnboarding: (name) => set({ userName: name.trim(), onboarded: true, introCourseCompleted: true }),
+  resetAll: () => {
+    latestPlanRequest++;
+    set({
+      goals: [], sessions: [], gtdTasks: [], projects: [], habits: [], habitGroups: [], reflections: {}, metricDefs: [],
+      generatedPlan: null, isPlanning: false,
+      planningError: null, focusTimer: null, pendingUndo: null, weekOffset: 0,
+    });
+  },
+  importTasks: (tasks) => set((s) => {
+    const migrated = migrateLegacyProjects(s.projects, tasks);
+    return { projects: migrated.projects, gtdTasks: [...migrated.gtdTasks, ...s.gtdTasks] };
+  }),
+  addProject: (title, options) => {
+    const trimmed = title.trim();
+    if (!trimmed) return '';
+    const id = createId('project');
+    const now = new Date().toISOString();
+    set((s) => ({
+      projects: [...s.projects, {
+        id,
+        title: trimmed,
+        outcome: options?.outcome?.trim() || '',
+        color: '#8b5cf6',
+        status: 'active',
+        health: 'unknown',
+        ...(options?.targetDate ? { targetDate: options.targetDate } : {}),
+        ...(options?.deadline ? { deadline: options.deadline } : {}),
+        createdAt: now,
+      }],
+    }));
+    return id;
+  },
+  updateProject: (id, patch) => set((s) => ({
+    projects: s.projects.map(project => project.id === id
+      ? {
+        ...project,
+        ...patch,
+        ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+        ...(patch.outcome !== undefined ? { outcome: patch.outcome.trim() } : {}),
+        ...(patch.definitionOfDone !== undefined ? { definitionOfDone: patch.definitionOfDone.trim() || undefined } : {}),
+        ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
+        ...(patch.status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
+        ...(patch.status === 'archived' ? { archivedAt: new Date().toISOString() } : {}),
+        updatedAt: new Date().toISOString(),
+      }
+      : project),
   })),
+  restoreBackup: (data) => set((s) => restoreBackupState(s as unknown as Record<string, unknown>, data) as Partial<S>),
   setActiveView: (v) => set({ activeView: v }),
   setGTDFilter: (f) => set({ gtdFilter: f, activeContext: 'all', activePriority: 'all' }),
   setActiveContext: (c) => set({ activeContext: c }),
   setActivePriority: (p) => set({ activePriority: p }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setWeekOffset: (n) => set({ weekOffset: n }),
-  // content uses an i18n key marker; GoalWizardModal renders the localized greeting.
-  openWizard: () => set({ wizardOpen: true, wizardMessages: [{ id:'m0', role:'ai', content:'wizard.pickCategory' }] }),
+  openWizard: () => set({ wizardOpen: true }),
   closeWizard: () => set({ wizardOpen: false }),
-  addWizardMessage: (m) => set((s) => ({ wizardMessages: [...s.wizardMessages, m] })),
   addGoal: (g) => set((s) => ({ goals: [...s.goals, g] })),
   updateGoal: (id, patch) => set((s) => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...patch } : g) })),
   toggleRoadmapNode: (goalId, nodeId) => set((s) => ({
@@ -695,103 +595,83 @@ export const useStore = create<S>()(persist((set) => ({
       return { ...g, roadmap: { ...g.roadmap, phases: g.roadmap.phases.map((p) => ({ ...p, nodes: p.nodes.map((n) => n.id === nodeId ? { ...n, done: !n.done } : n) })) } };
     }),
   })),
-  deleteGoal: (id) => set((s) => ({ goals: s.goals.filter(g => g.id !== id), sessions: s.sessions.map(x => x.goalId === id ? { ...x, goalId: '' } : x) })),
+  deleteGoal: (id) => set((s) => ({
+    goals: s.goals.filter(g => g.id !== id),
+    sessions: s.sessions.map(session => session.goalId === id ? { ...session, goalId: '' } : session),
+    habits: s.habits.map(habit => habit.goalId === id ? { ...habit, goalId: undefined } : habit),
+  })),
   openLog: (id) => set({ logOpen: true, loggingSessionId: id }),
   closeLog: () => set({ logOpen: false, loggingSessionId: null }),
-  addSession: (sess) => set((s) => ({
-    sessions: [...s.sessions, sess],
-    gtdTasks: s.gtdTasks.some((t) => t.sessionId === sess.id) ? s.gtdTasks : [taskFromSession(sess), ...s.gtdTasks],
-  })),
-  addSessions: (arr) => set((s) => {
-    const now = new Date().toISOString();
-    const existing = new Set(s.gtdTasks.map((t) => t.sessionId).filter(Boolean));
-    const linkedTasks = arr.filter((sess) => !existing.has(sess.id)).map((sess) => taskFromSession(sess, now));
-    return { sessions: [...s.sessions, ...arr], gtdTasks: [...linkedTasks, ...s.gtdTasks] };
+  addSession: (sess) => set((s) => appendSessions(s.gtdTasks, s.sessions, [sess])),
+  addSessions: (arr) => set((s) => appendSessions(s.gtdTasks, s.sessions, arr)),
+  deleteSession: (id) => set((s) => removeSessions(s, new Set([id]))),
+  deleteSeries: (seriesId) => set((s) => {
+    const ids = new Set(s.sessions.filter((x) => x.seriesId === seriesId).map((x) => x.id));
+    return removeSessions(s, ids);
   }),
-  deleteSession: (id) => set((s) => ({
-    sessions: s.sessions.filter((x) => x.id !== id),
-    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : t),
+  updateSession: (id, p) => set((s) => transitionSession(s, id, p)),
+  moveSession: (id, newDate, newHour, newMinute) => set((s) => transitionSession(s, id, {
+    date: newDate,
+    ...(newHour !== undefined ? { startHour: newHour } : {}),
+    ...(newMinute !== undefined ? { startMinute: newMinute } : {}),
   })),
-  deleteSeries: (seriesId) => set((s) => ({ sessions: s.sessions.filter((x) => x.seriesId !== seriesId) })),
-  updateSession: (id, p) => set((s) => {
-    const updated = s.sessions.map((x) => x.id === id ? { ...x, ...p } : x);
-    const session = updated.find((x) => x.id === id);
-    return {
-      sessions: updated,
-      gtdTasks: session ? s.gtdTasks.map((t) => t.sessionId === id ? syncTaskWithSession(t, session) : t) : s.gtdTasks,
-    };
-  }),
-  moveSession: (id, newDate, newHour, newMinute) => set((s) => ({ 
-    sessions: s.sessions.map((x) => x.id === id ? { 
-      ...x, 
-      date: newDate, 
-      ...(newHour !== undefined ? { startHour: newHour } : {}),
-      ...(newMinute !== undefined ? { startMinute: newMinute } : {}),
-    } : x),
-    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, scheduledDate: newDate, updatedAt: new Date().toISOString() } : t),
-  })),
-  resizeSession: (id, newDuration) => set((s) => ({ 
-    sessions: s.sessions.map((x) => x.id === id ? { ...x, durationMinutes: Math.max(15, newDuration) } : x),
-    gtdTasks: s.gtdTasks.map((t) => t.sessionId === id ? { ...t, durationMinutes: Math.max(15, newDuration), updatedAt: new Date().toISOString() } : t),
-  })),
+  resizeSession: (id, newDuration) => set((s) => transitionSession(s, id, { durationMinutes: Math.max(15, newDuration) })),
   syncScheduledSessions: () => set((s) => {
-    const linked = new Set(s.gtdTasks.map((t) => t.sessionId).filter(Boolean));
-    const missing = s.sessions.filter((session) => session.date && !linked.has(session.id));
-    if (!missing.length) return {};
-    const now = new Date().toISOString();
-    return { gtdTasks: [...missing.map((session) => taskFromSession(session, now)), ...s.gtdTasks] };
+    const taskBySession = new Map(s.gtdTasks.filter(task => task.sessionId).map(task => [task.sessionId!, task.id]));
+    let changed = false;
+    const sessions = s.sessions.map(session => {
+      const taskId = taskBySession.get(session.id);
+      if (session.taskId || !taskId) return session;
+      changed = true;
+      return { ...session, taskId };
+    });
+    return changed ? { sessions } : {};
+  }),
+  extendRecurringSeries: () => set((s) => {
+    const added = extendRecurringSeries(s.sessions);
+    return added.length ? { sessions: [...s.sessions, ...added] } : {};
   }),
   openSessionModal: (id) => set({ sessionModalId: id }),
   closeSessionModal: () => set({ sessionModalId: null }),
-  captureTask: (title, dur = 5) => set((s) => ({
-    gtdTasks: [{
-      id: `t${Date.now()}`,
-      title,
-      status: 'inbox' as GTDStatus,
-      priority: 3 as Priority,
-      createdAt: new Date().toISOString(),
-      durationMinutes: dur,
-      context: '@anywhere' as TaskContext,
-      tags: [],
-    }, ...s.gtdTasks]
-  })),
+  captureTask: (title, dur) => {
+    const id = createId('task');
+    set((s) => ({
+      gtdTasks: [{
+        id,
+        title,
+        status: 'inbox' as GTDStatus,
+        priority: 3 as Priority,
+        createdAt: new Date().toISOString(),
+        durationMinutes: dur && dur > 0 ? dur : undefined,
+        context: '@anywhere' as TaskContext,
+        tags: [],
+      }, ...s.gtdTasks]
+    }));
+    return id;
+  },
   processTask: (id, status, ctx) => set((s) => {
-    const now = new Date().toISOString();
-    const orig = s.gtdTasks.find((x) => x.id === id);
-    const mapped = s.gtdTasks.map((x) => x.id === id ? { ...x, status, processedAt: now, updatedAt: now, completedAt: status === 'done' ? now : x.completedAt, ...ctx } : x);
-    const linkedSessionId = orig?.sessionId;
-    // Completing a recurring task spawns the next occurrence (Microsoft To Do behaviour).
-    if (status === 'done' && orig && orig.recurring && orig.status !== 'done') {
-      const due = nextDueDate(orig.recurFromCompletion ? undefined : orig.dueDate, orig.recurring);
-      const next: GTDTask = {
-        ...orig,
-        id: `t${Date.now()}`,
-        status: 'next-action',
-        createdAt: now,
-        updatedAt: now,
-        processedAt: undefined,
-        completedAt: undefined,
-        dueDate: due,
-        remindAt: orig.remindAt && orig.dueDate
-          ? `${due}T${orig.remindAt.slice(11, 16) || '09:00'}` : undefined,
-        isTodayFocus: false,
-        completedPomodoros: 0,
-        subtasks: (orig.subtasks || []).map((st) => ({ ...st, done: false })),
-      };
+    const before = s.gtdTasks.find(task => task.id === id);
+    const next = transitionTaskStatus(s, id, status, ctx);
+    // Completion is one tap in every task list. For non-recurring tasks keep a
+    // short rollback window, including a linked calendar session, so a stray
+    // tap never turns into silent data loss. Recurring completion deliberately
+    // skips this because it creates the next occurrence.
+    if (status === 'done' && before && before.status !== 'done' && !before.recurring) {
+      const sessionSnapshots = s.sessions
+        .filter(session => session.taskId === id || session.id === before.sessionId)
+        .map(session => ({ id: session.id, status: session.status }));
       return {
-        gtdTasks: [next, ...mapped],
-        sessions: linkedSessionId ? s.sessions.map((x) => x.id === linkedSessionId ? { ...x, status: 'done' } : x) : s.sessions,
+        ...next,
+        pendingUndo: { kind: 'complete', items: [{ id, status: before.status }], taskSnapshot: before, sessionSnapshots, ts: Date.now() },
       };
     }
-    return {
-      gtdTasks: mapped,
-      sessions: linkedSessionId && status === 'done'
-        ? s.sessions.map((x) => x.id === linkedSessionId ? { ...x, status: 'done' } : x)
-        : s.sessions,
-    };
+    return next;
   }),
   updateTask: (id, patch) => set((s) => ({
-    gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, ...patch, updatedAt: new Date().toISOString() } : x)
+    gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, ...patch, updatedAt: new Date().toISOString() } : x),
+    sessions: patch.sessionId
+      ? s.sessions.map(session => session.id === patch.sessionId ? { ...session, taskId: id } : session)
+      : s.sessions,
   })),
   toggleSubtask: (taskId, subtaskId) => set((s) => ({
     gtdTasks: s.gtdTasks.map((t) => t.id === taskId
@@ -802,39 +682,52 @@ export const useStore = create<S>()(persist((set) => ({
     const t = s.gtdTasks.find((x) => x.id === id);
     if (!t || t.status === 'trash') return {};
     return {
-      gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : x),
-      pendingUndo: { items: [...(s.pendingUndo?.items ?? []), { id, status: t.status, isArchived: t.isArchived }], ts: Date.now() },
+      gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, sessionId: undefined, status: 'trash' as GTDStatus, isArchived: true, updatedAt: new Date().toISOString() } : x),
+      sessions: s.sessions.map(session => session.taskId === id ? { ...session, taskId: undefined } : session),
+      pendingUndo: { kind: 'delete', items: [...(s.pendingUndo?.items ?? []), { id, status: t.status, isArchived: t.isArchived, sessionId: t.sessionId, scheduledDate: t.scheduledDate }], ts: Date.now() },
     };
   }),
   pendingUndo: null,
   undoDelete: () => set((s) => {
     if (!s.pendingUndo) return {};
+    if (s.pendingUndo.kind === 'complete' && s.pendingUndo.taskSnapshot) {
+      const task = s.pendingUndo.taskSnapshot;
+      const statuses = new Map((s.pendingUndo.sessionSnapshots || []).map(session => [session.id, session.status]));
+      return {
+        gtdTasks: s.gtdTasks.map(item => item.id === task.id ? task : item),
+        sessions: s.sessions.map(session => statuses.has(session.id) ? { ...session, status: statuses.get(session.id)! } : session),
+        pendingUndo: null,
+      };
+    }
     const prev = new Map(s.pendingUndo.items.map((i) => [i.id, i]));
     return {
       gtdTasks: s.gtdTasks.map((x) => {
         const p = prev.get(x.id);
-        return p ? { ...x, status: p.status, isArchived: p.isArchived, updatedAt: new Date().toISOString() } : x;
+        return p ? { ...x, status: p.status, isArchived: p.isArchived, sessionId: p.sessionId, scheduledDate: p.scheduledDate, updatedAt: new Date().toISOString() } : x;
+      }),
+      sessions: s.sessions.map(session => {
+        const task = s.pendingUndo?.items.find(item => item.sessionId === session.id);
+        return task ? { ...session, taskId: task.id } : session;
       }),
       pendingUndo: null,
     };
   }),
   clearUndo: () => set({ pendingUndo: null }),
-  reorderTasks: (fromId, toId) => set((s) => {
-    const fromIdx = s.gtdTasks.findIndex(x => x.id === fromId);
-    const toIdx = s.gtdTasks.findIndex(x => x.id === toId);
-    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return {};
-    const items = [...s.gtdTasks];
-    const [moved] = items.splice(fromIdx, 1);
-    items.splice(toIdx, 0, moved);
-    return { gtdTasks: items.map((t, i) => ({ ...t, updatedAt: new Date().toISOString(), _order: i })) };
+  toggleTodayFocus: (id) => set((s) => {
+    const today = todayFocusKey();
+    return {
+      gtdTasks: s.gtdTasks.map((x) => x.id === id
+        ? { ...x, todayFocusDate: x.todayFocusDate === today ? undefined : today, isTodayFocus: undefined }
+        : x),
+    };
   }),
-  toggleTodayFocus: (id) => set((s) => ({
-    gtdTasks: s.gtdTasks.map((x) => x.id === id ? { ...x, isTodayFocus: !x.isTodayFocus } : x)
-  })),
   openEditTask: (id) => set({ gtdEditTaskId: id }),
   closeEditTask: () => set({ gtdEditTaskId: null }),
   openTimerLauncher: (o) => set({ timerLauncher: o }),
   closeTimerLauncher: () => set({ timerLauncher: null }),
+  openTimerAssignment: () => set({ timerAssignmentOpen: true }),
+  closeTimerAssignment: () => set({ timerAssignmentOpen: false }),
+  assignTimerLink: (o) => set((s) => s.focusTimer ? { focusTimer: { ...s.focusTimer, ...o }, timerAssignmentOpen: false } : { timerAssignmentOpen: false }),
   startTimer: (o) => set({
     focusTimer: {
       mode: o.mode,
@@ -878,21 +771,16 @@ export const useStore = create<S>()(persist((set) => ({
     if (ft.linkType === 'task' && ft.linkId) {
       const task = s.gtdTasks.find((x) => x.id === ft.linkId);
       if (task) {
-        return {
-          focusTimer: null,
-          gtdTasks: s.gtdTasks.map((x) => x.id === ft.linkId
-            ? { ...x, status: 'done' as GTDStatus, completedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), completedPomodoros: (x.completedPomodoros || 0) + 1 }
-            : x),
-        };
+        return { gtdTasks: s.gtdTasks.map((x) => x.id === ft.linkId ? { ...x, completedPomodoros: (task.completedPomodoros || 0) + 1, updatedAt: new Date().toISOString() } : x), focusTimer: null };
       }
     }
     if (ft.linkType === 'session' && ft.linkId) {
-      return {
-        focusTimer: null,
-        sessions: s.sessions.map((x) => x.id === ft.linkId
-          ? { ...x, status: 'done', durationMinutes: elapsedMin }
-          : x),
-      };
+      const next = transitionSession(s, ft.linkId, { status: 'done', durationMinutes: elapsedMin });
+      return { ...next, focusTimer: null };
+    }
+    if (ft.linkType === 'habit' && ft.linkId) {
+      const date = format(new Date(), 'yyyy-MM-dd');
+      return { habits: s.habits.map((h) => h.id === ft.linkId ? { ...h, log: { ...h.log, [date]: { status: 'done', count: h.targetCount } } } : h), focusTimer: null };
     }
     return { focusTimer: null };
   }),
@@ -901,10 +789,9 @@ export const useStore = create<S>()(persist((set) => ({
 
   // ─── AI Scheduler ───
   schedulePrefs: defaultPrefs,
-  generatedDay: null,
-  isGenerating: false,
   generatedPlan: null,
   isPlanning: false,
+  planningError: null,
   doingTaskId: null,
 
   updateLifeBlock: (id, patch) => set((s) => {
@@ -926,7 +813,7 @@ export const useStore = create<S>()(persist((set) => ({
   }),
   updatePrefs: (patch) => set((s) => ({ schedulePrefs: { ...s.schedulePrefs, ...patch } })),
   addCommitment: (c) => set((s) => ({
-    schedulePrefs: { ...s.schedulePrefs, commitments: [...(s.schedulePrefs.commitments || []), { ...c, id: `fc-${Date.now()}` }] }
+    schedulePrefs: { ...s.schedulePrefs, commitments: [...(s.schedulePrefs.commitments || []), { ...c, id: createId('commitment') }] }
   })),
   updateCommitment: (id, patch) => set((s) => ({
     schedulePrefs: { ...s.schedulePrefs, commitments: (s.schedulePrefs.commitments || []).map(c => c.id === id ? { ...c, ...patch } : c) }
@@ -934,70 +821,37 @@ export const useStore = create<S>()(persist((set) => ({
   removeCommitment: (id) => set((s) => ({
     schedulePrefs: { ...s.schedulePrefs, commitments: (s.schedulePrefs.commitments || []).filter(c => c.id !== id) }
   })),
-  generateAISchedule: () => {
-    set({ isGenerating: true, generatedDay: null });
-    setTimeout(() => {
-      const st = useStore.getState();
-      const today = new Date().toISOString().slice(0,10);
-      const day = generateSchedule(st.schedulePrefs, st.goals, st.gtdTasks, today);
-      set({ generatedDay: day, isGenerating: false });
-    }, 1400);
-  },
-  setBlockStatus: (blockId, status) => set((s) => ({
-    generatedDay: s.generatedDay ? { ...s.generatedDay, blocks: s.generatedDay.blocks.map(b => b.id===blockId ? { ...b, status } : b) } : null
-  })),
-  acceptAllBlocks: () => set((s) => ({
-    generatedDay: s.generatedDay ? { ...s.generatedDay, blocks: s.generatedDay.blocks.map(b => b.status==='rejected' ? b : { ...b, status:'accepted' as const }) } : null
-  })),
-  // Convert accepted (non-locked) blocks into real planned sessions on the schedule.
-  commitGeneratedDay: () => set((s) => {
-    if (!s.generatedDay) return {};
-    const accepted = s.generatedDay.blocks.filter(b => b.status === 'accepted' && !b.locked);
-    if (!accepted.length) return {};
-    const date = s.generatedDay.date;
-    const seriesId = `arch-${Date.now()}`;
-    const newSessions: Session[] = accepted.map((b, i) => ({
-      id: `s${Date.now()}-${i}`,
-      goalId: b.type === 'goal' && b.sourceId ? b.sourceId : '',
-      date,
-      startHour: Math.floor(b.startMinutes / 60) % 24,
-      startMinute: b.startMinutes % 60,
-      durationMinutes: b.durationMinutes,
-      title: b.title,
-      description: b.reasoning || '',
-      tasks: [],
-      sessionType: 'regular',
-      status: 'planned',
-      color: b.color,
-      seriesId,
-    }));
-    return { sessions: [...s.sessions, ...newSessions], generatedDay: null, activeView: 'week' };
-  }),
-  clearGenerated: () => set({ generatedDay: null }),
   setDoingTask: (id) => set({ doingTaskId: id }),
 
   // ─── Multi-week AI Scheduler ───
   generatePlan: (horizon, options) => {
-    set({ isPlanning: true, generatedPlan: null });
+    const requestId = ++latestPlanRequest;
+    set({ isPlanning: true, planningError: null, generatedPlan: null });
     (async () => {
-      const st = useStore.getState();
-      const provider = getProvider(st.schedulePrefs.provider);
-      const started = Date.now();
-      const plan = await provider.generate({
-        range: horizonRange(horizon),
-        prefs: st.schedulePrefs,
-        goals: st.goals,
-        habits: st.habits,
-        tasks: st.gtdTasks,
-        sessions: st.sessions,
-        options,
-        lang: st.lang,
-        profile: st.userProfile,
-      });
-      // keep the "building…" state visible for at least a beat so the UI doesn't flash
-      const minWait = 600 - (Date.now() - started);
-      if (minWait > 0) await new Promise(r => setTimeout(r, minWait));
-      set({ generatedPlan: plan, isPlanning: false });
+      try {
+        const st = useStore.getState();
+        const provider = getProvider(st.schedulePrefs.provider);
+        const started = Date.now();
+        const plan = await provider.generate({
+          range: horizonRange(horizon),
+          prefs: st.schedulePrefs,
+          goals: st.goals,
+          habits: st.habits,
+          tasks: st.gtdTasks,
+          sessions: st.sessions,
+          options,
+          lang: st.lang,
+          profile: st.userProfile,
+        });
+        const minWait = 600 - (Date.now() - started);
+        if (minWait > 0) await new Promise(r => setTimeout(r, minWait));
+        if (requestId !== latestPlanRequest) return;
+        set({ generatedPlan: plan, isPlanning: false, planningError: null });
+      } catch (error) {
+        if (requestId !== latestPlanRequest) return;
+        const message = error instanceof Error ? error.message.slice(0, 160) : 'planning-failed';
+        set({ generatedPlan: null, isPlanning: false, planningError: message });
+      }
     })();
   },
   regeneratePlan: () => {
@@ -1019,15 +873,16 @@ export const useStore = create<S>()(persist((set) => ({
   // Convert every accepted, non-locked block (all source kinds) into real sessions.
   commitPlan: () => set((s) => {
     if (!s.generatedPlan) return {};
-    const seriesId = `plan-${Date.now()}`;
+    const planId = s.generatedPlan.id;
     const newSessions: Session[] = [];
-    let i = 0;
     for (const day of s.generatedPlan.days) {
       for (const b of day.blocks) {
         if (b.status !== 'accepted' || b.locked) continue;
+        const sourceTask = b.sourceKind === 'task' && b.sourceId ? s.gtdTasks.find(task => task.id === b.sourceId) : undefined;
         newSessions.push({
-          id: `s${Date.now()}-${i++}`,
+          id: createId('session'),
           goalId: b.sourceKind === 'goal' && b.sourceId ? b.sourceId : '',
+          ...(sourceTask && !sourceTask.recurring ? { taskId: sourceTask.id } : {}),
           date: day.date,
           startHour: Math.floor(b.startMinutes / 60) % 24,
           startMinute: b.startMinutes % 60,
@@ -1038,16 +893,20 @@ export const useStore = create<S>()(persist((set) => ({
           sessionType: 'regular',
           status: 'planned',
           color: b.color,
-          seriesId,
+          planId,
           sourceKind: b.sourceKind,
           planSourceId: b.sourceKind === 'habit' || b.sourceKind === 'task' ? b.sourceId : undefined,
         });
       }
     }
     if (!newSessions.length) return {};
-    return { sessions: [...s.sessions, ...newSessions], generatedPlan: null, activeView: 'week' };
+    const appended = appendSessions(s.gtdTasks, s.sessions, newSessions);
+    return { ...appended, generatedPlan: null, activeView: 'week' };
   }),
-  clearPlan: () => set({ generatedPlan: null }),
+  clearPlan: () => {
+    latestPlanRequest++;
+    set({ generatedPlan: null, isPlanning: false, planningError: null });
+  },
 }), {
   name: 'ai-scheduler-store',
   // v2: dropped the seeded demo data — start every install on a clean slate.
@@ -1056,51 +915,31 @@ export const useStore = create<S>()(persist((set) => ({
   // v4: add first-run intro course; existing onboarded users are marked complete.
   // v5: life-balance sanity — merge in any life blocks missing from old installs
   //     (breakfast/dinner/…), clamp hours into [min,max], add commitments[].
-  version: 5,
-  migrate: (persisted: any, version) => {
-    if (version < 2 && persisted) {
-      return { ...persisted, goals: [], sessions: [], gtdTasks: [], generatedDay: null, userName: '', onboarded: false };
-    }
-    if (version < 3 && persisted && Array.isArray(persisted.sessions)) {
-      persisted.sessions = persisted.sessions.map((s: any) => ({
-        ...s,
-        tasks: Array.isArray(s.tasks) ? s.tasks : [],
-        startHour: Number.isFinite(s.startHour) ? s.startHour : 9,
-        startMinute: Number.isFinite(s.startMinute) ? s.startMinute : 0,
-        durationMinutes: Number.isFinite(s.durationMinutes) ? s.durationMinutes : 60,
-      }));
-    }
-    if (version < 4 && persisted) {
-      persisted.introCourseCompleted = !!persisted.onboarded;
-    }
-    if (version < 5 && persisted?.schedulePrefs) {
-      const prefs = persisted.schedulePrefs;
-      const existing: any[] = Array.isArray(prefs.lifeBlocks) ? prefs.lifeBlocks : [];
-      // Re-add default blocks lost by older installs, clamp saved hours into bounds.
-      prefs.lifeBlocks = defaultLifeBlocks.map(def => {
-        const cur = existing.find((b: any) => b.id === def.id);
-        if (!cur) return def;
-        const merged = { ...def, ...cur, minHours: def.minHours, maxHours: def.maxHours };
-        merged.hoursPerDay = Math.min(Math.max(Number(merged.hoursPerDay) || def.recommended, def.minHours), def.maxHours);
-        return merged;
-      });
-      // Keep any custom blocks that aren't part of the defaults.
-      for (const b of existing) if (!prefs.lifeBlocks.some((x: any) => x.id === b.id)) prefs.lifeBlocks.push(b);
-      if (!Array.isArray(prefs.commitments)) prefs.commitments = [];
-    }
-    return persisted;
-  },
+  // v6: counter-habit days logged under target were stored as 'failed' — reclassify
+  //     them as 'partial' so history stops showing honest progress as failures.
+  // v7: Session.taskId becomes the canonical task↔calendar link; old plan batch
+  //     ids stop masquerading as recurrence series (deleting one must not delete all).
+  // v8: GTDStatus dropped 'project'/'waiting-for'/'reference' — those statuses had no
+  //     way to be assigned from the UI (dead-end data). Any leftover tasks fold into
+  //     'someday-maybe', which is where they were already grouped for viewing.
+  // v9: My Day is date-scoped. The former boolean leaked yesterday's focus into
+  // every future day, so existing selected tasks are kept for today only.
+  // v10: habit groups organize related routines while habits remain independent.
+  // v11: projects become durable operational containers instead of task labels.
+  version: CURRENT_STORE_VERSION,
+  migrate: migratePersistedState,
   // Persist only durable data — not transient UI/modal state.
   partialize: (s) => ({
     goals: s.goals,
     sessions: s.sessions,
     gtdTasks: s.gtdTasks,
+    projects: s.projects,
     habits: s.habits,
+    habitGroups: s.habitGroups,
     reflections: s.reflections,
     metricDefs: s.metricDefs,
     habitRemindersEnabled: s.habitRemindersEnabled,
     notifPrefs: s.notifPrefs,
-    density: s.density,
     theme: s.theme,
     userName: s.userName,
     userProfile: s.userProfile,
@@ -1109,7 +948,6 @@ export const useStore = create<S>()(persist((set) => ({
     aiDisclaimerAcceptedAt: s.aiDisclaimerAcceptedAt,
     lang: s.lang,
     schedulePrefs: s.schedulePrefs,
-    generatedDay: s.generatedDay,
     generatedPlan: s.generatedPlan,
     weekOffset: s.weekOffset,
     focusTimer: s.focusTimer,

@@ -1,12 +1,13 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --experimental-strip-types src/ai/intentFilter.test.ts && node --experimental-strip-types src/utils/localized.test.ts && node --experimental-strip-types src/ai/schedulePlan.test.ts && node --experimental-strip-types src/utils/nlDate.test.ts && node --experimental-strip-types src/utils/importCsv.test.ts",
+    "test": "node proxy/api/ai.security.test.mjs && node --experimental-strip-types src/domain/id.test.ts && node --experimental-strip-types src/domain/date.test.ts && node --experimental-strip-types src/domain/taskFocus.test.ts && node --experimental-strip-types src/domain/taskTransitions.test.ts && node --experimental-strip-types src/domain/recurrence.test.ts && node --experimental-strip-types src/domain/habitGroups.test.ts && node --experimental-strip-types src/domain/projects.test.ts && node --experimental-strip-types src/services/backup.test.ts && node --experimental-strip-types src/components/settingsBackupImportError.test.ts && node --experimental-strip-types src/ai/intentFilter.test.ts && node --experimental-strip-types src/utils/localized.test.ts && node --experimental-strip-types src/ai/schedulePlan.test.ts && node --experimental-strip-types src/utils/nlDate.test.ts && node --experimental-strip-types src/utils/taskCapture.test.ts && node --experimental-strip-types src/utils/time.test.ts && node --experimental-strip-types src/utils/importCsv.test.ts",
     "build": "vite build",
+    "build:single": "SINGLE_FILE=true vite build",
     "preview": "vite preview",
     "android:sync": "vite build && cap sync android",
     "android:open": "cap open android",
@@ -29,7 +30,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.0",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
@@ -38,7 +38,7 @@
     "@vitejs/plugin-react": "5.1.1",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
-    "vite": "7.3.2",
+    "vite": "7.3.6",
     "vite-plugin-singlefile": "2.3.0"
   }
 }
