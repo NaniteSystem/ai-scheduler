@@ -38,7 +38,7 @@ export function deriveProjectSection(task: GTDTask): ProjectSection {
   return 'backlog';
 }
 
-/** Active projects whose next review date has arrived (or passed). */
+/** Non-archived projects whose next review date has arrived (or passed). */
 export function projectsNeedingReview(projects: Project[], today: string): Project[] {
   const inactive = new Set(['archived', 'completed', 'canceled']);
   return projects.filter(project => !inactive.has(project.status)

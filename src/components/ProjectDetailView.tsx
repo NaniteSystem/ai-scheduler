@@ -24,9 +24,13 @@ export function ProjectDetailView({ project, onBack }: { project: Project; onBac
   const t = useT();
   const locale = useDateLocale();
   const {
-    gtdTasks, goals, areas, updateProject, captureTask, updateTask, processTask, openEditTask, setActiveView, askConfirm,
+    projects, gtdTasks, goals, areas, updateProject, captureTask, updateTask, processTask, openEditTask, setActiveView, askConfirm,
   } = useStore();
   const today = localDateKey();
+
+  const hasDuplicateTitle = (value: string, exceptId?: string) => projects.some(p => (
+    p.id !== exceptId && p.title.toLocaleLowerCase() === value.toLocaleLowerCase()
+  ));
 
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(project.title);
@@ -79,6 +83,7 @@ export function ProjectDetailView({ project, onBack }: { project: Project; onBac
     if (!trimmed) { setEditError(t('projects.nameRequired')); return; }
     const trimmedOutcome = editOutcome.trim();
     if (!trimmedOutcome) { setEditError(t('projects.outcomeRequired')); return; }
+    if (hasDuplicateTitle(trimmed, project.id)) { setEditError(t('projects.duplicateName')); return; }
     updateProject(project.id, {
       title: trimmed,
       outcome: trimmedOutcome,

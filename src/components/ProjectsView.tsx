@@ -141,7 +141,7 @@ export function ProjectsView({ onBack, onOpenProject }: { onBack: () => void; on
     return (
       <article key={project.id} className="tcard p-5 overflow-hidden" style={{ borderTop: `3px solid ${project.color}` }}>
         <div className="flex items-start gap-3">
-          <button type="button" onClick={() => onOpenProject(project.id)} className="w-11 h-11 rounded-2xl grid place-items-center shrink-0" style={{ background: `${project.color}18`, color: project.color }} aria-label={t('projects.edit')}>
+          <button type="button" onClick={() => onOpenProject(project.id)} className="w-11 h-11 rounded-2xl grid place-items-center shrink-0" style={{ background: `${project.color}18`, color: project.color }} aria-label={t('projects.openProject', { title: project.title })}>
             <Folder className="w-5 h-5" />
           </button>
           <button type="button" onClick={() => onOpenProject(project.id)} className="min-w-0 flex-1 text-left">
