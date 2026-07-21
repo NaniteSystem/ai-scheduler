@@ -40,6 +40,7 @@ const Onboarding = lazy(() => import('./components/Onboarding').then(module => (
 const IntroCourse = lazy(() => import('./components/IntroCourse').then(module => ({ default: module.IntroCourse })));
 const GoalCreateWizard = lazy(() => import('./components/GoalCreateWizard').then(module => ({ default: module.GoalCreateWizard })));
 const ProjectsView = lazy(() => import('./components/ProjectsView').then(module => ({ default: module.ProjectsView })));
+const ProjectDetailView = lazy(() => import('./components/ProjectDetailView').then(module => ({ default: module.ProjectDetailView })));
 const AreasView = lazy(() => import('./components/AreasView').then(module => ({ default: module.AreasView })));
 
 function ViewLoading(){
@@ -203,6 +204,7 @@ export default function App(){
   useEffect(()=>{ initTimerActionListener(); },[]);
   useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
   const[selectedGoalId,setSelectedGoalId]=useState<string|null>(null);
+  const[selectedProjectId,setSelectedProjectId]=useState<string|null>(null);
   const[qt,setQt]=useState('');
   const[listening,setListening]=useState(false);
   const[voiceError,setVoiceError]=useState<VoiceErrorCode|null>(null);
@@ -446,7 +448,7 @@ export default function App(){
           const topTab=(id:AppView,label:string,Ic:React.ComponentType<{className?:string;strokeWidth?:number}>)=>{
             const a=bottomNavActiveView===id;
             return (
-              <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setOverviewChild(false);}}
+              <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);}}
                 className={`relative h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors ${a?'text-[var(--primary)]':'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}>
                 {a&&<motion.span layoutId="top-nav-pill" transition={{type:'spring',stiffness:480,damping:38}} className="absolute inset-0 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/10"/>}
                 <Ic className="relative w-[18px] h-[18px]" strokeWidth={a?2.5:2}/><span className="relative">{label}</span>
@@ -481,7 +483,11 @@ export default function App(){
 {activeView==='settings'&&<SettingsView onBack={overviewChild?()=>{store.setActiveView('progress');setOverviewChild(false);}:undefined}/>}
 
 {/* ═══════════════════ PROJECTS ═══════════════════ */}
-{activeView==='projects'&&<ProjectsView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}}/>}
+{activeView==='projects'&&(()=>{
+  const selectedProject = selectedProjectId ? projects.find(p=>p.id===selectedProjectId) : null;
+  if (selectedProject) return <ProjectDetailView project={selectedProject} onBack={()=>setSelectedProjectId(null)}/>;
+  return <ProjectsView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}} onOpenProject={(id)=>setSelectedProjectId(id)}/>;
+})()}
 {activeView==='areas'&&<AreasView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}} onOpenProject={(id)=>{setSelectedProjectId(id);store.setActiveView('projects');}}/>}
 
 {/* ═══════════════════ DASHBOARD ═══════════════════ */}
@@ -618,7 +624,7 @@ export default function App(){
   ];
   return <div className="px-4 md:px-10 py-6 md:py-8 max-w-[1040px] space-y-7 pb-32">
     <div className="anim-fade"><h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('overview.manage')}</h1><p className="text-[14px] text-[var(--text-dim)] mt-1">{openTasks.length} {t('overview.tasks').toLowerCase()} · {trackedHabits.length} {t('bottomNav.habits').toLowerCase()}</p></div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{tiles.map((ti,i)=><motion.button {...listItem(i)} key={ti.id} onClick={()=>ti.onClick?ti.onClick():(()=>{store.setActiveView(ti.id as AppView);setSelectedGoalId(null);setOverviewChild(false);})()} className="tcard lift min-h-[116px] p-5 text-left flex items-center gap-4"><div className="w-12 h-12 rounded-2xl grid place-items-center shrink-0" style={{background:`${ti.c}18`,color:ti.c}}><ti.Ic className="w-6 h-6"/></div><div className="min-w-0 flex-1"><div className="text-[16px] font-bold text-[var(--text)]">{ti.label}</div><div className="text-[12px] text-[var(--text-dim)] mt-1">{ti.sub}</div></div><ChevronRight className="w-5 h-5 text-[var(--text-mute)]"/></motion.button>)}</div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{tiles.map((ti,i)=><motion.button {...listItem(i)} key={ti.id} onClick={()=>ti.onClick?ti.onClick():(()=>{store.setActiveView(ti.id as AppView);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);})()} className="tcard lift min-h-[116px] p-5 text-left flex items-center gap-4"><div className="w-12 h-12 rounded-2xl grid place-items-center shrink-0" style={{background:`${ti.c}18`,color:ti.c}}><ti.Ic className="w-6 h-6"/></div><div className="min-w-0 flex-1"><div className="text-[16px] font-bold text-[var(--text)]">{ti.label}</div><div className="text-[12px] text-[var(--text-dim)] mt-1">{ti.sub}</div></div><ChevronRight className="w-5 h-5 text-[var(--text-mute)]"/></motion.button>)}</div>
 
   </div>;
 })()}
@@ -897,7 +903,7 @@ export default function App(){
             const navBtn=(id:AppView,label:string,Ic:React.ComponentType<{className?:string;strokeWidth?:number}>)=>{
               const a=bottomNavActiveView===id;
               return (
-                <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setOverviewChild(false);}}
+                <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);}}
                   className={`relative flex-1 min-h-[56px] rounded-[18px] flex flex-col items-center justify-center gap-1 transition-colors ${a?'text-[var(--primary)] bg-[var(--primary)]/8':'text-[var(--text-mute)] active:text-[var(--text)]'}`}>
                   <Ic className="w-[22px] h-[22px]" strokeWidth={a?2.5:2}/>
                   <span className="text-[10px] font-semibold leading-none">{label}</span>
