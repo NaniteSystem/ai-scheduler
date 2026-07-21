@@ -11,6 +11,7 @@ server/.env
 # Local tooling / session artifacts
 .playwright-mcp/
 .claude/
+.superpowers/
 android/.gradle-user/
 
 # Build outputs

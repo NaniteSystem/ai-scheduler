@@ -17,7 +17,7 @@ interface BackupImportPreviewProps {
 }
 
 const ROWS: readonly BackupPreviewKey[] = [
-  'goals', 'sessions', 'gtdTasks', 'projects', 'habits', 'habitGroups', 'reflections', 'metricDefs',
+  'goals', 'sessions', 'gtdTasks', 'projects', 'areas', 'habits', 'habitGroups', 'reflections', 'metricDefs',
   'profile', 'preferences', 'notifications', 'generatedPlan', 'focusTimer',
 ];
 
@@ -26,6 +26,7 @@ const LABEL_KEYS: Record<BackupPreviewKey, string> = {
   sessions: 'settings.backupPreview.sessions',
   gtdTasks: 'settings.backupPreview.tasks',
   projects: 'settings.backupPreview.projects',
+  areas: 'settings.backupPreview.areas',
   habits: 'settings.backupPreview.habits',
   habitGroups: 'settings.backupPreview.habitGroups',
   reflections: 'settings.backupPreview.reflectionDays',

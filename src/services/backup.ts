@@ -7,7 +7,7 @@ const SCHEMA_VERSION = 1;
 const MIN_RECOVERY_STORE_VERSION = 2;
 
 export const DURABLE_KEYS = [
-  'goals', 'sessions', 'gtdTasks', 'projects', 'habits', 'habitGroups', 'reflections', 'metricDefs',
+  'goals', 'sessions', 'gtdTasks', 'projects', 'areas', 'habits', 'habitGroups', 'reflections', 'metricDefs',
   'habitRemindersEnabled', 'notifPrefs', 'theme', 'userName',
   'userProfile', 'onboarded', 'introCourseCompleted', 'aiDisclaimerAcceptedAt',
   'lang', 'schedulePrefs', 'generatedPlan', 'weekOffset',
@@ -36,7 +36,7 @@ export interface BackupInspection {
 
 export type BackupPreviewAction = 'update' | 'replace' | 'clear';
 export type BackupPreviewKey =
-  | 'goals' | 'sessions' | 'gtdTasks' | 'projects' | 'habits' | 'habitGroups' | 'reflections' | 'metricDefs'
+  | 'goals' | 'sessions' | 'gtdTasks' | 'projects' | 'areas' | 'habits' | 'habitGroups' | 'reflections' | 'metricDefs'
   | 'profile' | 'preferences' | 'notifications' | 'generatedPlan' | 'focusTimer';
 
 export interface BackupPreviewRow {
@@ -143,6 +143,17 @@ function projectIsValid(value: unknown): boolean {
     && optionalFieldIsValid(value, 'archivedAt', dateTimeIsValid);
 }
 
+function areaIsValid(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.title === 'string' && value.title.trim().length > 0
+    && typeof value.color === 'string'
+    && dateTimeIsValid(value.createdAt)
+    && optionalFieldIsValid(value, 'icon', field => typeof field === 'string')
+    && optionalFieldIsValid(value, 'notes', field => typeof field === 'string')
+    && optionalFieldIsValid(value, 'archivedAt', dateTimeIsValid);
+}
+
 function gtdTaskIsValid(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return typeof value.id === 'string'
@@ -174,7 +185,8 @@ function gtdTaskIsValid(value: unknown): boolean {
     && optionalFieldIsValid(value, 'completedPomodoros', field => Number.isInteger(field) && (field as number) >= 0)
     && optionalFieldIsValid(value, 'todayFocusDate', dateIsValid)
     && optionalFieldIsValid(value, 'isTodayFocus', field => typeof field === 'boolean')
-    && optionalFieldIsValid(value, 'isArchived', field => typeof field === 'boolean');
+    && optionalFieldIsValid(value, 'isArchived', field => typeof field === 'boolean')
+    && optionalFieldIsValid(value, 'blockingReason', field => typeof field === 'string');
 }
 
 function userProfileIsValid(value: unknown): boolean {
@@ -566,6 +578,7 @@ export function restoreBackupState(state: Record<string, unknown>, data: BackupD
     sessions,
     gtdTasks,
     projects: Array.isArray(data.projects) ? data.projects : state.projects,
+    areas: Array.isArray(data.areas) ? data.areas : state.areas,
     habits: Array.isArray(data.habits) ? data.habits : state.habits,
     habitGroups: Array.isArray(data.habitGroups) ? data.habitGroups : state.habitGroups,
     reflections: isRecord(data.reflections) ? data.reflections : state.reflections,
@@ -609,6 +622,7 @@ export function buildBackupPreview(state: Record<string, unknown>, data: BackupD
     ['sessions', 'sessions'],
     ['gtdTasks', 'gtdTasks'],
     ['projects', 'projects'],
+    ['areas', 'areas'],
     ['habits', 'habits'],
     ['habitGroups', 'habitGroups'],
     ['reflections', 'reflections'],
@@ -712,6 +726,7 @@ export function inspectBackup(text: string): BackupInspection {
   if ('gtdTasks' in data && (!Array.isArray(data.gtdTasks) || !recordIdsAreUnique(data.gtdTasks) || !data.gtdTasks.every(gtdTaskIsValid))) throw new Error('invalid-tasks');
   if ('projects' in data && Array.isArray(data.projects)) data.projects = data.projects.map(project => isRecord(project) ? normalizeProject(project as unknown as import('../types.ts').Project) : project);
   if ('projects' in data && (!Array.isArray(data.projects) || !recordIdsAreUnique(data.projects) || !data.projects.every(projectIsValid))) throw new Error('invalid-projects');
+  if ('areas' in data && (!Array.isArray(data.areas) || !recordIdsAreUnique(data.areas) || !data.areas.every(areaIsValid))) throw new Error('invalid-areas');
   if ('habits' in data && (!Array.isArray(data.habits) || !recordIdsAreUnique(data.habits) || !data.habits.every(habitIsValid))) throw new Error('invalid-habits');
   if ('habitGroups' in data && (!Array.isArray(data.habitGroups) || !recordIdsAreUnique(data.habitGroups) || !data.habitGroups.every(habitGroupIsValid))) throw new Error('invalid-habit-groups');
   if ('metricDefs' in data && !metricDefsAreValid(data.metricDefs)) throw new Error('invalid-metrics');

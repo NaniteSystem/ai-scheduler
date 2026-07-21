@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { addDays, parseISO, format, isWeekend, differenceInCalendarDays } from 'date-fns';
-import type { Goal, Session, GTDTask, GTDStatus, Priority, TaskContext, SchedulePrefs, LifeBlock, Habit, HabitGroup, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment, Milestone, AppView, Project } from './types';
+import type { Goal, Session, GTDTask, GTDStatus, Priority, TaskContext, SchedulePrefs, LifeBlock, Habit, HabitGroup, HabitStatus, ReflectionEntry, MetricDef, FocusTimer, GeneratedPlan, PlanHorizon, PlanOptions, FixedCommitment, Milestone, AppView, Project, Area } from './types';
 import { getProvider, horizonRange } from './scheduler';
 import { hapticSuccess, hapticTick } from './utils/haptics';
 import { createId } from './domain/id';
@@ -288,6 +288,7 @@ interface S {
   sessions: Session[];
   gtdTasks: GTDTask[];
   projects: Project[];
+  areas: Area[];
   habits: Habit[];
   habitGroups: HabitGroup[];
   addHabit: (h: Habit) => void;
@@ -357,7 +358,10 @@ interface S {
   restoreBackup: (data: any) => void;
   importTasks: (tasks: GTDTask[]) => void;
   addProject: (title: string, options?: { outcome?: string; targetDate?: string; deadline?: string }) => string;
-  updateProject: (id: string, patch: Partial<Pick<Project, 'title' | 'outcome' | 'definitionOfDone' | 'color' | 'status' | 'health' | 'targetDate' | 'deadline' | 'notes'>>) => void;
+  updateProject: (id: string, patch: Partial<Pick<Project, 'title' | 'outcome' | 'definitionOfDone' | 'color' | 'status' | 'health' | 'targetDate' | 'deadline' | 'notes' | 'goalId' | 'areaId' | 'reviewCadence' | 'nextReviewDate'>>) => void;
+  addArea: (title: string, options?: { color?: string; icon?: string }) => string;
+  updateArea: (id: string, patch: Partial<Pick<Area, 'title' | 'color' | 'icon' | 'notes' | 'archivedAt'>>) => void;
+  deleteArea: (id: string) => void;
   setActiveView: (v: AppView) => void;
   setGTDFilter: (f: string) => void;
   setActiveContext: (c: string) => void;
@@ -442,6 +446,7 @@ export const useStore = create<S>()(persist((set) => ({
   sessions: [],
   gtdTasks: [],
   projects: [],
+  areas: [],
   habits: [],
   habitGroups: [],
   addHabit: (h) => set((s) => ({ habits: [...s.habits, h] })),
@@ -534,7 +539,7 @@ export const useStore = create<S>()(persist((set) => ({
   resetAll: () => {
     latestPlanRequest++;
     set({
-      goals: [], sessions: [], gtdTasks: [], projects: [], habits: [], habitGroups: [], reflections: {}, metricDefs: [],
+      goals: [], sessions: [], gtdTasks: [], projects: [], areas: [], habits: [], habitGroups: [], reflections: {}, metricDefs: [],
       generatedPlan: null, isPlanning: false,
       planningError: null, focusTimer: null, pendingUndo: null, weekOffset: 0,
     });
@@ -572,11 +577,43 @@ export const useStore = create<S>()(persist((set) => ({
         ...(patch.outcome !== undefined ? { outcome: patch.outcome.trim() } : {}),
         ...(patch.definitionOfDone !== undefined ? { definitionOfDone: patch.definitionOfDone.trim() || undefined } : {}),
         ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
+        ...(patch.goalId !== undefined ? { goalId: patch.goalId || undefined } : {}),
+        ...(patch.areaId !== undefined ? { areaId: patch.areaId || undefined } : {}),
         ...(patch.status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
         ...(patch.status === 'archived' ? { archivedAt: new Date().toISOString() } : {}),
         updatedAt: new Date().toISOString(),
       }
       : project),
+  })),
+  addArea: (title, options) => {
+    const trimmed = title.trim();
+    if (!trimmed) return '';
+    const id = createId('area');
+    const now = new Date().toISOString();
+    set((s) => ({
+      areas: [...s.areas, {
+        id,
+        title: trimmed,
+        color: options?.color || '#8b5cf6',
+        ...(options?.icon ? { icon: options.icon } : {}),
+        createdAt: now,
+      }],
+    }));
+    return id;
+  },
+  updateArea: (id, patch) => set((s) => ({
+    areas: s.areas.map(area => area.id === id
+      ? {
+        ...area,
+        ...patch,
+        ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+        ...(patch.notes !== undefined ? { notes: patch.notes.trim() || undefined } : {}),
+      }
+      : area),
+  })),
+  deleteArea: (id) => set((s) => ({
+    areas: s.areas.filter(area => area.id !== id),
+    projects: s.projects.map(project => project.areaId === id ? { ...project, areaId: undefined } : project),
   })),
   restoreBackup: (data) => set((s) => restoreBackupState(s as unknown as Record<string, unknown>, data) as Partial<S>),
   setActiveView: (v) => set({ activeView: v }),
@@ -926,6 +963,7 @@ export const useStore = create<S>()(persist((set) => ({
   // every future day, so existing selected tasks are kept for today only.
   // v10: habit groups organize related routines while habits remain independent.
   // v11: projects become durable operational containers instead of task labels.
+  // v12: areas are standing life spheres, independent of Goals, linkable from projects.
   version: CURRENT_STORE_VERSION,
   migrate: migratePersistedState,
   // Persist only durable data — not transient UI/modal state.
@@ -934,6 +972,7 @@ export const useStore = create<S>()(persist((set) => ({
     sessions: s.sessions,
     gtdTasks: s.gtdTasks,
     projects: s.projects,
+    areas: s.areas,
     habits: s.habits,
     habitGroups: s.habitGroups,
     reflections: s.reflections,

@@ -17,9 +17,11 @@ import { startVoice, voiceAvailable, voiceErrorCode, type VoiceErrorCode, type V
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
 import type { Session, GTDTask, AppView } from './types';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic,Settings as SettingsIcon,LayoutGrid,BarChart3,Folder } from 'lucide-react';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic,Settings as SettingsIcon,LayoutGrid,BarChart3,Folder,Layers } from 'lucide-react';
 import { EnergyChart } from './components/EnergyChart';
 import { NebullaMark } from './components/BrandLogo';
+import { projectsNeedingReview } from './domain/projects';
+import { localDateKey } from './domain/date';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { SessionIcon } from './components/ui/IconPicker';
 import { Drawer } from './components/ui/Drawer';
@@ -40,6 +42,8 @@ const Onboarding = lazy(() => import('./components/Onboarding').then(module => (
 const IntroCourse = lazy(() => import('./components/IntroCourse').then(module => ({ default: module.IntroCourse })));
 const GoalCreateWizard = lazy(() => import('./components/GoalCreateWizard').then(module => ({ default: module.GoalCreateWizard })));
 const ProjectsView = lazy(() => import('./components/ProjectsView').then(module => ({ default: module.ProjectsView })));
+const ProjectDetailView = lazy(() => import('./components/ProjectDetailView').then(module => ({ default: module.ProjectDetailView })));
+const AreasView = lazy(() => import('./components/AreasView').then(module => ({ default: module.AreasView })));
 
 function ViewLoading(){
   const t = useT();
@@ -202,6 +206,7 @@ export default function App(){
   useEffect(()=>{ initTimerActionListener(); },[]);
   useEffect(()=>{ if(store.pendingGoalId){ setSelectedGoalId(store.pendingGoalId); store.setPendingGoalId(null); } },[store.pendingGoalId]);
   const[selectedGoalId,setSelectedGoalId]=useState<string|null>(null);
+  const[selectedProjectId,setSelectedProjectId]=useState<string|null>(null);
   const[qt,setQt]=useState('');
   const[listening,setListening]=useState(false);
   const[voiceError,setVoiceError]=useState<VoiceErrorCode|null>(null);
@@ -445,7 +450,7 @@ export default function App(){
           const topTab=(id:AppView,label:string,Ic:React.ComponentType<{className?:string;strokeWidth?:number}>)=>{
             const a=bottomNavActiveView===id;
             return (
-              <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setOverviewChild(false);}}
+              <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);}}
                 className={`relative h-10 px-4 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors ${a?'text-[var(--primary)]':'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'}`}>
                 {a&&<motion.span layoutId="top-nav-pill" transition={{type:'spring',stiffness:480,damping:38}} className="absolute inset-0 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/10"/>}
                 <Ic className="relative w-[18px] h-[18px]" strokeWidth={a?2.5:2}/><span className="relative">{label}</span>
@@ -480,7 +485,12 @@ export default function App(){
 {activeView==='settings'&&<SettingsView onBack={overviewChild?()=>{store.setActiveView('progress');setOverviewChild(false);}:undefined}/>}
 
 {/* ═══════════════════ PROJECTS ═══════════════════ */}
-{activeView==='projects'&&<ProjectsView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}}/>}
+{activeView==='projects'&&(()=>{
+  const selectedProject = selectedProjectId ? projects.find(p=>p.id===selectedProjectId) : null;
+  if (selectedProject) return <ProjectDetailView project={selectedProject} onBack={()=>setSelectedProjectId(null)}/>;
+  return <ProjectsView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}} onOpenProject={(id)=>setSelectedProjectId(id)}/>;
+})()}
+{activeView==='areas'&&<AreasView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}} onOpenProject={(id)=>{setSelectedProjectId(id);store.setActiveView('projects');}}/>}
 
 {/* ═══════════════════ DASHBOARD ═══════════════════ */}
 {activeView==='dashboard'&&(()=>{
@@ -603,19 +613,22 @@ export default function App(){
   const openTasks=gtdTasks.filter(t=>t.status!=='done'&&t.status!=='trash'&&!t.isArchived);
   const unsortedTasks=gtdTasks.filter(t=>t.status==='inbox'&&!t.processedAt&&!t.isArchived);
   const activeGoals=goals.filter(g=>(g.status??'active')==='active');
+  const activeProjectCount=projects.filter(project=>project.status==='active').length;
+  const pendingProjectReview=projectsNeedingReview(projects, localDateKey()).length;
   const totalHoursLogged=+(sessions.filter(s=>s.status==='done').reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
   const tiles: {id:AppView|'pomodoro';Ic:React.ComponentType<{className?:string}>;c:string;label:string;sub:string;onClick?:()=>void}[]=[
     {id:'inbox',Ic:Inbox,c:'#0d9488',label:t('overview.tasks'),sub:t('overview.unsortedN',{n:unsortedTasks.length})},
     {id:'habits',Ic:Flame,c:'#e0532f',label:t('bottomNav.habits'),sub:t('overview.trackedN',{n:trackedHabits.length})},
     {id:'pomodoro',Ic:Timer,c:'#e11d48',label:'Pomodoro',sub:'Focus timer and deep work',onClick:()=>store.openTimerLauncher({linkType:null,linkId:null,label:'Pomodoro'})},
     {id:'planner',Ic:Wand2,c:'#6467f2',label:t('planner.title'),sub:t('planner.cardSub')},
-    {id:'projects',Ic:Folder,c:'#8b5cf6',label:t('projects.title'),sub:t('projects.activeCount',{n:projects.filter(project=>project.status==='active').length})},
+    {id:'projects',Ic:Folder,c:'#8b5cf6',label:t('projects.title'),sub:pendingProjectReview>0 ? t('projects.activeReviewCount',{n:activeProjectCount,m:pendingProjectReview}) : t('projects.activeCount',{n:activeProjectCount})},
+    {id:'areas',Ic:Layers,c:'#0d9488',label:t('areas.title'),sub:t('areas.activeCount',{n:store.areas.filter(area=>!area.archivedAt).length})},
     {id:'goals',Ic:Target,c:'#6467f2',label:t('bottomNav.goals'),sub:`${activeGoals.length} ${t('overview.activeGoalsSub')}`},
     {id:'statistics',Ic:BarChart3,c:'#22c55e',label:t('overview.statistics'),sub:`${fmtHours(totalHoursLogged, store.lang)} · ${adherence}%`},
   ];
   return <div className="px-4 md:px-10 py-6 md:py-8 max-w-[1040px] space-y-7 pb-32">
     <div className="anim-fade"><h1 className="display text-[30px] md:text-[44px] text-[var(--text)]">{t('overview.manage')}</h1><p className="text-[14px] text-[var(--text-dim)] mt-1">{openTasks.length} {t('overview.tasks').toLowerCase()} · {trackedHabits.length} {t('bottomNav.habits').toLowerCase()}</p></div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{tiles.map((ti,i)=><motion.button {...listItem(i)} key={ti.id} onClick={()=>ti.onClick?ti.onClick():(()=>{store.setActiveView(ti.id as AppView);setSelectedGoalId(null);setOverviewChild(false);})()} className="tcard lift min-h-[116px] p-5 text-left flex items-center gap-4"><div className="w-12 h-12 rounded-2xl grid place-items-center shrink-0" style={{background:`${ti.c}18`,color:ti.c}}><ti.Ic className="w-6 h-6"/></div><div className="min-w-0 flex-1"><div className="text-[16px] font-bold text-[var(--text)]">{ti.label}</div><div className="text-[12px] text-[var(--text-dim)] mt-1">{ti.sub}</div></div><ChevronRight className="w-5 h-5 text-[var(--text-mute)]"/></motion.button>)}</div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{tiles.map((ti,i)=><motion.button {...listItem(i)} key={ti.id} onClick={()=>ti.onClick?ti.onClick():(()=>{store.setActiveView(ti.id as AppView);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);})()} className="tcard lift min-h-[116px] p-5 text-left flex items-center gap-4"><div className="w-12 h-12 rounded-2xl grid place-items-center shrink-0" style={{background:`${ti.c}18`,color:ti.c}}><ti.Ic className="w-6 h-6"/></div><div className="min-w-0 flex-1"><div className="text-[16px] font-bold text-[var(--text)]">{ti.label}</div><div className="text-[12px] text-[var(--text-dim)] mt-1">{ti.sub}</div></div><ChevronRight className="w-5 h-5 text-[var(--text-mute)]"/></motion.button>)}</div>
 
   </div>;
 })()}
@@ -894,7 +907,7 @@ export default function App(){
             const navBtn=(id:AppView,label:string,Ic:React.ComponentType<{className?:string;strokeWidth?:number}>)=>{
               const a=bottomNavActiveView===id;
               return (
-                <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setOverviewChild(false);}}
+                <button key={id} onClick={()=>{store.setActiveView(id);setSelectedGoalId(null);setSelectedProjectId(null);setOverviewChild(false);}}
                   className={`relative flex-1 min-h-[56px] rounded-[18px] flex flex-col items-center justify-center gap-1 transition-colors ${a?'text-[var(--primary)] bg-[var(--primary)]/8':'text-[var(--text-mute)] active:text-[var(--text)]'}`}>
                   <Ic className="w-[22px] h-[22px]" strokeWidth={a?2.5:2}/>
                   <span className="text-[10px] font-semibold leading-none">{label}</span>

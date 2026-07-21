@@ -4,7 +4,7 @@ export type Category =
   | 'writing' | 'music' | 'meditation' | 'health';
 
 export type AppView =
-  | 'dashboard' | 'goals' | 'projects' | 'week' | 'inbox' | 'habits' | 'progress' | 'manager' | 'statistics'
+  | 'dashboard' | 'goals' | 'projects' | 'areas' | 'week' | 'inbox' | 'habits' | 'progress' | 'manager' | 'statistics'
   | 'architect' | 'planner' | 'archive' | 'settings';
 
 export type SessionType = 'regular' | 'checkpoint' | 'catchup' | 'intensive';
@@ -162,6 +162,18 @@ export interface Project {
   archivedAt?: string;
 }
 
+export interface Area {
+  id: string;
+  title: string;
+  color: string;
+  /** Emoji marker, same convention as Goal.emoji. */
+  icon?: string;
+  notes?: string;
+  createdAt: string;
+  /** Areas don't complete — only archive. */
+  archivedAt?: string;
+}
+
 export type Priority = 1 | 2 | 3 | 4; // P1=urgent, P4=none
 export type EnergyLevel = 'deep' | 'medium' | 'shallow' | 'any';
 export type TaskContext = '@home' | '@work' | '@phone' | '@computer' | '@errand' | '@anywhere';
@@ -199,6 +211,8 @@ export interface GTDTask {
   /** @deprecated use todayFocusDate; retained only while older backups migrate. */
   isTodayFocus?: boolean;
   isArchived?: boolean;
+  /** Free-text reason this task is stuck (e.g. "waiting on vendor reply"). Non-empty ⇒ the task is in the project board's Waiting section regardless of status. */
+  blockingReason?: string;
 }
 
 // ─── Habits (routine tracker) ──────────────────────────────────────────────
