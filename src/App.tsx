@@ -17,7 +17,7 @@ import { startVoice, voiceAvailable, voiceErrorCode, type VoiceErrorCode, type V
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { CATEGORY_META } from './types';
 import type { Session, GTDTask, AppView } from './types';
-import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic,Settings as SettingsIcon,LayoutGrid,BarChart3,Folder } from 'lucide-react';
+import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic,Settings as SettingsIcon,LayoutGrid,BarChart3,Folder,Layers } from 'lucide-react';
 import { EnergyChart } from './components/EnergyChart';
 import { NebullaMark } from './components/BrandLogo';
 import { ConfirmModal } from './components/ui/ConfirmModal';
@@ -40,6 +40,7 @@ const Onboarding = lazy(() => import('./components/Onboarding').then(module => (
 const IntroCourse = lazy(() => import('./components/IntroCourse').then(module => ({ default: module.IntroCourse })));
 const GoalCreateWizard = lazy(() => import('./components/GoalCreateWizard').then(module => ({ default: module.GoalCreateWizard })));
 const ProjectsView = lazy(() => import('./components/ProjectsView').then(module => ({ default: module.ProjectsView })));
+const AreasView = lazy(() => import('./components/AreasView').then(module => ({ default: module.AreasView })));
 
 function ViewLoading(){
   const t = useT();
@@ -481,6 +482,7 @@ export default function App(){
 
 {/* ═══════════════════ PROJECTS ═══════════════════ */}
 {activeView==='projects'&&<ProjectsView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}}/>}
+{activeView==='areas'&&<AreasView onBack={()=>{store.setActiveView('manager');setSelectedGoalId(null);setOverviewChild(false);}} onOpenProject={(id)=>{setSelectedProjectId(id);store.setActiveView('projects');}}/>}
 
 {/* ═══════════════════ DASHBOARD ═══════════════════ */}
 {activeView==='dashboard'&&(()=>{
@@ -610,6 +612,7 @@ export default function App(){
     {id:'pomodoro',Ic:Timer,c:'#e11d48',label:'Pomodoro',sub:'Focus timer and deep work',onClick:()=>store.openTimerLauncher({linkType:null,linkId:null,label:'Pomodoro'})},
     {id:'planner',Ic:Wand2,c:'#6467f2',label:t('planner.title'),sub:t('planner.cardSub')},
     {id:'projects',Ic:Folder,c:'#8b5cf6',label:t('projects.title'),sub:t('projects.activeCount',{n:projects.filter(project=>project.status==='active').length})},
+    {id:'areas',Ic:Layers,c:'#0d9488',label:t('areas.title'),sub:t('areas.activeCount',{n:store.areas.filter(area=>!area.archivedAt).length})},
     {id:'goals',Ic:Target,c:'#6467f2',label:t('bottomNav.goals'),sub:`${activeGoals.length} ${t('overview.activeGoalsSub')}`},
     {id:'statistics',Ic:BarChart3,c:'#22c55e',label:t('overview.statistics'),sub:`${fmtHours(totalHoursLogged, store.lang)} · ${adherence}%`},
   ];
