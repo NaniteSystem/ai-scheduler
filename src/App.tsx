@@ -20,6 +20,8 @@ import type { Session, GTDTask, AppView } from './types';
 import { Calendar,Target,Clock,Plus,CheckCircle2,Circle,X,ChevronRight,ChevronLeft,Sparkles,AlertCircle,MapPin,Link as LinkIcon,Bell,RotateCcw,Repeat2,Edit2,Home as HomeIcon,User as UserIcon,Inbox,Archive,Flame,Timer,Wand2,Search as SearchIcon,Mic,Settings as SettingsIcon,LayoutGrid,BarChart3,Folder,Layers } from 'lucide-react';
 import { EnergyChart } from './components/EnergyChart';
 import { NebullaMark } from './components/BrandLogo';
+import { projectsNeedingReview } from './domain/projects';
+import { localDateKey } from './domain/date';
 import { ConfirmModal } from './components/ui/ConfirmModal';
 import { SessionIcon } from './components/ui/IconPicker';
 import { Drawer } from './components/ui/Drawer';
@@ -611,13 +613,15 @@ export default function App(){
   const openTasks=gtdTasks.filter(t=>t.status!=='done'&&t.status!=='trash'&&!t.isArchived);
   const unsortedTasks=gtdTasks.filter(t=>t.status==='inbox'&&!t.processedAt&&!t.isArchived);
   const activeGoals=goals.filter(g=>(g.status??'active')==='active');
+  const activeProjectCount=projects.filter(project=>project.status==='active').length;
+  const pendingProjectReview=projectsNeedingReview(projects, localDateKey()).length;
   const totalHoursLogged=+(sessions.filter(s=>s.status==='done').reduce((a,s)=>a+s.durationMinutes,0)/60).toFixed(1);
   const tiles: {id:AppView|'pomodoro';Ic:React.ComponentType<{className?:string}>;c:string;label:string;sub:string;onClick?:()=>void}[]=[
     {id:'inbox',Ic:Inbox,c:'#0d9488',label:t('overview.tasks'),sub:t('overview.unsortedN',{n:unsortedTasks.length})},
     {id:'habits',Ic:Flame,c:'#e0532f',label:t('bottomNav.habits'),sub:t('overview.trackedN',{n:trackedHabits.length})},
     {id:'pomodoro',Ic:Timer,c:'#e11d48',label:'Pomodoro',sub:'Focus timer and deep work',onClick:()=>store.openTimerLauncher({linkType:null,linkId:null,label:'Pomodoro'})},
     {id:'planner',Ic:Wand2,c:'#6467f2',label:t('planner.title'),sub:t('planner.cardSub')},
-    {id:'projects',Ic:Folder,c:'#8b5cf6',label:t('projects.title'),sub:t('projects.activeCount',{n:projects.filter(project=>project.status==='active').length})},
+    {id:'projects',Ic:Folder,c:'#8b5cf6',label:t('projects.title'),sub:pendingProjectReview>0 ? t('projects.activeReviewCount',{n:activeProjectCount,m:pendingProjectReview}) : t('projects.activeCount',{n:activeProjectCount})},
     {id:'areas',Ic:Layers,c:'#0d9488',label:t('areas.title'),sub:t('areas.activeCount',{n:store.areas.filter(area=>!area.archivedAt).length})},
     {id:'goals',Ic:Target,c:'#6467f2',label:t('bottomNav.goals'),sub:`${activeGoals.length} ${t('overview.activeGoalsSub')}`},
     {id:'statistics',Ic:BarChart3,c:'#22c55e',label:t('overview.statistics'),sub:`${fmtHours(totalHoursLogged, store.lang)} · ${adherence}%`},
