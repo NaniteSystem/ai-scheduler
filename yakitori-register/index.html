@@ -73,12 +73,19 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
   .row input { font-size: 16px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; width: 130px; }
   .scroll { max-height: 60vh; overflow: auto; }
+  .bk { border: none; border-radius: 10px; padding: 6px 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .bk.ok { background: #dcfce7; color: var(--ok); }
+  .bk.warn { background: #fee2e2; color: var(--bad); }
+  .backup { margin-top: 20px; padding: 12px; border: 2px solid var(--line); border-radius: 12px; }
+  .backup h2 { margin-bottom: 6px; }
+  .backup .info { color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
 <header>
   <h1 data-t="title"></h1>
   <div class="cashbox"><span data-t="sales"></span>: <span id="cashTop"></span></div>
+  <button class="bk" id="backupChip"></button>
   <div class="langs">
     <button data-lang="ja">日本語</button>
     <button data-lang="ru">Русский</button>
@@ -140,8 +147,15 @@ const I18N = {
     set: '4本セット', single: '単品', pcs: '本', time: '時刻', order: '注文', items: '内容', sum: '金額',
     status: '状態', stDone: '完了', stCancelled: '取消', stActive: '受付中',
     confirmCancel: '注文 #{n}（¥{s}）を取り消しますか？',
-    orders: '注文数', sticks: '販売本数', product: '商品', exportCsv: 'CSV保存', resetDay: '一日をリセット',
-    confirmReset: '全ての注文・履歴を削除します。よろしいですか？', byItem: '商品別',
+    orders: '注文数', sticks: '販売本数', product: '商品', exportCsv: 'CSV保存',
+    confirmReset: '本日を締めますか？注文は「過去の日」に移ります（削除されません）。バックアップも保存されます。', byItem: '商品別',
+    resetDay: '一日を締める', backup: 'バックアップ', downloadBackup: 'バックアップを保存', restore: 'ファイルから復元',
+    autoFile: 'ファイルへ自動保存を設定', autoResume: '自動保存を再開', autoOn: '自動保存中', autoFail: '自動保存に失敗',
+    lastBackup: '最終バックアップ', never: 'まだありません', unsaved: '未バックアップの変更',
+    confirmRestore: '現在のデータをファイルの内容で置き換えますか？（現在のデータは先に保存されます）',
+    restoreBad: 'このファイルは読み込めません', restored: '復元しました', persistOk: 'ブラウザの永続保存: 有効',
+    persistNo: 'ブラウザの永続保存: 未許可', pastDays: '過去の日', date: '日付',
+    backupHint: 'データはこの端末のブラウザ内（2か所）に自動保存されます。念のため定期的に「バックアップを保存」してください。',
   },
   ru: {
     title: 'Якитори — касса', newOrder: 'Новый заказ', shio: 'Соль', tare: 'Тарэ', none: 'Без',
@@ -151,8 +165,15 @@ const I18N = {
     set: 'набор из 4', single: 'поштучно', pcs: 'шт.', time: 'Время', order: 'Заказ', items: 'Состав', sum: 'Сумма',
     status: 'Статус', stDone: 'Выдан', stCancelled: 'Отменён', stActive: 'Готовится',
     confirmCancel: 'Отменить заказ #{n} (¥{s})?',
-    orders: 'Заказов', sticks: 'Продано шт.', product: 'Товар', exportCsv: 'Сохранить CSV', resetDay: 'Сбросить день',
-    confirmReset: 'Удалить все заказы и историю? Это нельзя отменить.', byItem: 'По видам',
+    orders: 'Заказов', sticks: 'Продано шт.', product: 'Товар', exportCsv: 'Сохранить CSV',
+    confirmReset: 'Закрыть день? Заказы перейдут в «Прошлые дни» (не удаляются), и автоматически скачается бэкап.', byItem: 'По видам',
+    resetDay: 'Закрыть день', backup: 'Резервная копия', downloadBackup: 'Скачать бэкап', restore: 'Восстановить из файла',
+    autoFile: 'Настроить автосохранение в файл', autoResume: 'Возобновить автосохранение', autoOn: 'Автосохранение в файл', autoFail: 'Ошибка автосохранения',
+    lastBackup: 'Последний бэкап', never: 'ещё не было', unsaved: 'Изменений без бэкапа',
+    confirmRestore: 'Заменить текущие данные данными из файла? (текущие данные сначала будут скачаны)',
+    restoreBad: 'Не удалось прочитать файл', restored: 'Данные восстановлены', persistOk: 'Постоянное хранилище браузера: включено',
+    persistNo: 'Постоянное хранилище браузера: не разрешено', pastDays: 'Прошлые дни', date: 'Дата',
+    backupHint: 'Данные автоматически хранятся в браузере этого устройства (в двух местах). Для надёжности регулярно нажимайте «Скачать бэкап».',
   },
   en: {
     title: 'Yakitori Register', newOrder: 'New order', shio: 'Salt', tare: 'Tare', none: 'Plain',
@@ -162,24 +183,147 @@ const I18N = {
     set: 'set of 4', single: 'single', pcs: 'pcs', time: 'Time', order: 'Order', items: 'Items', sum: 'Amount',
     status: 'Status', stDone: 'Done', stCancelled: 'Cancelled', stActive: 'Open',
     confirmCancel: 'Cancel order #{n} (¥{s})?',
-    orders: 'Orders', sticks: 'Sticks sold', product: 'Item', exportCsv: 'Export CSV', resetDay: 'Reset day',
-    confirmReset: 'Delete all orders and history? This cannot be undone.', byItem: 'By item',
+    orders: 'Orders', sticks: 'Sticks sold', product: 'Item', exportCsv: 'Export CSV',
+    confirmReset: 'Close the day? Orders move to "Previous days" (nothing is deleted) and a backup is downloaded.', byItem: 'By item',
+    resetDay: 'Close day', backup: 'Backup', downloadBackup: 'Download backup', restore: 'Restore from file',
+    autoFile: 'Set up auto-save to file', autoResume: 'Resume auto-save', autoOn: 'Auto-saving to file', autoFail: 'Auto-save failed',
+    lastBackup: 'Last backup', never: 'none yet', unsaved: 'Changes not backed up',
+    confirmRestore: 'Replace current data with the file contents? (current data is downloaded first)',
+    restoreBad: 'Could not read this file', restored: 'Data restored', persistOk: 'Persistent browser storage: on',
+    persistNo: 'Persistent browser storage: not granted', pastDays: 'Previous days', date: 'Date',
+    backupHint: 'Data is saved automatically in this browser (in two places). To be safe, press "Download backup" regularly.',
   },
 };
 
 // ---------- state (saved in this browser, works offline) ----------
 // order.items is keyed "productId:flavor", e.g. { "momo:shio": 2, "kawa:tare": 1 }
+// Data is kept in three places: localStorage, an IndexedDB mirror, and (optionally) a
+// backup file on disk that is rewritten after every change. Closed days go to state.archive,
+// nothing is ever deleted. state.rev counts data changes, state.backupRev = rev at last backup.
 const KEY = 'yakitori-register-v2';
+const BACKUP_REMIND_AFTER = 10;
 let state = load();
 let cart = {};
 let tab = 'active';
+let fileHandle = null, fileStatus = 'none'; // none | needsPermission | on | error
+let persisted = false;
 
-function load() {
-  const def = { lang: 'ja', nextNo: 1, orders: [] };
-  try { return Object.assign(def, JSON.parse(localStorage.getItem(KEY)) || {}); }
-  catch { return def; }
+function normalize(s) {
+  return Object.assign({ lang: 'ja', nextNo: 1, orders: [], archive: [], rev: 0, backupRev: 0,
+    lastBackupAt: 0, savedAt: 0 }, s || {});
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} }
+function load() {
+  try { return normalize(JSON.parse(localStorage.getItem(KEY))); }
+  catch { return normalize(); }
+}
+function save(dataChanged = true) {
+  if (dataChanged) state.rev++;
+  state.savedAt = Date.now();
+  const json = JSON.stringify(state);
+  try { localStorage.setItem(KEY, json); } catch {}
+  idbSet('state', json);
+  if (dataChanged && fileStatus === 'on') writeBackupFile();
+}
+
+// --- IndexedDB mirror ---
+const idb = new Promise(res => {
+  try {
+    const r = indexedDB.open('yakitori-register', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => res(null);
+  } catch { res(null); }
+});
+async function idbGet(k) {
+  const db = await idb; if (!db) return undefined;
+  return new Promise(res => {
+    const r = db.transaction('kv').objectStore('kv').get(k);
+    r.onsuccess = () => res(r.result); r.onerror = () => res(undefined);
+  });
+}
+async function idbSet(k, v) {
+  const db = await idb; if (!db) return;
+  try { db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch {}
+}
+
+// --- backup file / download ---
+const backupJson = () => JSON.stringify({ app: 'yakitori-register', exportedAt: Date.now(), state }, null, 1);
+function markBackedUp() {
+  state.backupRev = state.rev; state.lastBackupAt = Date.now(); save(false);
+}
+function downloadBackup() {
+  markBackedUp();
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const name = `yakitori-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+  download(new Blob([backupJson()], { type: 'application/json' }), name);
+}
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+let writing = Promise.resolve();
+function writeBackupFile() {
+  writing = writing.then(async () => {
+    try {
+      const w = await fileHandle.createWritable();
+      await w.write(backupJson()); await w.close();
+      state.backupRev = state.rev; state.lastBackupAt = Date.now();
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+      idbSet('state', JSON.stringify(state));
+      fileStatus = 'on';
+    } catch { fileStatus = 'error'; }
+    renderBackupChip(); if (tab === 'cash') renderSales();
+  });
+}
+async function setupAutoFile() {
+  try {
+    fileHandle = await window.showSaveFilePicker({ suggestedName: 'yakitori-backup.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] });
+    idbSet('fileHandle', fileHandle);
+    fileStatus = 'on'; writeBackupFile();
+  } catch {}
+}
+async function resumeAutoFile() {
+  try {
+    if (await fileHandle.requestPermission({ mode: 'readwrite' }) === 'granted') { fileStatus = 'on'; writeBackupFile(); }
+  } catch { fileStatus = 'error'; }
+}
+function restoreFromFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    let data;
+    try { data = JSON.parse(r.result); } catch {}
+    const s = data && data.app === 'yakitori-register' && data.state;
+    if (!s || !Array.isArray(s.orders)) { alert(t('restoreBad')); return; }
+    if (!confirm(t('confirmRestore'))) return;
+    downloadBackup(); // keep a copy of what we are about to replace
+    state = normalize(s); state.lang = state.lang || 'ja';
+    save(); markBackedUp(); alert(t('restored')); render();
+  };
+  r.readAsText(file);
+}
+
+// On start: take the IndexedDB copy if it is newer than localStorage (e.g. localStorage was cleared),
+// reconnect the auto-save file, and ask the browser not to evict our storage.
+(async () => {
+  const mirrored = await idbGet('state');
+  if (mirrored) {
+    try {
+      const m = normalize(JSON.parse(mirrored));
+      if (m.savedAt > state.savedAt) { state = m; save(false); }
+    } catch {}
+  } else save(false);
+  fileHandle = await idbGet('fileHandle') || null;
+  if (fileHandle) {
+    try { fileStatus = await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted' ? 'on' : 'needsPermission'; }
+    catch { fileStatus = 'needsPermission'; }
+    if (fileStatus === 'on' && state.backupRev !== state.rev) writeBackupFile();
+  }
+  try { persisted = await navigator.storage.persisted() || await navigator.storage.persist(); } catch {}
+  render();
+})();
 
 const t = k => I18N[state.lang][k] ?? k;
 const yen = n => '¥' + n.toLocaleString('ja-JP');
@@ -207,7 +351,17 @@ function render() {
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   ['active', 'history', 'cash'].forEach(x => document.getElementById('tab-' + x).hidden = x !== tab);
   document.getElementById('cashTop').textContent = yen(totalSales());
-  renderProducts(); renderTotal(); renderActive(); renderHistory(); renderSales();
+  renderProducts(); renderTotal(); renderActive(); renderHistory(); renderSales(); renderBackupChip();
+}
+
+function renderBackupChip() {
+  const chip = document.getElementById('backupChip');
+  const pending = state.rev - state.backupRev;
+  const warn = fileStatus === 'error' || fileStatus === 'needsPermission' ||
+    (fileStatus !== 'on' && (pending >= BACKUP_REMIND_AFTER || (!state.lastBackupAt && pending > 0)));
+  chip.className = 'bk ' + (warn ? 'warn' : 'ok');
+  chip.textContent = warn ? `⚠ ${t('backup')}${pending ? ' (' + pending + ')' : ''}`
+    : `💾 ${state.lastBackupAt ? timeText(state.lastBackupAt) : t('backup')}`;
 }
 
 function renderProducts() {
@@ -286,14 +440,50 @@ function renderSales() {
     </table>
     <div class="row" style="margin-top:20px">
       <button class="small plain" id="exportCsv">${t('exportCsv')}</button>
-      <button class="small bad" id="resetDay">${t('resetDay')}</button></div>`;
+      <button class="small bad" id="resetDay">${t('resetDay')}</button></div>
+    ${renderBackupBox()}
+    ${renderArchive()}`;
+}
+
+function renderBackupBox() {
+  const pending = state.rev - state.backupRev;
+  const canFile = 'showSaveFilePicker' in window;
+  const fileLine = fileStatus === 'on' ? `✅ ${t('autoOn')}${fileHandle ? ': ' + fileHandle.name : ''}`
+    : fileStatus === 'error' ? `⚠ ${t('autoFail')}` : '';
+  return `<div class="backup">
+    <h2>💾 ${t('backup')}</h2>
+    <div class="info">${t('backupHint')}</div>
+    <div class="info" style="margin-top:6px">${t('lastBackup')}: ${state.lastBackupAt
+      ? new Date(state.lastBackupAt).toLocaleString(state.lang === 'en' ? 'en-GB' : state.lang) : t('never')}
+      · ${t('unsaved')}: ${pending}<br>${persisted ? t('persistOk') : t('persistNo')}${fileLine ? '<br>' + fileLine : ''}</div>
+    <div class="row">
+      <button class="small ok" id="downloadBackup">${t('downloadBackup')}</button>
+      <button class="small plain" id="restoreBtn">${t('restore')}</button>
+      ${canFile && fileStatus === 'needsPermission' ? `<button class="small bad" id="resumeAuto">${t('autoResume')}</button>` : ''}
+      ${canFile && fileStatus !== 'needsPermission' ? `<button class="small plain" id="setupAuto">${t('autoFile')}</button>` : ''}
+    </div>
+    <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+  </div>`;
+}
+
+function renderArchive() {
+  if (!state.archive.length) return '';
+  const rows = [...state.archive].reverse().map(d => {
+    const v = d.orders.filter(o => o.status !== 'cancelled');
+    return `<tr><td>${new Date(d.closedAt).toLocaleDateString(state.lang === 'en' ? 'en-GB' : state.lang)}</td>
+      <td class="num">${v.length}</td><td class="num">${v.reduce((a, o) => a + count(o.items), 0)}</td>
+      <td class="num">${yen(v.reduce((a, o) => a + o.total, 0))}</td></tr>`;
+  }).join('');
+  return `<h2 style="margin-top:20px">${t('pastDays')}</h2><table>
+    <tr><th>${t('date')}</th><th class="num">${t('orders')}</th><th class="num">${t('sticks')}</th><th class="num">${t('sales')}</th></tr>
+    ${rows}</table>`;
 }
 
 // ---------- actions ----------
 document.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
-  if (d.lang) { state.lang = d.lang; save(); }
+  if (d.lang) { state.lang = d.lang; save(false); }
   else if (d.tab) tab = d.tab;
   else if (d.inc) cart[d.inc] = (cart[d.inc] || 0) + 1;
   else if (d.dec) cart[d.dec] = Math.max(0, (cart[d.dec] || 0) - 1);
@@ -313,10 +503,21 @@ document.addEventListener('click', e => {
   else if (b.id === 'exportCsv') exportCsv();
   else if (b.id === 'resetDay') {
     if (!confirm(t('confirmReset'))) return;
-    state = { lang: state.lang, nextNo: 1, orders: [] }; save();
+    if (state.orders.length) state.archive.push({ closedAt: Date.now(), orders: state.orders });
+    state.orders = []; state.nextNo = 1; save();
+    downloadBackup();
   }
+  else if (b.id === 'backupChip') tab = 'cash';
+  else if (b.id === 'downloadBackup') downloadBackup();
+  else if (b.id === 'restoreBtn') { document.getElementById('restoreFile').click(); return; }
+  else if (b.id === 'setupAuto') { setupAutoFile(); return; }
+  else if (b.id === 'resumeAuto') { resumeAutoFile(); return; }
   else return;
   render();
+});
+
+document.addEventListener('change', e => {
+  if (e.target.id === 'restoreFile' && e.target.files[0]) restoreFromFile(e.target.files[0]);
 });
 
 function exportCsv() {
@@ -325,10 +526,7 @@ function exportCsv() {
   state.orders.forEach(o => lines.push([new Date(o.time).toLocaleString('ja-JP'), o.no,
     ...cols.map(c => o.items[c] || 0), o.status, o.total].join(',')));
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `yakitori-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click(); URL.revokeObjectURL(a.href);
+  download(blob, `yakitori-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 render();
