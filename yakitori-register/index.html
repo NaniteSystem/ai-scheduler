@@ -128,13 +128,13 @@ const PRODUCTS = [
   { id: 'negi',   ja: 'ねぎ',     ru: 'Нэги (с луком)',     en: 'Negi (with leek)' },
   { id: 'bonjiri',ja: 'ボンジリ', ru: 'Бондзири (хвостик)', en: 'Bonjiri (tail)' },
 ];
-const FLAVORS = ['shio', 'tare'];
+const FLAVORS = ['shio', 'tare', 'none'];
 const UNIT = 100, SET_SIZE = 4, SET_PRICE = 300;
 
 const I18N = {
   ja: {
-    title: '焼き鳥 レジ', newOrder: '新しい注文', shio: '塩', tare: 'タレ',
-    rule: '1本100円・どれでも4本で300円（塩・タレ同じ値段）', total: '合計', clear: 'クリア', pay: '会計する',
+    title: '焼き鳥 レジ', newOrder: '新しい注文', shio: '塩', tare: 'タレ', none: 'なし',
+    rule: '1本100円・どれでも4本で300円（塩・タレ・なし同じ値段）', total: '合計', clear: 'クリア', pay: '会計する',
     active: '受付中', history: '履歴', sales: '売上', done: '渡した', cancel: '取消',
     noActive: '受付中の注文はありません', noHistory: 'まだ履歴はありません',
     set: '4本セット', single: '単品', pcs: '本', time: '時刻', order: '注文', items: '内容', sum: '金額',
@@ -144,8 +144,8 @@ const I18N = {
     confirmReset: '全ての注文・履歴を削除します。よろしいですか？', byItem: '商品別',
   },
   ru: {
-    title: 'Якитори — касса', newOrder: 'Новый заказ', shio: 'Соль', tare: 'Тарэ',
-    rule: '1 шт. — 100 ¥ · любые 4 шт. — 300 ¥ (соль/тарэ — цена одна)', total: 'Итого', clear: 'Очистить', pay: 'Оплачено',
+    title: 'Якитори — касса', newOrder: 'Новый заказ', shio: 'Соль', tare: 'Тарэ', none: 'Без',
+    rule: '1 шт. — 100 ¥ · любые 4 шт. — 300 ¥ (соль / тарэ / без — цена одна)', total: 'Итого', clear: 'Очистить', pay: 'Оплачено',
     active: 'Заказы', history: 'История', sales: 'Выручка', done: 'Выдан', cancel: 'Отмена',
     noActive: 'Нет текущих заказов', noHistory: 'История пока пуста',
     set: 'набор из 4', single: 'поштучно', pcs: 'шт.', time: 'Время', order: 'Заказ', items: 'Состав', sum: 'Сумма',
@@ -155,8 +155,8 @@ const I18N = {
     confirmReset: 'Удалить все заказы и историю? Это нельзя отменить.', byItem: 'По видам',
   },
   en: {
-    title: 'Yakitori Register', newOrder: 'New order', shio: 'Salt', tare: 'Tare',
-    rule: '¥100 each · any 4 for ¥300 (salt or tare, same price)', total: 'Total', clear: 'Clear', pay: 'Paid',
+    title: 'Yakitori Register', newOrder: 'New order', shio: 'Salt', tare: 'Tare', none: 'Plain',
+    rule: '¥100 each · any 4 for ¥300 (salt, tare or plain, same price)', total: 'Total', clear: 'Clear', pay: 'Paid',
     active: 'Orders', history: 'History', sales: 'Sales', done: 'Handed', cancel: 'Cancel',
     noActive: 'No open orders', noHistory: 'No history yet',
     set: 'set of 4', single: 'single', pcs: 'pcs', time: 'Time', order: 'Order', items: 'Items', sum: 'Amount',
@@ -281,7 +281,7 @@ function renderSales() {
       ${PRODUCTS.map(p => {
         const q = FLAVORS.map(f => per[`${p.id}:${f}`] || 0);
         return `<tr><td>${p.ja}${state.lang === 'ja' ? '' : ' — ' + p[state.lang]}</td>
-          ${q.map(x => `<td class="num">${x}</td>`).join('')}<td class="num"><b>${q[0] + q[1]}</b></td></tr>`;
+          ${q.map(x => `<td class="num">${x}</td>`).join('')}<td class="num"><b>${q.reduce((a, b) => a + b, 0)}</b></td></tr>`;
       }).join('')}
     </table>
     <div class="row" style="margin-top:20px">
