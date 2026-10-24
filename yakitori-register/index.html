@@ -31,7 +31,8 @@
   .prod.has { border-color: var(--accent); background: var(--soft); }
   .prod .name { font-size: 22px; font-weight: 700; }
   .prod .sub { color: var(--muted); font-size: 13px; min-height: 18px; }
-  .qty { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
+  .qty { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+  .qty .fl { min-width: 44px; font-weight: 700; font-size: 15px; text-align: left; }
   .qty button { width: 52px; height: 52px; font-size: 26px; border-radius: 12px; border: none; cursor: pointer;
     background: var(--ink); color: #fff; }
   .qty button.minus { background: #d6cbbf; color: var(--ink); }
@@ -41,14 +42,6 @@
     padding-top: 12px; border-top: 1px dashed var(--line); }
   .total .big { font-size: 34px; font-weight: 800; color: var(--accent); }
   .breakdown { color: var(--muted); font-size: 14px; }
-  .pay { margin-top: 12px; }
-  .pay label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
-  .pay input { width: 100%; font-size: 24px; padding: 8px 10px; border: 2px solid var(--line); border-radius: 10px; }
-  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .quick button { flex: 1 1 auto; padding: 10px 8px; border: 1px solid var(--line); background: var(--card);
-    border-radius: 10px; font-size: 15px; cursor: pointer; }
-  .change { font-size: 20px; margin-top: 10px; font-weight: 700; }
-  .change.short { color: var(--bad); }
   .actions { display: flex; gap: 8px; margin-top: 14px; }
   .btn { padding: 14px 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 700; cursor: pointer; }
   .btn.primary { background: var(--accent); color: var(--accent-ink); flex: 1; }
@@ -85,7 +78,7 @@
 <body>
 <header>
   <h1 data-t="title"></h1>
-  <div class="cashbox"><span data-t="inRegister"></span>: <span id="cashTop"></span></div>
+  <div class="cashbox"><span data-t="sales"></span>: <span id="cashTop"></span></div>
   <div class="langs">
     <button data-lang="ja">日本語</button>
     <button data-lang="ru">Русский</button>
@@ -108,12 +101,6 @@
       <div class="big" id="total">¥0</div>
     </div>
 
-    <div class="pay">
-      <label for="received" data-t="received"></label>
-      <input id="received" type="number" inputmode="numeric" min="0" step="10" placeholder="0">
-      <div class="quick" id="quick"></div>
-      <div class="change" id="change"></div>
-    </div>
 
     <div class="actions">
       <button class="btn ghost" id="clearBtn" data-t="clear"></button>
@@ -126,7 +113,7 @@
     <div class="tabs">
       <button data-tab="active"><span data-t="active"></span> (<span id="activeCount">0</span>)</button>
       <button data-tab="history" data-t="history"></button>
-      <button data-tab="cash" data-t="cash"></button>
+      <button data-tab="cash" data-t="sales"></button>
     </div>
     <div id="tab-active" class="scroll"></div>
     <div id="tab-history" class="scroll"></div>
@@ -136,69 +123,59 @@
 
 <script>
 const PRODUCTS = [
-  { id: 'momo',   ja: 'もも',     ru: 'Момо (бедро)',     en: 'Momo (thigh)' },
-  { id: 'kawa',   ja: 'かわ',     ru: 'Кава (кожа)',      en: 'Kawa (skin)' },
-  { id: 'negi',   ja: 'ねぎ',     ru: 'Нэги (с луком)',   en: 'Negi (with leek)' },
+  { id: 'momo',   ja: 'もも',     ru: 'Момо (бедро)',       en: 'Momo (thigh)' },
+  { id: 'kawa',   ja: 'かわ',     ru: 'Кава (кожа)',        en: 'Kawa (skin)' },
+  { id: 'negi',   ja: 'ねぎ',     ru: 'Нэги (с луком)',     en: 'Negi (with leek)' },
   { id: 'bonjiri',ja: 'ボンジリ', ru: 'Бондзири (хвостик)', en: 'Bonjiri (tail)' },
 ];
+const FLAVORS = ['shio', 'tare'];
 const UNIT = 100, SET_SIZE = 4, SET_PRICE = 300;
 
 const I18N = {
   ja: {
-    title: '焼き鳥 レジ', inRegister: 'レジ内', newOrder: '新しい注文',
-    rule: '1本100円・どれでも4本で300円', total: '合計', received: 'お預かり',
-    exact: 'ちょうど', change: 'おつり', short: '不足', clear: 'クリア', pay: '会計する',
-    active: '受付中', history: '履歴', cash: 'レジ', done: '渡した', cancel: '取消',
+    title: '焼き鳥 レジ', newOrder: '新しい注文', shio: '塩', tare: 'タレ',
+    rule: '1本100円・どれでも4本で300円（塩・タレ同じ値段）', total: '合計', clear: 'クリア', pay: '会計する',
+    active: '受付中', history: '履歴', sales: '売上', done: '渡した', cancel: '取消',
     noActive: '受付中の注文はありません', noHistory: 'まだ履歴はありません',
     set: '4本セット', single: '単品', pcs: '本', time: '時刻', order: '注文', items: '内容', sum: '金額',
     status: '状態', stDone: '完了', stCancelled: '取消', stActive: '受付中',
-    confirmCancel: '注文 #{n} を取り消して ¥{s} を返金しますか？',
-    startCash: '釣り銭準備金', sales: '売上', orders: '注文数', sticks: '販売本数',
-    save: '保存', adjust: '入出金', adjustHint: '例: -5000 (取り出し)', apply: '反映',
-    exportCsv: 'CSV保存', resetDay: '一日をリセット',
-    confirmReset: '全ての注文・履歴を削除します。よろしいですか？',
-    adjustment: '入出金', byItem: '商品別',
+    confirmCancel: '注文 #{n}（¥{s}）を取り消しますか？',
+    orders: '注文数', sticks: '販売本数', product: '商品', exportCsv: 'CSV保存', resetDay: '一日をリセット',
+    confirmReset: '全ての注文・履歴を削除します。よろしいですか？', byItem: '商品別',
   },
   ru: {
-    title: 'Якитори — касса', inRegister: 'В кассе', newOrder: 'Новый заказ',
-    rule: '1 шт. — 100 ¥ · любые 4 шт. — 300 ¥', total: 'Итого', received: 'Получено от клиента',
-    exact: 'Без сдачи', change: 'Сдача', short: 'Не хватает', clear: 'Очистить', pay: 'Оплатить',
-    active: 'Заказы', history: 'История', cash: 'Касса', done: 'Выдан', cancel: 'Отмена',
+    title: 'Якитори — касса', newOrder: 'Новый заказ', shio: 'Соль', tare: 'Тарэ',
+    rule: '1 шт. — 100 ¥ · любые 4 шт. — 300 ¥ (соль/тарэ — цена одна)', total: 'Итого', clear: 'Очистить', pay: 'Оплачено',
+    active: 'Заказы', history: 'История', sales: 'Выручка', done: 'Выдан', cancel: 'Отмена',
     noActive: 'Нет текущих заказов', noHistory: 'История пока пуста',
     set: 'набор из 4', single: 'поштучно', pcs: 'шт.', time: 'Время', order: 'Заказ', items: 'Состав', sum: 'Сумма',
     status: 'Статус', stDone: 'Выдан', stCancelled: 'Отменён', stActive: 'Готовится',
-    confirmCancel: 'Отменить заказ #{n} и вернуть ¥{s}?',
-    startCash: 'Размен на начало', sales: 'Выручка', orders: 'Заказов', sticks: 'Продано шт.',
-    save: 'Сохранить', adjust: 'Внесение / изъятие', adjustHint: 'напр. -5000 (изъятие)', apply: 'Применить',
-    exportCsv: 'Сохранить CSV', resetDay: 'Сбросить день',
-    confirmReset: 'Удалить все заказы и историю? Это нельзя отменить.',
-    adjustment: 'Корректировка', byItem: 'По видам',
+    confirmCancel: 'Отменить заказ #{n} (¥{s})?',
+    orders: 'Заказов', sticks: 'Продано шт.', product: 'Товар', exportCsv: 'Сохранить CSV', resetDay: 'Сбросить день',
+    confirmReset: 'Удалить все заказы и историю? Это нельзя отменить.', byItem: 'По видам',
   },
   en: {
-    title: 'Yakitori Register', inRegister: 'In register', newOrder: 'New order',
-    rule: '¥100 each · any 4 for ¥300', total: 'Total', received: 'Cash received',
-    exact: 'Exact', change: 'Change', short: 'Short by', clear: 'Clear', pay: 'Pay',
-    active: 'Orders', history: 'History', cash: 'Cash', done: 'Handed', cancel: 'Cancel',
+    title: 'Yakitori Register', newOrder: 'New order', shio: 'Salt', tare: 'Tare',
+    rule: '¥100 each · any 4 for ¥300 (salt or tare, same price)', total: 'Total', clear: 'Clear', pay: 'Paid',
+    active: 'Orders', history: 'History', sales: 'Sales', done: 'Handed', cancel: 'Cancel',
     noActive: 'No open orders', noHistory: 'No history yet',
     set: 'set of 4', single: 'single', pcs: 'pcs', time: 'Time', order: 'Order', items: 'Items', sum: 'Amount',
     status: 'Status', stDone: 'Done', stCancelled: 'Cancelled', stActive: 'Open',
-    confirmCancel: 'Cancel order #{n} and refund ¥{s}?',
-    startCash: 'Starting float', sales: 'Sales', orders: 'Orders', sticks: 'Sticks sold',
-    save: 'Save', adjust: 'Cash in / out', adjustHint: 'e.g. -5000 (take out)', apply: 'Apply',
-    exportCsv: 'Export CSV', resetDay: 'Reset day',
-    confirmReset: 'Delete all orders and history? This cannot be undone.',
-    adjustment: 'Adjustment', byItem: 'By item',
+    confirmCancel: 'Cancel order #{n} (¥{s})?',
+    orders: 'Orders', sticks: 'Sticks sold', product: 'Item', exportCsv: 'Export CSV', resetDay: 'Reset day',
+    confirmReset: 'Delete all orders and history? This cannot be undone.', byItem: 'By item',
   },
 };
 
 // ---------- state (saved in this browser, works offline) ----------
-const KEY = 'yakitori-register-v1';
+// order.items is keyed "productId:flavor", e.g. { "momo:shio": 2, "kawa:tare": 1 }
+const KEY = 'yakitori-register-v2';
 let state = load();
 let cart = {};
 let tab = 'active';
 
 function load() {
-  const def = { lang: 'ja', startCash: 0, nextNo: 1, orders: [], adjustments: [] };
+  const def = { lang: 'ja', nextNo: 1, orders: [] };
   try { return Object.assign(def, JSON.parse(localStorage.getItem(KEY)) || {}); }
   catch { return def; }
 }
@@ -212,16 +189,14 @@ function price(n) {
   const sets = Math.floor(n / SET_SIZE), rest = n % SET_SIZE;
   return { sets, rest, total: sets * SET_PRICE + rest * UNIT };
 }
-const itemsText = items => Object.entries(items).filter(([, q]) => q > 0)
-  .map(([id, q]) => `${pname(id)} ×${q}`).join(', ');
+const itemsText = items => Object.entries(items).filter(([, q]) => q > 0).map(([key, q]) => {
+  const [id, fl] = key.split(':');
+  return state.lang === 'ja' ? `${pname(id)}（${t(fl)}）×${q}` : `${pname(id)} · ${t(fl)} ×${q}`;
+}).join(', ');
 const timeText = ts => new Date(ts).toLocaleTimeString(state.lang === 'en' ? 'en-GB' : state.lang,
   { hour: '2-digit', minute: '2-digit' });
-
-function cashInRegister() {
-  const sales = state.orders.filter(o => o.status !== 'cancelled').reduce((a, o) => a + o.total, 0);
-  const adj = state.adjustments.reduce((a, x) => a + x.amount, 0);
-  return state.startCash + sales + adj;
-}
+const validOrders = () => state.orders.filter(o => o.status !== 'cancelled');
+const totalSales = () => validOrders().reduce((a, o) => a + o.total, 0);
 
 // ---------- rendering ----------
 function render() {
@@ -231,21 +206,25 @@ function render() {
   document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === state.lang));
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   ['active', 'history', 'cash'].forEach(x => document.getElementById('tab-' + x).hidden = x !== tab);
-  document.getElementById('cashTop').textContent = yen(cashInRegister());
-  renderProducts(); renderTotal(); renderActive(); renderHistory(); renderCash();
+  document.getElementById('cashTop').textContent = yen(totalSales());
+  renderProducts(); renderTotal(); renderActive(); renderHistory(); renderSales();
 }
 
 function renderProducts() {
   document.getElementById('products').innerHTML = PRODUCTS.map(p => {
-    const q = cart[p.id] || 0;
+    const has = FLAVORS.some(f => cart[`${p.id}:${f}`]);
     const sub = state.lang === 'ja' ? '' : p[state.lang];
-    return `<div class="prod ${q ? 'has' : ''}">
+    return `<div class="prod ${has ? 'has' : ''}">
       <div class="name">${p.ja}</div><div class="sub">${sub}</div>
-      <div class="qty">
-        <button class="minus" data-dec="${p.id}" aria-label="-">−</button>
-        <span>${q}</span>
-        <button data-inc="${p.id}" aria-label="+">+</button>
-      </div></div>`;
+      ${FLAVORS.map(f => {
+        const key = `${p.id}:${f}`;
+        return `<div class="qty">
+          <span class="fl">${t(f)}</span>
+          <button class="minus" data-dec="${key}" aria-label="-">−</button>
+          <span>${cart[key] || 0}</span>
+          <button data-inc="${key}" aria-label="+">+</button>
+        </div>`;
+      }).join('')}</div>`;
   }).join('');
 }
 
@@ -256,19 +235,8 @@ function renderTotal() {
   if (p.sets) parts.push(`${t('set')} ×${p.sets} = ${yen(p.sets * SET_PRICE)}`);
   if (p.rest) parts.push(`${t('single')} ×${p.rest} = ${yen(p.rest * UNIT)}`);
   document.getElementById('breakdown').textContent = n ? `${n} ${t('pcs')} · ${parts.join(' + ')}` : '';
-
-  const quick = [p.total, 500, 1000, 2000, 5000, 10000].filter((v, i, a) => v > 0 && a.indexOf(v) === i);
-  document.getElementById('quick').innerHTML = quick.map((v, i) =>
-    `<button data-recv="${v}">${i === 0 && v === p.total ? t('exact') : yen(v)}</button>`).join('');
-
-  const recv = Number(document.getElementById('received').value) || 0;
-  const ch = document.getElementById('change');
-  if (!n || !recv) { ch.textContent = ''; ch.className = 'change'; }
-  else if (recv >= p.total) { ch.textContent = `${t('change')}: ${yen(recv - p.total)}`; ch.className = 'change'; }
-  else { ch.textContent = `${t('short')}: ${yen(p.total - recv)}`; ch.className = 'change short'; }
-
-  document.getElementById('payBtn').disabled = !n || (recv > 0 && recv < p.total);
-  document.getElementById('clearBtn').disabled = !n && !recv;
+  document.getElementById('payBtn').disabled = !n;
+  document.getElementById('clearBtn').disabled = !n;
 }
 
 function renderActive() {
@@ -286,42 +254,36 @@ function renderActive() {
 }
 
 function renderHistory() {
-  const rows = [
-    ...state.orders.map(o => ({ time: o.time, html: `<tr class="${o.status === 'cancelled' ? 'cancelled' : ''}">
-      <td>${timeText(o.time)}</td><td>#${o.no}</td><td>${itemsText(o.items)}</td>
-      <td>${t(o.status === 'done' ? 'stDone' : o.status === 'cancelled' ? 'stCancelled' : 'stActive')}</td>
-      <td class="num">${yen(o.total)}</td></tr>` })),
-    ...state.adjustments.map(a => ({ time: a.time, html: `<tr>
-      <td>${timeText(a.time)}</td><td>—</td><td>${t('adjustment')}</td><td></td>
-      <td class="num">${a.amount > 0 ? '+' : ''}${yen(a.amount)}</td></tr>` })),
-  ].sort((a, b) => b.time - a.time);
+  const rows = [...state.orders].sort((a, b) => b.time - a.time);
   document.getElementById('tab-history').innerHTML = rows.length ? `<table>
     <tr><th>${t('time')}</th><th>${t('order')}</th><th>${t('items')}</th><th>${t('status')}</th><th class="num">${t('sum')}</th></tr>
-    ${rows.map(r => r.html).join('')}</table>` : `<p class="empty">${t('noHistory')}</p>`;
+    ${rows.map(o => `<tr class="${o.status === 'cancelled' ? 'cancelled' : ''}">
+      <td>${timeText(o.time)}</td><td>#${o.no}</td><td>${itemsText(o.items)}</td>
+      <td>${t(o.status === 'done' ? 'stDone' : o.status === 'cancelled' ? 'stCancelled' : 'stActive')}</td>
+      <td class="num">${yen(o.total)}</td></tr>`).join('')}</table>`
+    : `<p class="empty">${t('noHistory')}</p>`;
 }
 
-function renderCash() {
-  const valid = state.orders.filter(o => o.status !== 'cancelled');
-  const sales = valid.reduce((a, o) => a + o.total, 0);
+function renderSales() {
+  const valid = validOrders();
   const per = {};
-  PRODUCTS.forEach(p => per[p.id] = 0);
-  valid.forEach(o => Object.entries(o.items).forEach(([id, q]) => per[id] += q));
+  valid.forEach(o => Object.entries(o.items).forEach(([k, q]) => per[k] = (per[k] || 0) + q));
   const sticks = Object.values(per).reduce((a, b) => a + b, 0);
   document.getElementById('tab-cash').innerHTML = `
     <div class="stats">
-      <div class="stat"><div class="k">${t('inRegister')}</div><div class="v">${yen(cashInRegister())}</div></div>
-      <div class="stat"><div class="k">${t('sales')}</div><div class="v">${yen(sales)}</div></div>
+      <div class="stat"><div class="k">${t('sales')}</div><div class="v">${yen(totalSales())}</div></div>
       <div class="stat"><div class="k">${t('orders')}</div><div class="v">${valid.length}</div></div>
       <div class="stat"><div class="k">${t('sticks')}</div><div class="v">${sticks}</div></div>
     </div>
     <h2>${t('byItem')}</h2>
-    <table>${PRODUCTS.map(p => `<tr><td>${p.ja}${state.lang === 'ja' ? '' : ' — ' + p[state.lang]}</td><td class="num">${per[p.id]} ${t('pcs')}</td></tr>`).join('')}</table>
-    <div class="row"><label>${t('startCash')}:</label>
-      <input id="startCash" type="number" inputmode="numeric" value="${state.startCash}">
-      <button class="small plain" id="saveStart">${t('save')}</button></div>
-    <div class="row"><label>${t('adjust')}:</label>
-      <input id="adjAmount" type="number" inputmode="numeric" placeholder="${t('adjustHint')}">
-      <button class="small plain" id="applyAdj">${t('apply')}</button></div>
+    <table>
+      <tr><th>${t('product')}</th>${FLAVORS.map(f => `<th class="num">${t(f)}</th>`).join('')}<th class="num">${t('total')}</th></tr>
+      ${PRODUCTS.map(p => {
+        const q = FLAVORS.map(f => per[`${p.id}:${f}`] || 0);
+        return `<tr><td>${p.ja}${state.lang === 'ja' ? '' : ' — ' + p[state.lang]}</td>
+          ${q.map(x => `<td class="num">${x}</td>`).join('')}<td class="num"><b>${q[0] + q[1]}</b></td></tr>`;
+      }).join('')}
+    </table>
     <div class="row" style="margin-top:20px">
       <button class="small plain" id="exportCsv">${t('exportCsv')}</button>
       <button class="small bad" id="resetDay">${t('resetDay')}</button></div>`;
@@ -335,42 +297,33 @@ document.addEventListener('click', e => {
   else if (d.tab) tab = d.tab;
   else if (d.inc) cart[d.inc] = (cart[d.inc] || 0) + 1;
   else if (d.dec) cart[d.dec] = Math.max(0, (cart[d.dec] || 0) - 1);
-  else if (d.recv) document.getElementById('received').value = d.recv;
   else if (d.done) { state.orders.find(o => o.no == d.done).status = 'done'; save(); }
   else if (d.cancel) {
     const o = state.orders.find(o => o.no == d.cancel);
     if (!confirm(t('confirmCancel').replace('{n}', o.no).replace('{s}', o.total))) return;
     o.status = 'cancelled'; save();
   }
-  else if (b.id === 'clearBtn') { cart = {}; document.getElementById('received').value = ''; }
+  else if (b.id === 'clearBtn') cart = {};
   else if (b.id === 'payBtn') {
     const n = count(cart); if (!n) return;
-    const items = {}; Object.entries(cart).forEach(([id, q]) => { if (q) items[id] = q; });
+    const items = {}; Object.entries(cart).forEach(([k, q]) => { if (q) items[k] = q; });
     state.orders.push({ no: state.nextNo++, items, total: price(n).total, time: Date.now(), status: 'active' });
-    save(); cart = {}; document.getElementById('received').value = ''; tab = 'active';
-  }
-  else if (b.id === 'saveStart') { state.startCash = Number(document.getElementById('startCash').value) || 0; save(); }
-  else if (b.id === 'applyAdj') {
-    const amount = Number(document.getElementById('adjAmount').value) || 0;
-    if (amount) { state.adjustments.push({ amount, time: Date.now() }); save(); }
+    save(); cart = {}; tab = 'active';
   }
   else if (b.id === 'exportCsv') exportCsv();
   else if (b.id === 'resetDay') {
     if (!confirm(t('confirmReset'))) return;
-    state = Object.assign(load(), { nextNo: 1, orders: [], adjustments: [] }); save();
+    state = { lang: state.lang, nextNo: 1, orders: [] }; save();
   }
   else return;
   render();
 });
-document.getElementById('received').addEventListener('input', renderTotal);
 
 function exportCsv() {
-  const head = ['time', 'order', ...PRODUCTS.map(p => p.id), 'status', 'amount'];
-  const lines = [head.join(',')];
+  const cols = PRODUCTS.flatMap(p => FLAVORS.map(f => `${p.id}:${f}`));
+  const lines = [['time', 'order', ...cols, 'status', 'amount'].join(',')];
   state.orders.forEach(o => lines.push([new Date(o.time).toLocaleString('ja-JP'), o.no,
-    ...PRODUCTS.map(p => o.items[p.id] || 0), o.status, o.total].join(',')));
-  state.adjustments.forEach(a => lines.push([new Date(a.time).toLocaleString('ja-JP'), '',
-    ...PRODUCTS.map(() => ''), 'adjustment', a.amount].join(',')));
+    ...cols.map(c => o.items[c] || 0), o.status, o.total].join(',')));
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
